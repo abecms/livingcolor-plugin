@@ -24,24 +24,16 @@ def _run_scheduled_daily_analysis() -> None:
 def bootstrap_livingcolor_server() -> None:
     """Wire delivery runtime API dependencies to server-owned services."""
     global _scheduler
+    from jira_dashboard.compat import install_hermes_cli_jira_dashboard_shim
+
+    install_hermes_cli_jira_dashboard_shim()
+
     from lc_server.env_loader import load_livingcolor_dotenv
 
     load_livingcolor_dotenv(override=True)
 
     from delivery_runtime.api import deps
     from delivery_runtime.persistence.db import init_db
-    from lc_server.bundled_credentials import ensure_bundled_openrouter_credentials
-    from lc_server.model_defaults import ensure_livingcolor_fixed_model
-
-    try:
-        ensure_bundled_openrouter_credentials()
-    except Exception as exc:
-        logger.warning("Could not apply bundled OpenRouter credentials: %s", exc)
-
-    try:
-        ensure_livingcolor_fixed_model()
-    except Exception as exc:
-        logger.warning("Could not apply LivingColor fixed model defaults: %s", exc)
 
     try:
         init_db()
