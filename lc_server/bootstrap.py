@@ -21,7 +21,7 @@ def _run_scheduled_daily_analysis() -> None:
     services.pm_inbox.run_daily_analysis(config.project_key)
 
 
-def bootstrap_lc_server() -> None:
+def bootstrap_livingcolor_server() -> None:
     """Wire delivery runtime API dependencies to server-owned services."""
     global _scheduler
     from lc_server.env_loader import load_livingcolor_dotenv

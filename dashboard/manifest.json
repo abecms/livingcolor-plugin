@@ -1,0 +1,11 @@
+{
+  "name": "livingcolor",
+  "label": "LivingColor",
+  "description": "Autonomous delivery platform — Work Orders, readiness queue, gates, Jira PM dashboard.",
+  "icon": "Palette",
+  "version": "0.1.0",
+  "tab": { "path": "/livingcolor", "position": "end" },
+  "entry": "dist/index.js",
+  "css": "dist/style.css",
+  "api": "plugin_api.py"
+}
