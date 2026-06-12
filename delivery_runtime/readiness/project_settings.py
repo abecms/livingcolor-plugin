@@ -1,0 +1,394 @@
+"""Per-project delivery settings stored in project_mapping.yaml."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any
+
+from delivery_runtime.communication.language import DEFAULT_COMMUNICATION_LANGUAGE, normalize_communication_language
+from delivery_runtime.readiness.project_mapping import load_project_mapping
+from delivery_runtime.readiness.ticket_scope import (
+    TicketScopeConfig,
+    default_ticket_scope,
+    parse_ticket_scope,
+    persist_ticket_scope_for_project,
+    serialize_ticket_scope,
+)
+
+_DEFAULT_SPRINT_DURATION_DAYS = 14
+_DEFAULT_SPRINT_CAPACITY_DAYS = 15.0
+_INTEGRATION_MCP_KEY = "mcp_servers"
+
+
+@dataclass(frozen=True)
+class ProjectDeliverySettings:
+    sprint_duration_days: int = _DEFAULT_SPRINT_DURATION_DAYS
+    sprint_capacity_days: float = _DEFAULT_SPRINT_CAPACITY_DAYS
+    communication_language: str = DEFAULT_COMMUNICATION_LANGUAGE
+
+
+def _normalize_project_key(project_key: str) -> str:
+    return (project_key or "").strip().upper()
+
+
+def _mapping_entry(project_key: str, mapping: dict[str, Any] | None = None) -> dict[str, Any]:
+    root = mapping if mapping is not None else load_project_mapping()
+    if not isinstance(root, dict):
+        return {}
+    block = root.get(project_key) or root.get(project_key.lower()) or {}
+    return block if isinstance(block, dict) else {}
+
+
+def _write_project_mapping(mapping: dict[str, Any]) -> None:
+    try:
+        import yaml
+    except ImportError as exc:
+        raise RuntimeError("PyYAML is required to save project settings") from exc
+
+    from delivery_runtime.persistence.paths import get_project_mapping_path
+
+    path = get_project_mapping_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.safe_dump(mapping, sort_keys=False, allow_unicode=True), encoding="utf-8")
+
+
+def _upsert_mapping_entry(project_key: str, updater) -> dict[str, Any]:
+    key = _normalize_project_key(project_key)
+    if not key:
+        raise ValueError("project_key is required")
+
+    mapping = load_project_mapping()
+    if not isinstance(mapping, dict):
+        mapping = {}
+    entry = _mapping_entry(key, mapping)
+    updater(entry)
+    mapping[key] = entry
+    _write_project_mapping(mapping)
+    return entry
+
+
+def mapping_has_delivery_settings(project_key: str) -> bool:
+    entry = _mapping_entry(_normalize_project_key(project_key))
+    sprint = entry.get("sprint")
+    return isinstance(sprint, dict) and (
+        sprint.get("duration_days") is not None or sprint.get("capacity_days") is not None
+    )
+
+
+def load_project_delivery_settings(project_key: str) -> ProjectDeliverySettings:
+    key = _normalize_project_key(project_key)
+    if not key:
+        return ProjectDeliverySettings()
+
+    entry = _mapping_entry(key)
+    sprint = entry.get("sprint")
+    sprint_map = sprint if isinstance(sprint, dict) else {}
+
+    duration_raw = sprint_map.get("duration_days")
+    capacity_raw = sprint_map.get("capacity_days")
+    language_raw = entry.get("communication_language") or entry.get("communicationLanguage")
+
+    duration = _DEFAULT_SPRINT_DURATION_DAYS
+    if duration_raw is not None:
+        try:
+            duration = max(1, int(duration_raw))
+        except (TypeError, ValueError):
+            pass
+
+    capacity = _DEFAULT_SPRINT_CAPACITY_DAYS
+    if capacity_raw is not None:
+        try:
+            capacity = max(0.5, float(capacity_raw))
+        except (TypeError, ValueError):
+            pass
+
+    return ProjectDeliverySettings(
+        sprint_duration_days=duration,
+        sprint_capacity_days=capacity,
+        communication_language=normalize_communication_language(language_raw),
+    )
+
+
+def persist_project_delivery_settings(
+    *,
+    project_key: str,
+    duration_days: int,
+    capacity_days: float,
+    communication_language: str,
+    ticket_scope: TicketScopeConfig | None = None,
+) -> ProjectDeliverySettings:
+    key = _normalize_project_key(project_key)
+    if not key:
+        raise ValueError("project_key is required")
+
+    resolved_duration = max(1, int(duration_days))
+    resolved_capacity = max(0.5, float(capacity_days))
+    resolved_language = normalize_communication_language(communication_language)
+
+    def _update(entry: dict[str, Any]) -> None:
+        entry["sprint"] = {
+            "duration_days": resolved_duration,
+            "capacity_days": resolved_capacity,
+        }
+        entry["communication_language"] = resolved_language
+
+    _upsert_mapping_entry(key, _update)
+
+    scope = ticket_scope if ticket_scope is not None else default_ticket_scope()
+    persist_ticket_scope_for_project(key, scope)
+
+    return ProjectDeliverySettings(
+        sprint_duration_days=resolved_duration,
+        sprint_capacity_days=resolved_capacity,
+        communication_language=resolved_language,
+    )
+
+
+def load_project_default_repo(project_key: str) -> str | None:
+    entry = _mapping_entry(_normalize_project_key(project_key))
+    raw = str(entry.get("default_repo") or "").strip()
+    return raw or None
+
+
+def load_project_integration_branch(project_key: str) -> str | None:
+    """Return the configured GitLab MR target branch for a project, if set."""
+    from delivery_runtime.readiness.project_mapping import resolve_configured_integration_branch
+
+    return resolve_configured_integration_branch(_normalize_project_key(project_key))
+
+
+def persist_project_integration_branch(project_key: str, integration_branch: str) -> str:
+    key = _normalize_project_key(project_key)
+    branch = (integration_branch or "").strip()
+    if not branch:
+        raise ValueError("integration_branch is required")
+
+    def _update(entry: dict[str, Any]) -> None:
+        entry["integration_branch"] = branch
+
+    _upsert_mapping_entry(key, _update)
+    return branch
+
+
+def load_project_jira_project_key(project_key: str) -> str | None:
+    """Return the linked Jira project key when it differs from the LivingColor project key."""
+    entry = _mapping_entry(_normalize_project_key(project_key))
+    raw = str(entry.get("jira_project_key") or entry.get("jiraProjectKey") or "").strip().upper()
+    return raw or None
+
+
+def resolve_jira_project_key(project_key: str) -> str:
+    """Resolve the Jira project key used for scans and daily analysis."""
+    key = _normalize_project_key(project_key)
+    return load_project_jira_project_key(key) or key
+
+
+def persist_project_jira_project_key(project_key: str, jira_project_key: str) -> str:
+    key = _normalize_project_key(project_key)
+    linked = _normalize_project_key(jira_project_key)
+    if not linked:
+        raise ValueError("jira_project_key is required")
+
+    def _update(entry: dict[str, Any]) -> None:
+        entry["jira_project_key"] = linked
+
+    _upsert_mapping_entry(key, _update)
+    return linked
+
+
+def load_project_gitlab_repos(project_key: str) -> list[dict[str, Any]]:
+    entry = _mapping_entry(_normalize_project_key(project_key))
+    repos = entry.get("repos")
+    if not isinstance(repos, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for item in repos:
+        if not isinstance(item, dict):
+            continue
+        path = str(item.get("path") or "").strip()
+        if not path:
+            continue
+        gitlab_id = item.get("gitlabId")
+        out.append({"path": path, "gitlabId": gitlab_id})
+    return out
+
+
+def persist_project_default_repo(project_key: str, default_repo: str) -> str:
+    key = _normalize_project_key(project_key)
+    repo = (default_repo or "").strip()
+    if not repo:
+        raise ValueError("default_repo is required")
+
+    def _update(entry: dict[str, Any]) -> None:
+        entry["default_repo"] = repo
+
+    _upsert_mapping_entry(key, _update)
+    _sync_provisioned_default_repo(key, repo)
+    return repo
+
+
+def _patch_yaml_context_default_repo(path, default_repo: str) -> None:
+    try:
+        import yaml
+    except ImportError:
+        return
+
+    if not path.is_file():
+        return
+    try:
+        loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except OSError:
+        return
+    if not isinstance(loaded, dict):
+        return
+    context = loaded.get("context")
+    context_map = dict(context) if isinstance(context, dict) else {}
+    context_map["defaultRepo"] = default_repo
+    loaded["context"] = context_map
+    path.write_text(yaml.safe_dump(loaded, sort_keys=False, allow_unicode=True), encoding="utf-8")
+
+
+def _patch_automation_state_default_repo(path, default_repo: str) -> None:
+    try:
+        import yaml
+    except ImportError:
+        return
+
+    if not path.is_file():
+        return
+    try:
+        loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except OSError:
+        return
+    if not isinstance(loaded, dict):
+        return
+    loaded["defaultRepo"] = default_repo
+    path.write_text(yaml.safe_dump(loaded, sort_keys=False, allow_unicode=True), encoding="utf-8")
+
+
+def _sync_provisioned_default_repo(project_key: str, default_repo: str) -> None:
+    from delivery_runtime.agents.paths import VALID_ROLES, get_agent_manifest_path, get_automation_state_path
+
+    for role in VALID_ROLES:
+        _patch_yaml_context_default_repo(get_agent_manifest_path(project_key, role), default_repo)
+    _patch_automation_state_default_repo(get_automation_state_path(project_key), default_repo)
+
+
+def load_project_mcp_servers(project_key: str) -> dict[str, dict[str, Any]]:
+    key = _normalize_project_key(project_key)
+    if not key:
+        return {}
+
+    entry = _mapping_entry(key)
+    integrations = entry.get("integrations")
+    integrations_map = integrations if isinstance(integrations, dict) else {}
+    stored = integrations_map.get(_INTEGRATION_MCP_KEY)
+    if not isinstance(stored, dict):
+        return {}
+
+    out: dict[str, dict[str, Any]] = {}
+    for name, config in stored.items():
+        server_name = str(name).strip()
+        if not server_name or not isinstance(config, dict):
+            continue
+        out[server_name] = dict(config)
+    return out
+
+
+def resolve_project_mcp_server(project_key: str, server_name: str) -> dict[str, Any]:
+    """Return MCP config saved on the project, falling back to global Hermes config."""
+    stored = load_project_mcp_servers(project_key).get(server_name)
+    if isinstance(stored, dict) and stored:
+        return dict(stored)
+
+    try:
+        from hermes_cli.mcp_config import _get_mcp_servers
+
+        global_cfg = _get_mcp_servers().get(server_name)
+        if isinstance(global_cfg, dict) and global_cfg:
+            return dict(global_cfg)
+    except ImportError:
+        pass
+
+    return {}
+
+
+def resolve_jira_browse_base_url(project_key: str) -> str | None:
+    """Return the Jira site URL saved for a project, if any."""
+    servers = load_project_mcp_servers(project_key)
+    jira_cfg = servers.get("jira")
+    if not isinstance(jira_cfg, dict):
+        return None
+
+    env = jira_cfg.get("env")
+    if not isinstance(env, dict):
+        return None
+
+    raw = str(env.get("JIRA_URL") or "").strip()
+    if not raw:
+        return None
+
+    with_protocol = raw if raw.lower().startswith(("http://", "https://")) else f"https://{raw}"
+    return with_protocol if with_protocol.endswith("/") else f"{with_protocol}/"
+
+
+def persist_project_mcp_server(project_key: str, server_name: str, server_config: dict[str, Any]) -> None:
+    key = _normalize_project_key(project_key)
+    name = (server_name or "").strip()
+    if not key or not name:
+        raise ValueError("project_key and server_name are required")
+    if not isinstance(server_config, dict):
+        raise ValueError("server_config must be a mapping")
+
+    def _update(entry: dict[str, Any]) -> None:
+        integrations = entry.get("integrations")
+        integrations_map = integrations if isinstance(integrations, dict) else {}
+        stored = integrations_map.get(_INTEGRATION_MCP_KEY)
+        stored_map = stored if isinstance(stored, dict) else {}
+        stored_map[name] = dict(server_config)
+        integrations_map[_INTEGRATION_MCP_KEY] = stored_map
+        entry["integrations"] = integrations_map
+
+    _upsert_mapping_entry(key, _update)
+
+
+def serialize_delivery_settings_for_share(
+    project_key: str,
+    *,
+    ticket_scope: TicketScopeConfig | None = None,
+) -> dict[str, Any]:
+    from delivery_runtime.automation.config import load_delivery_automation_config
+
+    config = load_delivery_automation_config(project_key=project_key)
+    scope = ticket_scope if ticket_scope is not None else config.ticket_scope or default_ticket_scope()
+    return {
+        "sprintDurationDays": config.sprint.duration_days,
+        "sprintCapacityDays": config.sprint.capacity_days,
+        "communicationLanguage": config.communication_language,
+        "ticketScope": serialize_ticket_scope(scope),
+    }
+
+
+def apply_shared_delivery_settings(project_key: str, payload: dict[str, Any] | None) -> None:
+    if not isinstance(payload, dict):
+        return
+    key = _normalize_project_key(project_key)
+    if not key:
+        return
+
+    duration = payload.get("sprintDurationDays")
+    capacity = payload.get("sprintCapacityDays")
+    language = payload.get("communicationLanguage")
+    scope_raw = payload.get("ticketScope")
+
+    if duration is None and capacity is None and language is None and scope_raw is None:
+        return
+
+    current = load_project_delivery_settings(key)
+    persist_project_delivery_settings(
+        project_key=key,
+        duration_days=int(duration) if duration is not None else current.sprint_duration_days,
+        capacity_days=float(capacity) if capacity is not None else current.sprint_capacity_days,
+        communication_language=str(language) if language is not None else current.communication_language,
+        ticket_scope=parse_ticket_scope(scope_raw) if scope_raw is not None else None,
+    )

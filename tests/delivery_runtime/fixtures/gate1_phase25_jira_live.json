@@ -1,0 +1,103 @@
+[
+  {
+    "snapshot": {
+      "key": "MAM-324",
+      "summary": "Un rendu affiche tous les médias indisponibles sur la durée de la vidéo, refaire le rendu du même projet fonctionne",
+      "description": "Acceptance criteria: rendered video must not show Adobe Media offline when source project is valid in Premiere.\nAprès avoir lancé un rendu sur le projet du document B4KQ363 qui apparaissait correctement dans Premiere, l'éditrice a vérifié dans Iris la vidéo rendue et cette dernière affiche l'écran rouge Media offline d’Adobe sur toute la durée de la vidéo. Render 1780297464807 sur l’AME 03\nRelancer le rendu du même projet exactement (le projet était encore ouvert dans Premiere) a correctement encodé la vidéo (rendu 1780297783709 sur l’AME 02.",
+      "status": "À faire",
+      "issueType": "Bug",
+      "projectKey": "MAM",
+      "priority": "Majeure",
+      "epic": { "key": "MAM-200", "summary": "Iris render stability" },
+      "linkedIssues": [{ "key": "MAM-300", "summary": "AME node failover", "relationship": "relates to" }],
+      "comments": [{ "author": "editor", "body": "Second render on same AME node succeeded without project reload." }]
+    },
+    "expectedRepo": "gitlab.com/afp/mam-iris-panel",
+    "rejectFeedback": "Identify AME panel vs proxy pipeline root cause before coding"
+  },
+  {
+    "snapshot": {
+      "key": "MAM-332",
+      "summary": "Le partial checkin de certains plans perd entièrement le son de certains plans",
+      "description": "Acceptance criteria: partial checkin must preserve audio tracks for all timeline clips.\nObservé avec les plans en pièce jointe.\nJe crée un document vide dans le SR et l'édite dans Premiere.\nJe place dans le chutier et sur la timeline tous les plans (avec ou sans point d’entrée et de sortie : les placer en entier reproduit également le problème).\nJe lance le rendu qui effectue le partial checkin : suite au remplacement des plans avec ceux générés par le media encoder local, je vois qu’il n’y a plus de soundwave sur aucun plan sauf le C9304.",
+      "status": "À faire",
+      "issueType": "Bug",
+      "projectKey": "MAM",
+      "priority": "Majeure"
+    },
+    "expectedRepo": "gitlab.com/afp/mam-iris-panel"
+  },
+  {
+    "snapshot": {
+      "key": "MAM-330",
+      "summary": "Erreur Update asset metadata bloquant deux rendus successifs",
+      "description": "Acceptance criteria: render must not fail when Flex workflow variables are defined.\nAu moment de faire un rendu du montage pour le document B6B87WE les rendus 1780871281113 et 1780871598278  ont été interrompus par une erreur Failed - AME Panel couldn’t find media files: Audio 2.wav\nEn consultant le core de flex je trouve deux workflows 817550 et 817820 en erreur au nom de l'éditrice dont l’heure concorde avec les rendus indiquant tous les deux l’erreur suivante\nJob: 817742 failed execution in job node or JAE - FlexSdkException: No variable exists with name: link-projects",
+      "status": "À faire",
+      "issueType": "Bug",
+      "projectKey": "MAM",
+      "priority": "Majeure"
+    },
+    "expectedRepo": "gitlab.com/afp/mam-iris-panel",
+    "rejectFeedback": "Map the failing Flex workflow variable link-projects to repository modules"
+  },
+  {
+    "snapshot": {
+      "key": "MAM-328",
+      "summary": "Lenteurs extrêmes du panel pour importer ou rendre un projet lorsque le répertoire DATA/Dalet/localStorage se remplit",
+      "description": "Acceptance criteria: panel operations must stay responsive when localStorage cache is pruned.\nConstaté en test chez Nafa puis sur le desk de Hong Kong chez Isabel Bonnet.\nA partir d’un certain niveau de remplissage du répertoire localStorage utiliser le panel est extrêmement lent (plusieurs minutes) pour chaque tâche : l’ouverture de deeplink d’un projet, le calcul des partial checkin ou checkin à effectuer pour cliquer sur un rendu, chacune des étapes d’un rendu.",
+      "status": "À faire",
+      "issueType": "Bug",
+      "projectKey": "MAM",
+      "priority": "Majeure"
+    },
+    "expectedRepo": "gitlab.com/afp/mam-iris-panel"
+  },
+  {
+    "snapshot": {
+      "key": "PDA-808",
+      "summary": "Gestion SARD gestion des CRA : ingestion des données avec dbt/airflow sur la couche gold snowflake",
+      "description": "Acceptance criteria: CRA ingestion pipeline lands validated rows in GLD_COM gold tables.",
+      "status": "À faire",
+      "issueType": "Tâche",
+      "projectKey": "PDA",
+      "priority": "Highest"
+    },
+    "expectedRepo": "gitlab.com/afp/pda-data-platform"
+  },
+  {
+    "snapshot": {
+      "key": "PDA-809",
+      "summary": "Erreur d'execution d'un NoteBook migré sur Workspace depuis le Scheduler",
+      "description": "Acceptance criteria: scheduler-triggered notebook runs must return explicit platform errors.\nL’execution d’un scheduler simple pour lancer un Notebook tombe systématiquement en erreur.\nLe message d’erreur affiché n’est pas explicite, il dir juste qu’une erreur interne s’est produite sans savoir laquelle",
+      "status": "À faire",
+      "issueType": "Tâche",
+      "projectKey": "PDA",
+      "priority": "Highest"
+    },
+    "expectedRepo": "gitlab.com/afp/pda-data-platform"
+  },
+  {
+    "snapshot": {
+      "key": "BOAE-236",
+      "summary": "Migrer les requêtes Text, Graphics, Videos et Web Stories de Search vers la FAR",
+      "description": "Acceptance criteria: Search query families are migrated to FAR endpoints with parity tests.",
+      "status": "À faire",
+      "issueType": "Tâche",
+      "projectKey": "BOAE",
+      "priority": "Highest"
+    },
+    "expectedRepo": "gitlab.com/afp/boae-news-api"
+  },
+  {
+    "snapshot": {
+      "key": "BOAE-235",
+      "summary": "ajouter le champ targetField dans les requêtes vers news",
+      "description": "Acceptance criteria: news queries expose targetField in request payload and response mapping.",
+      "status": "À faire",
+      "issueType": "Tâche",
+      "projectKey": "BOAE",
+      "priority": "Highest"
+    },
+    "expectedRepo": "gitlab.com/afp/boae-news-api"
+  }
+]

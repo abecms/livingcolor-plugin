@@ -1,0 +1,49 @@
+# Phase 2.5 validation mapping — checkout paths resolved at runtime.
+
+MAM:
+  default_repo: gitlab.com/afp/mam-iris-panel
+  conventions:
+    - TypeScript strict mode for Premiere panel code
+    - Add regression tests for render and partial checkin flows
+  repos:
+    gitlab.com/afp/mam-iris-panel:
+      checkout_path: "{fixtures_root}/repos/mam-iris-panel"
+
+PDA:
+  default_repo: gitlab.com/afp/pda-data-platform
+  conventions:
+    - dbt models require schema tests on gold tables
+    - Airflow DAG changes need backfill notes in MR
+  repos:
+    gitlab.com/afp/pda-data-platform:
+      checkout_path: "{fixtures_root}/repos/pda-data-platform"
+
+BOAE:
+  default_repo: gitlab.com/afp/boae-news-api
+  conventions:
+    - API query changes require contract tests
+  repos:
+    gitlab.com/afp/boae-news-api:
+      checkout_path: "{fixtures_root}/repos/boae-news-api"
+
+AAC:
+  default_repo: gitlab.com/org/app
+  repos:
+    gitlab.com/org/app:
+      checkout_path: "{fixtures_root}/repos/app"
+
+TVP:
+  default_repo: gitlab.com/org/app
+  conventions:
+    - Frontend-only changes should stay in panel modules with vitest coverage
+  repos:
+    gitlab.com/org/app:
+      checkout_path: "{fixtures_root}/repos/app"
+
+FOOD:
+  default_repo: gitlab.com/org/app
+  conventions:
+    - Checkout bug fixes require basket total regression tests
+  repos:
+    gitlab.com/org/app:
+      checkout_path: "{fixtures_root}/repos/app"

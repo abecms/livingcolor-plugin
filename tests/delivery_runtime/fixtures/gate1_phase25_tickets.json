@@ -1,0 +1,101 @@
+[
+  {
+    "snapshot": {
+      "key": "AAC-101",
+      "summary": "Implement OAuth callback persistence",
+      "description": "Acceptance criteria: store OAuth tokens after callback completes. Given a successful OAuth redirect, when the callback endpoint is hit, then tokens are persisted securely.",
+      "status": "To Do",
+      "issueType": "Story",
+      "projectKey": "AAC",
+      "priority": "High"
+    },
+    "expectedRepo": "gitlab.com/org/backend-api",
+    "rejectFeedback": "Add migration plan for token storage schema"
+  },
+  {
+    "snapshot": {
+      "key": "AAC-102",
+      "summary": "Expose health endpoint for deployment probes",
+      "description": "Acceptance criteria: GET /health returns 200 with service version and database connectivity.",
+      "status": "To Do",
+      "issueType": "Task",
+      "projectKey": "AAC",
+      "priority": "Medium"
+    },
+    "expectedRepo": "gitlab.com/org/backend-api"
+  },
+  {
+    "snapshot": {
+      "key": "AAC-103",
+      "summary": "Fix login redirect loop on Safari",
+      "description": "Users on Safari bounce between /login and /dashboard after SSO. Acceptance criteria: successful login lands on dashboard once.",
+      "status": "In Progress",
+      "issueType": "Bug",
+      "projectKey": "AAC",
+      "priority": "High"
+    },
+    "expectedRepo": "gitlab.com/org/web-app",
+    "rejectFeedback": "Mention cookie SameSite handling explicitly"
+  },
+  {
+    "snapshot": {
+      "key": "AAC-104",
+      "summary": "Update dashboard widgets",
+      "description": "Refresh widget layout.",
+      "status": "To Do",
+      "issueType": "Story",
+      "projectKey": "AAC",
+      "priority": "Low"
+    },
+    "expectedRepo": "gitlab.com/org/web-app"
+  },
+  {
+    "snapshot": {
+      "key": "AAC-105",
+      "summary": "Add GitLab pipeline badge to README",
+      "description": "Acceptance criteria: README shows main branch pipeline status badge linked to GitLab.",
+      "status": "To Do",
+      "issueType": "Task",
+      "projectKey": "AAC",
+      "priority": "Low"
+    },
+    "expectedRepo": "gitlab.com/org/backend-api"
+  },
+  {
+    "snapshot": {
+      "key": "AAC-106",
+      "summary": "Migrate user preferences to Postgres JSONB",
+      "description": "Acceptance criteria: preferences read/write via API; migration script backfills existing Redis keys.",
+      "status": "To Do",
+      "issueType": "Story",
+      "projectKey": "AAC",
+      "priority": "High"
+    },
+    "expectedRepo": "gitlab.com/org/backend-api",
+    "rejectFeedback": "Include rollback strategy for migration"
+  },
+  {
+    "snapshot": {
+      "key": "AAC-107",
+      "summary": "Instrument delivery metrics endpoint",
+      "description": "Acceptance criteria: Prometheus metrics for readiness queue depth and gate approval latency.",
+      "status": "To Do",
+      "issueType": "Task",
+      "projectKey": "AAC",
+      "priority": "Medium"
+    },
+    "expectedRepo": "gitlab.com/org/backend-api"
+  },
+  {
+    "snapshot": {
+      "key": "AAC-108",
+      "summary": "Unmapped infra ticket",
+      "description": "Acceptance criteria: rotate TLS certificates for staging cluster.",
+      "status": "To Do",
+      "issueType": "Task",
+      "projectKey": "AAC",
+      "priority": "Medium"
+    },
+    "expectedRepo": null
+  }
+]
