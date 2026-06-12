@@ -2,21 +2,37 @@
 
 from __future__ import annotations
 
-import pytest
+
+def test_role_defaults_are_none():
+    from lc_server.model_defaults import LIVINGCOLOR_DEVELOPER_MODEL, LIVINGCOLOR_DEVELOPER_PROVIDER
+
+    assert LIVINGCOLOR_DEVELOPER_MODEL is None
+    assert LIVINGCOLOR_DEVELOPER_PROVIDER is None
 
 
-def test_developer_default_model_is_deepseek():
-    from lc_server.model_defaults import LIVINGCOLOR_DEVELOPER_MODEL
+def test_developer_inference_uses_hermes_config_when_no_role_defaults(monkeypatch, tmp_path):
+    from lc_server.agent_bridge.inference_config import resolve_delivery_inference
 
-    assert LIVINGCOLOR_DEVELOPER_MODEL == "deepseek/deepseek-v4-pro"
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes"))
+    (tmp_path / "hermes").mkdir()
+    (tmp_path / "hermes" / "config.yaml").write_text(
+        "model:\n  provider: anthropic\n  default: claude-sonnet-4-20250514\n",
+        encoding="utf-8",
+    )
+
+    model, provider = resolve_delivery_inference(
+        manifest=None,
+        role_default_model=None,
+        role_default_provider=None,
+        allow_env_override=False,
+    )
+
+    assert model == "claude-sonnet-4-20250514"
+    assert provider == "anthropic"
 
 
 def test_developer_inference_uses_role_defaults_without_env_override(monkeypatch, tmp_path):
     from lc_server.agent_bridge.inference_config import resolve_delivery_inference
-    from lc_server.model_defaults import (
-        LIVINGCOLOR_DEVELOPER_MODEL,
-        LIVINGCOLOR_DEVELOPER_PROVIDER,
-    )
 
     monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes"))
     (tmp_path / "hermes").mkdir()
@@ -29,22 +45,17 @@ def test_developer_inference_uses_role_defaults_without_env_override(monkeypatch
 
     model, provider = resolve_delivery_inference(
         manifest=None,
-        role_default_model=LIVINGCOLOR_DEVELOPER_MODEL,
-        role_default_provider=LIVINGCOLOR_DEVELOPER_PROVIDER,
+        role_default_model="deepseek/deepseek-v4-pro",
+        role_default_provider="openrouter",
         allow_env_override=False,
     )
 
-    assert model == LIVINGCOLOR_DEVELOPER_MODEL
     assert model == "deepseek/deepseek-v4-pro"
     assert provider == "openrouter"
 
 
 def test_developer_inference_honors_env_override(monkeypatch, tmp_path):
     from lc_server.agent_bridge.inference_config import resolve_delivery_inference
-    from lc_server.model_defaults import (
-        LIVINGCOLOR_DEVELOPER_MODEL,
-        LIVINGCOLOR_DEVELOPER_PROVIDER,
-    )
 
     monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes"))
     (tmp_path / "hermes").mkdir()
@@ -57,8 +68,8 @@ def test_developer_inference_honors_env_override(monkeypatch, tmp_path):
 
     model, provider = resolve_delivery_inference(
         manifest=None,
-        role_default_model=LIVINGCOLOR_DEVELOPER_MODEL,
-        role_default_provider=LIVINGCOLOR_DEVELOPER_PROVIDER,
+        role_default_model="deepseek/deepseek-v4-pro",
+        role_default_provider="openrouter",
         allow_env_override=True,
     )
 
@@ -69,10 +80,6 @@ def test_developer_inference_honors_env_override(monkeypatch, tmp_path):
 def test_developer_inference_prefers_manifest_model(monkeypatch, tmp_path):
     from delivery_runtime.agents.schema import AgentIdentity, AgentManifest, AgentMcpConfig, AgentPrompt, AgentRuntime
     from lc_server.agent_bridge.inference_config import resolve_delivery_inference
-    from lc_server.model_defaults import (
-        LIVINGCOLOR_DEVELOPER_MODEL,
-        LIVINGCOLOR_DEVELOPER_PROVIDER,
-    )
 
     monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes"))
     (tmp_path / "hermes").mkdir()
@@ -102,8 +109,8 @@ def test_developer_inference_prefers_manifest_model(monkeypatch, tmp_path):
 
     model, provider = resolve_delivery_inference(
         manifest=manifest,
-        role_default_model=LIVINGCOLOR_DEVELOPER_MODEL,
-        role_default_provider=LIVINGCOLOR_DEVELOPER_PROVIDER,
+        role_default_model=None,
+        role_default_provider=None,
         allow_env_override=False,
     )
 

@@ -4,33 +4,14 @@ from __future__ import annotations
 
 import os
 
-LIVINGCOLOR_FIXED_PROVIDER = "openrouter"
-LIVINGCOLOR_FIXED_MODEL = "deepseek/deepseek-v4-pro"
-
-LIVINGCOLOR_DEVELOPER_PROVIDER = "openrouter"
-LIVINGCOLOR_DEVELOPER_MODEL = "deepseek/deepseek-v4-pro"
+LIVINGCOLOR_FIXED_PROVIDER: str | None = None
+LIVINGCOLOR_FIXED_MODEL: str | None = None
+LIVINGCOLOR_DEVELOPER_PROVIDER: str | None = None
+LIVINGCOLOR_DEVELOPER_MODEL: str | None = None
 
 
 def ensure_livingcolor_fixed_model() -> None:
-    """Pin the product default provider/model in Hermes config."""
-    from hermes_cli.config import load_config, save_config
-
-    cfg = load_config()
-    model_cfg = cfg.get("model")
-    if not isinstance(model_cfg, dict):
-        model_cfg = {}
-
-    changed = False
-    if model_cfg.get("provider") != LIVINGCOLOR_FIXED_PROVIDER:
-        model_cfg["provider"] = LIVINGCOLOR_FIXED_PROVIDER
-        changed = True
-    if model_cfg.get("default") != LIVINGCOLOR_FIXED_MODEL:
-        model_cfg["default"] = LIVINGCOLOR_FIXED_MODEL
-        changed = True
-
-    if changed:
-        cfg["model"] = model_cfg
-        save_config(cfg)
+    """No-op — Hermes user config is the sole source of truth."""
 
 
 def is_delivery_llm_available() -> bool:
