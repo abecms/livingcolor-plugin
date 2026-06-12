@@ -16,7 +16,7 @@ class FakeCtx:
 
 def _registered(monkeypatch, tmp_path):
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-    from tests.test_plugin_load import _load_plugin_module
+    from test_plugin_load import _load_plugin_module
 
     mod = _load_plugin_module()
     ctx = FakeCtx()

@@ -80,8 +80,10 @@ def test_ensure_managed_checkout_without_gitlab_token_returns_none(_isolate_herm
 
 
 def test_fetch_managed_checkout_fetches_without_reset(_isolate_hermes_home, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv("LIVINGCOLOR_HOME", str(tmp_path / "livingcolor"))
-    target = tmp_path / "livingcolor" / "TVP" / "tv5monde" / "demo-repo"
+    hermes_home = _isolate_hermes_home
+    livingcolor_home = hermes_home / "livingcolor"
+    livingcolor_home.mkdir(parents=True)
+    target = livingcolor_home / "TVP" / "tv5monde" / "demo-repo"
     target.mkdir(parents=True)
     (target / ".git").mkdir()
 

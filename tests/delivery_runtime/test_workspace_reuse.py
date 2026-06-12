@@ -47,8 +47,10 @@ def test_prepare_development_workspace_reuses_existing_checkout(tmp_path: Path):
 
 
 def test_managed_checkout_uses_source_path_without_copy(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv("LIVINGCOLOR_HOME", str(tmp_path / "livingcolor"))
-    managed_root = tmp_path / "livingcolor" / "TVP" / "org" / "demo-repo"
+    hermes_home = tmp_path / "hermes"
+    livingcolor_home = hermes_home / "livingcolor"
+    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    managed_root = livingcolor_home / "TVP" / "org" / "demo-repo"
     managed_root.mkdir(parents=True)
     (managed_root / "module.py").write_text("value = 1\n", encoding="utf-8")
     with allow_internal_git():

@@ -377,37 +377,49 @@ def _table_columns(conn: sqlite3.Connection, table: str) -> set[str]:
 
 def _migrate_org_id_columns(conn: sqlite3.Connection) -> None:
     """Add org_id to project-scoped tables (default local org for legacy rows)."""
+    tables = {
+        str(item["name"])
+        for item in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table'"
+        ).fetchall()
+    }
     for table in _ORG_SCOPED_TABLES:
+        if table not in tables:
+            continue
         columns = _table_columns(conn, table)
         if "org_id" not in columns:
             conn.execute(
                 f"ALTER TABLE {table} ADD COLUMN org_id TEXT NOT NULL DEFAULT '{LOCAL_ORG_ID}'"
             )
 
-    conn.execute(
-        """
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_sprint_state_org_project
-            ON sprint_state(org_id, project_key)
-        """
-    )
-    conn.execute(
-        """
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_execution_queue_org_project_jira
-            ON execution_queue_items(org_id, project_key, jira_key)
-        """
-    )
-    conn.execute(
-        """
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_project_memory_org_project
-            ON project_memory(org_id, project_key)
-        """
-    )
-    conn.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_daily_runs_org_project_started
-            ON daily_analysis_runs(org_id, project_key, started_at DESC)
-        """
-    )
+    if "sprint_state" in tables:
+        conn.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_sprint_state_org_project
+                ON sprint_state(org_id, project_key)
+            """
+        )
+    if "execution_queue_items" in tables:
+        conn.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_execution_queue_org_project_jira
+                ON execution_queue_items(org_id, project_key, jira_key)
+            """
+        )
+    if "project_memory" in tables:
+        conn.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_project_memory_org_project
+                ON project_memory(org_id, project_key)
+            """
+        )
+    if "daily_analysis_runs" in tables:
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_daily_runs_org_project_started
+                ON daily_analysis_runs(org_id, project_key, started_at DESC)
+            """
+        )
 
 
 def _migrate_execution_queue_consumer_columns(conn: sqlite3.Connection) -> None:
@@ -502,19 +514,21 @@ def _write_schema_version(conn: sqlite3.Connection) -> None:
 
 
 def _apply_schema_migrations(conn: sqlite3.Connection) -> None:
-    row = conn.execute(
-        "SELECT value FROM delivery_meta WHERE key = 'schema_version'"
-    ).fetchone()
-    current = int(row["value"]) if row else 0
-    if current >= SCHEMA_VERSION:
-        return
-
     tables = {
         str(item["name"])
         for item in conn.execute(
             "SELECT name FROM sqlite_master WHERE type = 'table'"
         ).fetchall()
     }
+    if "delivery_meta" in tables:
+        row = conn.execute(
+            "SELECT value FROM delivery_meta WHERE key = 'schema_version'"
+        ).fetchone()
+        current = int(row["value"]) if row else 0
+    else:
+        current = 0
+    if current >= SCHEMA_VERSION:
+        return
     if "merge_request_drafts" in tables:
         columns = {
             str(item["name"])
@@ -586,6 +600,16 @@ def _upgrade_existing_schema(conn: sqlite3.Connection) -> None:
             "SELECT name FROM sqlite_master WHERE type = 'table'"
         ).fetchall()
     }
+    if "delivery_meta" not in tables:
+        conn.execute("PRAGMA journal_mode=WAL")
+        _configure_connection(conn, busy_timeout_ms=_MIGRATION_BUSY_TIMEOUT_MS)
+        conn.executescript(_SCHEMA_SQL)
+        tables = {
+            str(item["name"])
+            for item in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            ).fetchall()
+        }
     if "merge_request_drafts" not in tables:
         conn.executescript(_MR_DRAFTS_SCHEMA_SQL)
     _apply_schema_migrations(conn)

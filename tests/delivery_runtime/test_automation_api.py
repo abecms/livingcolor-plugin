@@ -25,12 +25,6 @@ def _client():
     return client
 
 
-@pytest.fixture
-def livingcolor_home(tmp_path, monkeypatch):
-    monkeypatch.setenv("LIVINGCOLOR_HOME", str(tmp_path))
-    return tmp_path
-
-
 def _provision_result(*, warnings: list[str] | None = None) -> ProvisionResult:
     return ProvisionResult(
         status="ready",

@@ -1,13 +1,5 @@
 from pathlib import Path
 
-import pytest
-
-
-@pytest.fixture
-def livingcolor_home(tmp_path, monkeypatch):
-    monkeypatch.setenv("LIVINGCOLOR_HOME", str(tmp_path))
-    return tmp_path
-
 
 def test_project_agent_manifest_path(livingcolor_home):
     from delivery_runtime.agents.paths import get_agent_manifest_path
