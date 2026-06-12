@@ -1,0 +1,39 @@
+"""LivingColor plugin paths and constants.
+
+Import-safe module with no Hermes dependencies. Single source of truth for
+the plugin's data home: ``~/.hermes/livingcolor/`` (follows ``HERMES_HOME``).
+
+Function names intentionally mirror agent-lc's ``livingcolor_constants`` so
+ported modules only need their import rewritten.
+"""
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+
+def _hermes_home() -> Path:
+    override = os.environ.get("HERMES_HOME", "").strip()
+    return Path(override) if override else Path.home() / ".hermes"
+
+
+def get_livingcolor_home() -> Path:
+    """Return the plugin data home (default: ~/.hermes/livingcolor)."""
+    return _hermes_home() / "livingcolor"
+
+
+def ensure_livingcolor_home_layout() -> Path:
+    """Create the standard data home layout if missing."""
+    home = get_livingcolor_home()
+    for relative in ("config", "cache", "logs", "delivery", "work_orders"):
+        (home / relative).mkdir(parents=True, exist_ok=True)
+    return home
+
+
+def display_livingcolor_home() -> str:
+    """User-facing path string for logs and UI copy."""
+    home = get_livingcolor_home()
+    try:
+        return "~/" + str(home.relative_to(Path.home()))
+    except ValueError:
+        return str(home)
