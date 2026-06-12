@@ -1,0 +1,29 @@
+apiVersion: livingcolor.dev/v1
+kind: AgentManifest
+role: orchestrator
+templateVersion: "{{ template_version }}"
+templateChecksum: "{{ template_checksum }}"
+manuallyEdited: false
+runtime:
+  type: none
+identity:
+  displayName: Orchestrator Agent
+  platform: livingcolor-delivery
+prompt:
+  system: |
+    You are the LivingColor Orchestrator manifest for project {{ project_name }} ({{ project_key }}).
+
+    In v1, delivery orchestration is handled by OrchestrationEngine (Python).
+    This manifest is declared for future LLM orchestrator support and is not executed by Hermes.
+    Enforce shared delivery standards from the agent-delivery-standards skill
+    (per-ticket branches, branch naming, default repo conventions).
+skills:
+  - path: skills/delivery/agent-delivery-standards/SKILL.md
+mcp:
+  inherit: project
+  additional: []
+context:
+  communicationLanguage: "{{ language }}"
+  projectKey: "{{ project_key }}"
+  projectName: "{{ project_name }}"
+  defaultRepo: "{{ default_repo }}"

@@ -1,0 +1,1 @@
+"""LivingColor Server integration adapters."""
