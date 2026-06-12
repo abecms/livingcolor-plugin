@@ -4,7 +4,6 @@ import {
   buildJiraMcpAtlassianConfig,
   JIRA_ATLASSIAN_API_TOKEN_URL,
   JIRA_MCP_PRESET_NAME,
-  JIRA_MCP_STDIO_PRESET_CONFIG,
   readJiraSavedCredentials,
   type JiraEnvCredentials
 } from '@/lib/jira-mcp'
@@ -75,22 +74,6 @@ function isUnavailableRoute(error: unknown): boolean {
     message.includes('not found') ||
     message.includes('frontend not built')
   )
-}
-
-/** Persist the Atlassian-recommended mcp-remote stdio preset (OAuth handled by mcp-remote). */
-async function ensureJiraMcpStdioConfigured(): Promise<void> {
-  const config = await getLivingColorConfigRecord()
-  const currentServers =
-    config.mcp_servers && typeof config.mcp_servers === 'object' && !Array.isArray(config.mcp_servers)
-      ? (config.mcp_servers as Record<string, Record<string, unknown>>)
-      : {}
-  const existing = currentServers[JIRA_MCP_PRESET_NAME]
-
-  if (readJiraSavedCredentials(existing).usesEnvAuth) {
-    return
-  }
-
-  await saveMcpServerConfig(JIRA_MCP_PRESET_NAME, { ...JIRA_MCP_STDIO_PRESET_CONFIG })
 }
 
 async function persistJiraMcpConfig(serverConfig: Record<string, unknown>): Promise<void> {
@@ -192,8 +175,6 @@ export async function loadJiraDashboard(
 }
 
 export async function connectJiraViaMcp(requestGateway?: GatewayRequester): Promise<JiraConnectResponse> {
-  await ensureJiraMcpStdioConfigured()
-
   const result = await connectJiraMcp()
 
   if (requestGateway) {
