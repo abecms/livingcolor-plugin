@@ -1,4 +1,4 @@
-/** Local-mode stub — org/cloud Firebase APIs are unavailable in the plugin tab. */
+import { callDesktopApi } from '@/lib/desktop-api'
 
 export interface FirebaseOrgSummary {
   id: string
@@ -42,6 +42,62 @@ export interface FirebaseOrgProject {
   updatedAt?: string
 }
 
+export function bootstrapFirebaseSession(): Promise<FirebaseBootstrapResponse> {
+  return callDesktopApi({ path: '/api/firebase/bootstrap', method: 'POST' })
+}
+
+export function fetchFirebaseMe(): Promise<FirebaseBootstrapResponse> {
+  return callDesktopApi({ path: '/api/firebase/me' })
+}
+
+export function fetchFirebasePreferences(): Promise<FirebasePreferencesResponse> {
+  return callDesktopApi({ path: '/api/firebase/preferences' })
+}
+
+export function saveFirebasePreferences(
+  selectedJiraProjectKey: string | null
+): Promise<FirebasePreferencesResponse> {
+  return callDesktopApi({
+    path: '/api/firebase/preferences',
+    method: 'PUT',
+    body: { selectedJiraProjectKey }
+  })
+}
+
+export function createFirebaseTeamOrg(name: string): Promise<FirebaseOrgSummary> {
+  return callDesktopApi({ path: '/api/firebase/orgs', method: 'POST', body: { name } })
+}
+
+export function setFirebaseActiveOrg(orgId: string): Promise<{
+  activeOrgId: string
+  organizations: FirebaseOrgSummary[]
+}> {
+  return callDesktopApi({ path: '/api/firebase/me/active-org', method: 'PUT', body: { orgId } })
+}
+
+export function fetchOrgMembers(orgId: string): Promise<{ orgId: string; members: FirebaseOrgMember[] }> {
+  return callDesktopApi({ path: `/api/firebase/orgs/${encodeURIComponent(orgId)}/members` })
+}
+
+export function inviteOrgMember(
+  orgId: string,
+  email: string,
+  role: 'admin' | 'member' = 'member'
+): Promise<{ orgId: string; status: 'added' | 'invited'; member?: FirebaseOrgMember; invite?: Record<string, string> }> {
+  return callDesktopApi({
+    path: `/api/firebase/orgs/${encodeURIComponent(orgId)}/members`,
+    method: 'POST',
+    body: { email, role }
+  })
+}
+
+export function removeOrgMember(orgId: string, memberUid: string): Promise<{ orgId: string; removedUid: string }> {
+  return callDesktopApi({
+    path: `/api/firebase/orgs/${encodeURIComponent(orgId)}/members/${encodeURIComponent(memberUid)}`,
+    method: 'DELETE'
+  })
+}
+
 export interface FirebaseOrgInvite {
   id: string
   email: string
@@ -51,102 +107,71 @@ export interface FirebaseOrgInvite {
   invitedBy?: string
 }
 
+export function fetchOrgInvites(orgId: string): Promise<{ orgId: string; invites: FirebaseOrgInvite[] }> {
+  return callDesktopApi({ path: `/api/firebase/orgs/${encodeURIComponent(orgId)}/invites` })
+}
+
+export function revokeOrgInvite(orgId: string, inviteId: string): Promise<{ orgId: string; revokedInviteId: string }> {
+  return callDesktopApi({
+    path: `/api/firebase/orgs/${encodeURIComponent(orgId)}/invites/${encodeURIComponent(inviteId)}`,
+    method: 'DELETE'
+  })
+}
+
+export function fetchOrgProjects(orgId: string): Promise<{ orgId: string; projects: FirebaseOrgProject[] }> {
+  return callDesktopApi({ path: `/api/firebase/orgs/${encodeURIComponent(orgId)}/projects` })
+}
+
+export function saveOrgProjectConfig(
+  orgId: string,
+  jiraProjectKey: string,
+  payload: { projectName?: string; mapping?: Record<string, unknown>; deliverySettings?: Record<string, unknown> }
+): Promise<Record<string, unknown>> {
+  return callDesktopApi({
+    path: `/api/firebase/orgs/${encodeURIComponent(orgId)}/projects/${encodeURIComponent(jiraProjectKey)}`,
+    method: 'PUT',
+    body: payload
+  })
+}
+
+export function shareLocalProjectToOrg(
+  orgId: string,
+  jiraProjectKey: string
+): Promise<{ orgId: string; project: FirebaseOrgProject & Record<string, unknown> }> {
+  return callDesktopApi({
+    path: `/api/firebase/orgs/${encodeURIComponent(orgId)}/projects/share-local`,
+    method: 'POST',
+    body: { jiraProjectKey }
+  })
+}
+
+export function createOrgProject(
+  orgId: string,
+  jiraProjectKey: string,
+  projectName: string
+): Promise<{ orgId: string; project: FirebaseOrgProject }> {
+  return callDesktopApi({
+    path: `/api/firebase/orgs/${encodeURIComponent(orgId)}/projects`,
+    method: 'POST',
+    body: { jiraProjectKey, projectName }
+  })
+}
+
+export function deleteOrgProject(
+  orgId: string,
+  jiraProjectKey: string
+): Promise<{ orgId: string; deletedProjectKey: string }> {
+  return callDesktopApi({
+    path: `/api/firebase/orgs/${encodeURIComponent(orgId)}/projects/${encodeURIComponent(jiraProjectKey)}`,
+    method: 'DELETE'
+  })
+}
+
 export interface FirebaseClientConfigResponse {
   enabled: boolean
   config: Record<string, string> | null
 }
 
-export async function ensureFirebaseSession(): Promise<null> {
-  return null
-}
-
-export function bootstrapFirebaseSession(): Promise<FirebaseBootstrapResponse> {
-  return Promise.reject(new Error('Firebase is not available in the LivingColor plugin'))
-}
-
-export function fetchFirebaseMe(): Promise<FirebaseBootstrapResponse> {
-  return Promise.reject(new Error('Firebase is not available in the LivingColor plugin'))
-}
-
-export function fetchFirebasePreferences(): Promise<FirebasePreferencesResponse> {
-  return Promise.reject(new Error('Firebase is not available in the LivingColor plugin'))
-}
-
-export function saveFirebasePreferences(
-  _selectedJiraProjectKey: string | null
-): Promise<FirebasePreferencesResponse> {
-  return Promise.reject(new Error('Firebase is not available in the LivingColor plugin'))
-}
-
-export function createFirebaseTeamOrg(_name: string): Promise<FirebaseOrgSummary> {
-  return Promise.reject(new Error('Firebase is not available in the LivingColor plugin'))
-}
-
-export function setFirebaseActiveOrg(_orgId: string): Promise<{
-  activeOrgId: string
-  organizations: FirebaseOrgSummary[]
-}> {
-  return Promise.reject(new Error('Firebase is not available in the LivingColor plugin'))
-}
-
-export function fetchOrgMembers(_orgId: string): Promise<{ orgId: string; members: FirebaseOrgMember[] }> {
-  return Promise.reject(new Error('Firebase is not available in the LivingColor plugin'))
-}
-
-export function inviteOrgMember(
-  _orgId: string,
-  _email: string,
-  _role: 'admin' | 'member' = 'member'
-): Promise<{ orgId: string; status: 'added' | 'invited'; member?: FirebaseOrgMember; invite?: Record<string, string> }> {
-  return Promise.reject(new Error('Firebase is not available in the LivingColor plugin'))
-}
-
-export function removeOrgMember(_orgId: string, _memberUid: string): Promise<{ orgId: string; removedUid: string }> {
-  return Promise.reject(new Error('Firebase is not available in the LivingColor plugin'))
-}
-
-export function fetchOrgInvites(_orgId: string): Promise<{ orgId: string; invites: FirebaseOrgInvite[] }> {
-  return Promise.reject(new Error('Firebase is not available in the LivingColor plugin'))
-}
-
-export function revokeOrgInvite(_orgId: string, _inviteId: string): Promise<{ orgId: string; revokedInviteId: string }> {
-  return Promise.reject(new Error('Firebase is not available in the LivingColor plugin'))
-}
-
-export function fetchOrgProjects(_orgId: string): Promise<{ orgId: string; projects: FirebaseOrgProject[] }> {
-  return Promise.resolve({ orgId: _orgId, projects: [] })
-}
-
-export function saveOrgProjectConfig(
-  _orgId: string,
-  _jiraProjectKey: string,
-  _payload: { projectName?: string; mapping?: Record<string, unknown>; deliverySettings?: Record<string, unknown> }
-): Promise<Record<string, unknown>> {
-  return Promise.reject(new Error('Firebase is not available in the LivingColor plugin'))
-}
-
-export function shareLocalProjectToOrg(
-  _orgId: string,
-  _jiraProjectKey: string
-): Promise<{ orgId: string; project: FirebaseOrgProject & Record<string, unknown> }> {
-  return Promise.reject(new Error('Firebase is not available in the LivingColor plugin'))
-}
-
-export function createOrgProject(
-  _orgId: string,
-  jiraProjectKey: string,
-  projectName: string
-): Promise<{ orgId: string; project: FirebaseOrgProject }> {
-  return Promise.reject(new Error('Firebase is not available in the LivingColor plugin'))
-}
-
-export function deleteOrgProject(
-  _orgId: string,
-  _jiraProjectKey: string
-): Promise<{ orgId: string; deletedProjectKey: string }> {
-  return Promise.reject(new Error('Firebase is not available in the LivingColor plugin'))
-}
-
 export function fetchFirebaseClientConfig(): Promise<FirebaseClientConfigResponse> {
-  return Promise.resolve({ enabled: false, config: null })
+  return callDesktopApi({ path: '/api/firebase/client-config' })
 }
