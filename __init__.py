@@ -17,4 +17,7 @@ if str(_PLUGIN_ROOT) not in sys.path:
 
 
 def register(ctx) -> None:
-    """Hermes plugin entry point. Surfaces are added in later tasks."""
+    """Hermes plugin entry point."""
+    from agent_surfaces import register_surfaces
+
+    register_surfaces(ctx)
