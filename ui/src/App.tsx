@@ -9,6 +9,8 @@ import {
 } from './app/delivery'
 import { ProjectDeliveryDashboardView } from './app/delivery/project-dashboard'
 import { DASHBOARD_ROUTE, DELIVERY_ROUTE } from './app/routes'
+import { FirebaseAuthGate } from '@/components/firebase-auth-gate'
+import { FirebaseAuthProvider } from '@/contexts/firebase-auth-provider'
 import { I18nProvider } from '@/i18n'
 
 function DeliveryApp() {
@@ -52,5 +54,11 @@ export default function App() {
     )
   }
   if (apiOk === null) return null
-  return <DeliveryApp />
+  return (
+    <FirebaseAuthProvider>
+      <FirebaseAuthGate>
+        <DeliveryApp />
+      </FirebaseAuthGate>
+    </FirebaseAuthProvider>
+  )
 }
