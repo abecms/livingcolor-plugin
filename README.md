@@ -17,6 +17,18 @@ prebuilt).
 - Jira and GitLab MCP servers configured in Hermes
 - A project mapping in `~/.hermes/livingcolor/project_mapping.yaml`
 
+## LLM provider
+
+LivingColor uses whatever provider and model you configured in Hermes
+(`~/.hermes/config.yaml` → `model.provider` / `model.default`). The plugin
+does not bundle or override OpenRouter credentials.
+
+## MCP (Jira / GitLab)
+
+Configure MCP servers yourself via Hermes (`hermes mcp` or dashboard MCP
+settings). LivingColor only reads connection status and scopes per-project
+configs after you explicitly save credentials in Project → Integrations.
+
 ## Agent surfaces
 
 - Slash command: `/delivery status|scan <PROJECT>|queue|promote <id>|gates`
