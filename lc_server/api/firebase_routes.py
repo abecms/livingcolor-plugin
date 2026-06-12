@@ -16,7 +16,7 @@ from lc_server.integrations.firebase_auth import (
 )
 from lc_server.integrations.firestore_store import FirestoreStore
 
-router = APIRouter(prefix="/firebase", tags=["firebase"])
+router = APIRouter(tags=["firebase"])
 
 
 class FirebaseClientConfigResponse(BaseModel):
@@ -87,10 +87,19 @@ def _active_org_id(request: Request, user: FirebaseUser) -> str:
     return store.resolve_active_org_id(user)
 
 
-@router.get("/config", response_model=FirebaseClientConfigResponse)
-def get_firebase_config() -> FirebaseClientConfigResponse:
+def _firebase_client_config_response() -> FirebaseClientConfigResponse:
     config = client_firebase_config()
     return FirebaseClientConfigResponse(enabled=config is not None, config=config)
+
+
+@router.get("/client-config", response_model=FirebaseClientConfigResponse)
+def get_firebase_client_config() -> FirebaseClientConfigResponse:
+    return _firebase_client_config_response()
+
+
+@router.get("/config", response_model=FirebaseClientConfigResponse)
+def get_firebase_config() -> FirebaseClientConfigResponse:
+    return _firebase_client_config_response()
 
 
 @router.post("/bootstrap", response_model=FirebaseBootstrapResponse)
