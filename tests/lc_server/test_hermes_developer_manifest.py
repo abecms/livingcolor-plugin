@@ -103,3 +103,19 @@ def test_developer_runtime_config_uses_manifest_prompt_and_toolsets(livingcolor_
     assert toolsets == ["file", "terminal", "search"]
     assert max_iterations == 42
     assert platform == "livingcolor-delivery-custom"
+
+
+def test_developer_template_has_no_hardcoded_provider():
+    from lc_server.provisioning.template_renderer import render_role_template
+
+    rendered = render_role_template(
+        "developer",
+        variables={
+            "project_key": "TEST",
+            "project_name": "Test",
+            "language": "en",
+            "default_repo": "group/test-app",
+        },
+    )
+    assert "provider: openrouter" not in rendered
+    assert "model: deepseek" not in rendered

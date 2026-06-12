@@ -28,8 +28,8 @@ def test_render_developer_template_produces_valid_manifest():
     assert manifest.runtime.type == "hermes"
     assert manifest.runtime.max_iterations == 60
     assert manifest.runtime.toolsets == ("file", "terminal", "skills")
-    assert manifest.runtime.model == "deepseek/deepseek-v4-pro"
-    assert manifest.runtime.provider == "openrouter"
+    assert manifest.runtime.model is None
+    assert manifest.runtime.provider is None
     assert "LivingColor Developer Agent" in manifest.prompt.system
     assert len(manifest.prompt.rules) >= 1
     skill_paths = {skill.path for skill in manifest.skills}
