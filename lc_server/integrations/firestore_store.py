@@ -280,9 +280,6 @@ class FirestoreStore:
                 "sharedFromLocal": True,
             },
         )
-        from delivery_runtime.automation.local_projects import remove_local_project
-
-        remove_local_project(key)
         return saved
 
     def create_org_project(
@@ -644,6 +641,214 @@ class FirestoreStore:
             merged["createdAt"] = merged["updatedAt"]
         ref.set(merged, merge=True)
         return merged
+
+    def get_work_order_lock(self, org_id: str, wo_id: str) -> dict[str, Any] | None:
+        doc = (
+            get_firestore()
+            .collection("organizations")
+            .document(org_id)
+            .collection("locks")
+            .document(wo_id)
+            .get()
+        )
+        return doc.to_dict() if doc.exists else None
+
+    def acquire_work_order_lock(
+        self,
+        org_id: str,
+        wo_id: str,
+        user: FirebaseUser,
+        session_id: str | None = None,
+    ) -> dict[str, Any]:
+        if not self.is_org_member(org_id, user.uid):
+            raise ValueError("Forbidden")
+        key = wo_id.strip()
+        if not key:
+            raise ValueError("Work order id is required")
+        ref = (
+            get_firestore()
+            .collection("organizations")
+            .document(org_id)
+            .collection("locks")
+            .document(key)
+        )
+        existing = ref.get()
+        if existing.exists:
+            holder_uid = str((existing.to_dict() or {}).get("holderUid") or "")
+            if holder_uid and holder_uid != user.uid:
+                raise ValueError("Lock held by another member")
+        payload = {
+            "holderUid": user.uid,
+            "holderEmail": user.email,
+            "acquiredAt": _now_iso(),
+            "sessionId": (session_id or f"{user.uid}-default").strip(),
+        }
+        ref.set(payload, merge=True)
+        return {"orgId": org_id, "workOrderId": key, "lock": payload}
+
+    def release_work_order_lock(self, org_id: str, wo_id: str, user: FirebaseUser) -> dict[str, Any]:
+        if not self.is_org_member(org_id, user.uid):
+            raise ValueError("Forbidden")
+        key = wo_id.strip()
+        ref = (
+            get_firestore()
+            .collection("organizations")
+            .document(org_id)
+            .collection("locks")
+            .document(key)
+        )
+        doc = ref.get()
+        if not doc.exists:
+            return {"orgId": org_id, "workOrderId": key, "released": True}
+        holder_uid = str((doc.to_dict() or {}).get("holderUid") or "")
+        if holder_uid and holder_uid != user.uid:
+            raise ValueError("Lock held by another member")
+        ref.delete()
+        return {"orgId": org_id, "workOrderId": key, "released": True}
+
+    def get_work_order_snapshot(self, org_id: str, wo_id: str) -> dict[str, Any] | None:
+        key = wo_id.strip()
+        if not key:
+            return None
+        doc = (
+            get_firestore()
+            .collection("organizations")
+            .document(org_id)
+            .collection("workOrders")
+            .document(key)
+            .get()
+        )
+        if not doc.exists:
+            return None
+        data = doc.to_dict() or {}
+        data["id"] = doc.id
+        return data
+
+    def _upsert_work_order_snapshot(
+        self,
+        org_id: str,
+        wo_id: str,
+        snapshot: dict[str, Any],
+        updated_at: str,
+    ) -> None:
+        key = wo_id.strip()
+        patch = {
+            key_name: value
+            for key_name, value in snapshot.items()
+            if key_name not in {"id"} and value is not None
+        }
+        patch["updatedAt"] = str(patch.get("updatedAt") or updated_at)
+        if "createdAt" not in patch:
+            patch["createdAt"] = updated_at
+        (
+            get_firestore()
+            .collection("organizations")
+            .document(org_id)
+            .collection("workOrders")
+            .document(key)
+            .set(patch, merge=True)
+        )
+
+    def append_org_audit_event(
+        self,
+        org_id: str,
+        user: FirebaseUser,
+        event_type: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        if not self.is_org_member(org_id, user.uid):
+            raise ValueError("Forbidden")
+        created_at = _now_iso()
+        event_ref = (
+            get_firestore()
+            .collection("organizations")
+            .document(org_id)
+            .collection("events")
+            .document()
+        )
+        event_payload = {
+            "eventType": event_type,
+            "actorUid": user.uid,
+            "actorEmail": user.email,
+            "payload": payload,
+            "createdAt": created_at,
+        }
+        event_ref.set(event_payload)
+        return {"orgId": org_id, "eventId": event_ref.id, "event": event_payload}
+
+    def append_org_event(
+        self,
+        org_id: str,
+        user: FirebaseUser,
+        wo_id: str,
+        event_type: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        if not self.is_org_member(org_id, user.uid):
+            raise ValueError("Forbidden")
+        key = wo_id.strip()
+        if not key:
+            raise ValueError("Work order id is required")
+        lock = self.get_work_order_lock(org_id, key) or {}
+        holder_uid = str(lock.get("holderUid") or "")
+        if holder_uid and holder_uid != user.uid:
+            raise ValueError("Lock held by another member")
+        created_at = _now_iso()
+        event_ref = (
+            get_firestore()
+            .collection("organizations")
+            .document(org_id)
+            .collection("events")
+            .document()
+        )
+        event_payload = {
+            "woId": key,
+            "eventType": event_type,
+            "actorUid": user.uid,
+            "actorEmail": user.email,
+            "payload": payload,
+            "createdAt": created_at,
+        }
+        event_ref.set(event_payload)
+        work_order_patch = payload.get("workOrder")
+        if isinstance(work_order_patch, dict):
+            self._upsert_work_order_snapshot(org_id, key, work_order_patch, created_at)
+        return {"orgId": org_id, "eventId": event_ref.id, "event": event_payload}
+
+    def reconcile_pending_events(
+        self,
+        org_id: str,
+        user: FirebaseUser,
+        events: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        if not self.is_org_member(org_id, user.uid):
+            raise ValueError("Forbidden")
+        accepted: list[int | str] = []
+        conflicts: list[dict[str, Any]] = []
+        for item in events:
+            local_id = item.get("id")
+            wo_id = str(item.get("woId") or "").strip()
+            payload = item.get("payload") if isinstance(item.get("payload"), dict) else {}
+            if not wo_id:
+                continue
+            client_version = str(payload.get("updatedAt") or payload.get("clientUpdatedAt") or "")
+            server = self.get_work_order_snapshot(org_id, wo_id)
+            server_version = str((server or {}).get("updatedAt") or "")
+            if server_version and client_version and server_version > client_version:
+                conflicts.append(
+                    {
+                        "woId": wo_id,
+                        "serverVersion": server_version,
+                        "clientVersion": client_version,
+                        "localEventId": local_id,
+                    }
+                )
+                continue
+            event_type = str(payload.get("type") or payload.get("eventType") or "state_change")
+            self.append_org_event(org_id, user, wo_id, event_type, payload)
+            if local_id is not None:
+                accepted.append(local_id)
+        return {"orgId": org_id, "accepted": accepted, "conflicts": conflicts}
 
     def bootstrap_user(self, user: FirebaseUser) -> dict[str, Any]:
         self.upsert_user(user)

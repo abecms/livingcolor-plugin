@@ -29,21 +29,20 @@ Configure MCP servers yourself via Hermes (`hermes mcp` or dashboard MCP
 settings). LivingColor only reads connection status and scopes per-project
 configs after you explicitly save credentials in Project → Integrations.
 
-## Firebase (team workspaces)
+## Workspaces
 
-Team collaboration requires Firebase Admin credentials on the machine running
-the Hermes dashboard:
+**Personal (default)** — 100% local. Delivery state lives in
+`~/.hermes/livingcolor/runtime.db`. No account required; choose **Continue
+locally** on the welcome screen.
 
-```bash
-# ~/.hermes/livingcolor/.env
-FIREBASE_SERVICE_ACCOUNT_PATH=~/.hermes/livingcolor/firebase-sa.json
-```
+**Team** — shared projects via Firebase (`livingcolor-app`). Choose **Sign in
+to collaborate** on the welcome screen (Google or email). Team data is
+accessed through `https://api-livingcolor.visualq.ai`; users never install a
+Firebase service account locally.
 
-Download the service account JSON from the Firebase console (`livingcolor-app`
-project). Restart `hermes dashboard` after adding the file.
-
-Public web client config is embedded (safe to expose). Security is enforced
-by Firebase Auth + Firestore rules + verified ID tokens on API routes.
+Public Firebase web client config is embedded in the plugin (safe to expose).
+Security is enforced by Firebase Auth, Firestore rules, and verified ID tokens
+on the cloud API.
 
 ## Agent surfaces
 

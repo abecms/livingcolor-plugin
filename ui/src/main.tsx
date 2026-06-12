@@ -7,10 +7,18 @@
 import { createRoot } from 'react-dom/client'
 import { createElement } from 'react'
 import App from './App'
+import { installHermesNavBrand } from '@/lib/hermes-nav-brand'
 import './styles.css'
 
 const SDK = (window as any).__HERMES_PLUGIN_SDK__
 const REGISTRY = (window as any).__HERMES_PLUGINS__
+
+if (!SDK || !REGISTRY) {
+  console.error(
+    '[livingcolor] Hermes plugin SDK missing — register() was not called. ' +
+      'Ensure the dashboard host loaded before this script.',
+  )
+}
 
 if (SDK && REGISTRY) {
   const HostReact = SDK.React
@@ -25,4 +33,5 @@ if (SDK && REGISTRY) {
     return HostReact.createElement('div', { ref, className: 'lc-root' })
   }
   REGISTRY.register('livingcolor', LivingColorTab)
+  installHermesNavBrand()
 }

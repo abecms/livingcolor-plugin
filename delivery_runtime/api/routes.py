@@ -620,6 +620,61 @@ async def run_daily_analysis(body: DailyAnalysisRunRequest | None = None) -> dic
     return result
 
 
+@router.get("/projects/{jira_project_key}/share-payload")
+def get_local_project_share_payload(jira_project_key: str) -> dict[str, Any]:
+    from lc_server.integrations.local_project_share import build_local_project_share_payload
+
+    try:
+        return build_local_project_share_payload(jira_project_key)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/projects/{jira_project_key}/finalize-share")
+def finalize_local_project_share(jira_project_key: str) -> dict[str, str | bool]:
+    from delivery_runtime.automation.local_projects import remove_local_project
+
+    try:
+        remove_local_project(jira_project_key)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"jiraProjectKey": jira_project_key.strip().upper(), "removed": True}
+
+
+@router.get("/cloud/pending-events")
+def list_cloud_pending_events(orgId: str) -> dict[str, Any]:
+    from delivery_runtime.persistence.pending_events import list_pending_events
+
+    return {"orgId": orgId, "events": list_pending_events(orgId)}
+
+
+@router.post("/cloud/pending-events")
+def enqueue_cloud_pending_event(body: dict[str, Any]) -> dict[str, Any]:
+    from delivery_runtime.persistence.pending_events import enqueue_pending_event
+
+    org_id = str(body.get("orgId") or "").strip()
+    wo_id = str(body.get("woId") or "").strip()
+    payload = body.get("payload") if isinstance(body.get("payload"), dict) else {}
+    try:
+        event_id = enqueue_pending_event(org_id, wo_id, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"id": event_id, "orgId": org_id, "woId": wo_id}
+
+
+@router.post("/cloud/pending-events/mark-flushed")
+def mark_cloud_pending_events_flushed(body: dict[str, Any]) -> dict[str, Any]:
+    from delivery_runtime.persistence.pending_events import mark_pending_events_flushed
+
+    raw_ids = body.get("ids") if isinstance(body.get("ids"), list) else []
+    try:
+        ids = [int(item) for item in raw_ids]
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="ids must be integers") from exc
+    flushed = mark_pending_events_flushed(ids)
+    return {"flushed": flushed}
+
+
 @router.post("/comment-proposals/{proposal_id}/decision", response_model=JiraCommentProposalResponse)
 def decide_comment_proposal(
     proposal_id: str,

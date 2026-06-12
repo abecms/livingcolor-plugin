@@ -23,18 +23,18 @@ export function SprintHeaderStrip({
     : 0
 
   return (
-    <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-white/[0.08] bg-white/[0.025] px-4 py-3 backdrop-blur-sm">
+    <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-border bg-card px-4 py-3">
       {sprint ? (
         <>
-          <span className="text-sm font-semibold text-white">{sprint.sprintName}</span>
-          <span className="text-xs tabular-nums text-(--ui-text-secondary)">
+          <span className="text-sm font-semibold text-foreground">{sprint.sprintName}</span>
+          <span className="text-xs tabular-nums text-muted-foreground">
             {sprint.usedDays}d / {sprint.capacityDays}d
           </span>
-          <div className="h-1.5 min-w-24 flex-1 overflow-hidden rounded-full bg-white/10">
+          <div className="h-1.5 min-w-24 flex-1 overflow-hidden rounded-full bg-muted">
             <div
               className={cn(
                 'h-full rounded-full bg-gradient-to-r transition-all duration-500',
-                pct >= 95 ? 'from-white/35 to-white/55' : 'from-white/55 to-white/80'
+                pct >= 95 ? 'from-warning/70 to-warning' : 'from-primary/70 to-primary'
               )}
               style={{ width: `${pct}%` }}
             />
@@ -42,12 +42,12 @@ export function SprintHeaderStrip({
           {sprint.overflowRisk ? <StatusPill tone="warning">Overflow risk</StatusPill> : null}
         </>
       ) : (
-        <span className="flex-1 text-sm text-(--ui-text-secondary)">No sprint selected yet.</span>
+        <span className="flex-1 text-sm text-muted-foreground">No sprint selected yet.</span>
       )}
 
       {clarificationCount > 0 ? (
         <button
-          className="inline-flex items-center gap-1.5 rounded-full border border-white/12 bg-white/[0.04] px-3 py-1 text-xs font-medium text-white/65 transition-colors hover:border-white/25 hover:text-white/90"
+          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/40 px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-ring/40 hover:text-foreground"
           onClick={onOpenClarifications}
           type="button"
         >

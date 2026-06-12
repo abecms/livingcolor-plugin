@@ -18,6 +18,10 @@ if str(_PLUGIN_ROOT) not in sys.path:
 
 def register(ctx) -> None:
     """Hermes plugin entry point."""
+    from jira_dashboard.compat import install_hermes_cli_jira_dashboard_shim
+
+    install_hermes_cli_jira_dashboard_shim()
+
     from agent_surfaces import register_surfaces
 
     register_surfaces(ctx)

@@ -9,10 +9,6 @@ import {
 
 type Mode = 'sign-in' | 'register'
 
-function brandAssetPath(path: string): string {
-  return `${import.meta.env.BASE_URL}${path.replace(/^\/+/, '')}`
-}
-
 export function FirebaseLoginPage() {
   const [mode, setMode] = useState<Mode>('sign-in')
   const [email, setEmail] = useState('')
@@ -56,16 +52,9 @@ export function FirebaseLoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-6">
+    <div className="flex h-full items-center justify-center px-6 py-12">
       <div className="w-full max-w-md rounded-xl border border-border bg-card p-8 shadow-sm">
-        <div className="mb-8 space-y-4 text-center">
-          <img
-            alt="LivingColor"
-            className="mx-auto h-10 w-auto object-contain"
-            height={40}
-            src={brandAssetPath('livingcolor-logo-white.png')}
-            width={180}
-          />
+        <div className="mb-8 space-y-2 text-center">
           <p className="text-sm text-muted-foreground">Sign in to sync project settings across devices.</p>
         </div>
 

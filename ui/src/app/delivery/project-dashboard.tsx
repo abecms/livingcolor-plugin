@@ -20,6 +20,8 @@ import { notify, notifyError } from '@/store/notifications'
 
 import { DashboardGhostButton, DashboardPageHeader, DashboardPageShell } from './dashboard-ui'
 
+import { useTeamWorkOrders } from '@/hooks/use-team-work-orders'
+import { useWorkOrderLock } from '@/hooks/use-work-order-lock'
 import { useProjectWorkspace } from '@/hooks/use-project-workspace'
 
 import { ClarificationsPanel } from './clarifications-panel'
@@ -62,7 +64,7 @@ async function findNextReviewGate(workOrder: WorkOrder): Promise<DeliveryGate | 
 export function ProjectDeliveryDashboardView() {
   const { activeProject, activeProjectKey } = useProjectWorkspace()
   const [inbox, setInbox] = useState<PmInboxPayload | null>(null)
-  const [completedWorkOrders, setCompletedWorkOrders] = useState<WorkOrder[]>([])
+  const [localWorkOrders, setLocalWorkOrders] = useState<WorkOrder[]>([])
   const [actionId, setActionId] = useState<string | null>(null)
   const [clarificationsOpen, setClarificationsOpen] = useState(false)
   const [reviewOpen, setReviewOpen] = useState(false)
@@ -71,6 +73,27 @@ export function ProjectDeliveryDashboardView() {
   const [gate, setGate] = useState<DeliveryGate | null>(null)
   const projectConfigRevision = useStore($projectConfigRevision)
   const location = useLocation()
+
+  const sheetOpen = reviewOpen || progressOpen
+  const lockWorkOrderId = sheetOpen ? workOrder?.id ?? null : null
+  const { acquire: acquireWorkOrderLock, release: releaseWorkOrderLock, orgId: lockOrgId } =
+    useWorkOrderLock(lockWorkOrderId)
+
+  useEffect(() => {
+    if (!lockWorkOrderId) {
+      return
+    }
+    let cancelled = false
+    void acquireWorkOrderLock().then(acquired => {
+      if (!cancelled && !acquired && lockOrgId) {
+        notifyError(new Error('Lock unavailable'), 'Another teammate is editing this work order')
+      }
+    })
+    return () => {
+      cancelled = true
+      void releaseWorkOrderLock()
+    }
+  }, [acquireWorkOrderLock, lockOrgId, lockWorkOrderId, releaseWorkOrderLock])
 
   const requestSeq = useRef(0)
   const refreshDashboard = useCallback(async () => {
@@ -82,7 +105,7 @@ export function ProjectDeliveryDashboardView() {
         return
       }
       setInbox(payload)
-      setCompletedWorkOrders(overview.workOrders.items.filter(item => item.status === 'completed'))
+      setLocalWorkOrders(overview.workOrders.items)
     } catch (error) {
       if (seq === requestSeq.current) {
         notifyError(error, 'Execution queue is not ready yet')
@@ -99,6 +122,11 @@ export function ProjectDeliveryDashboardView() {
     void refreshDashboard()
   }, [refreshDashboard, location.pathname, projectConfigRevision])
 
+  const { workOrders: visibleWorkOrders } = useTeamWorkOrders(localWorkOrders)
+  const completedWorkOrders = useMemo(
+    () => visibleWorkOrders.filter(item => item.status === 'completed'),
+    [visibleWorkOrders]
+  )
   const columns = useMemo(() => buildKanbanColumns(inbox, completedWorkOrders), [inbox, completedWorkOrders])
 
   const pendingProposals = useMemo(

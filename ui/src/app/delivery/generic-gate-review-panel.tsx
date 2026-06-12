@@ -4,12 +4,14 @@ import { Button } from '@/components/ui/button'
 import { dashboardOutlineButtonProps, dashboardPrimaryButtonProps, DASHBOARD_SHEET_BODY_CLASS, DASHBOARD_SHEET_HEADER_CLASS } from './dashboard-ui'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Textarea } from '@/components/ui/textarea'
+import { useWorkOrderLock } from '@/hooks/use-work-order-lock'
 import { approveDeliveryGate, rejectDeliveryGate } from '@/lib/delivery'
 import { notify, notifyError } from '@/store/notifications'
 
 import { buildGatePayloadSections } from './gate-payload-formatters'
 import { GatePayloadSections } from './gate-payload-sections'
 import type { DeliveryGate, WorkOrder } from './types'
+import { WorkOrderLockNotice } from './work-order-lock-notice'
 
 export function GenericGateReviewPanel({
   gate,
@@ -28,6 +30,7 @@ export function GenericGateReviewPanel({
 }) {
   const [feedback, setFeedback] = useState('')
   const [busy, setBusy] = useState(false)
+  const { canWrite, lockMessage } = useWorkOrderLock(workOrder?.id)
 
   if (!workOrder || !gate) {
     return null
@@ -106,7 +109,7 @@ export function GenericGateReviewPanel({
             {isClarificationGate ? (
               <Button
                 data-testid="clarification-relaunch-button"
-                disabled={busy}
+                disabled={busy || !canWrite}
                 onClick={() => void relaunchAnalysis()}
                 size="sm"
                 {...dashboardOutlineButtonProps()}
@@ -119,6 +122,7 @@ export function GenericGateReviewPanel({
         </SheetHeader>
 
         <div className={DASHBOARD_SHEET_BODY_CLASS} data-testid="generic-gate-review-panel">
+          <WorkOrderLockNotice message={lockMessage} />
           <GatePayloadSections sections={buildGatePayloadSections(gate.gateType, gate.payload ?? {})} />
 
           <div className="space-y-2">
@@ -138,10 +142,10 @@ export function GenericGateReviewPanel({
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button disabled={busy} onClick={() => void approve()} {...dashboardPrimaryButtonProps()}>
+            <Button disabled={busy || !canWrite} onClick={() => void approve()} {...dashboardPrimaryButtonProps()}>
               Approve
             </Button>
-            <Button disabled={busy} onClick={() => void reject()} {...dashboardOutlineButtonProps()}>
+            <Button disabled={busy || !canWrite} onClick={() => void reject()} {...dashboardOutlineButtonProps()}>
               Reject
             </Button>
           </div>

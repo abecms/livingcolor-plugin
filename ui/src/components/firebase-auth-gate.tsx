@@ -1,51 +1,59 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 
 import { FirebaseLoginPage } from '@/app/auth/firebase-login-page'
+import { WelcomePage } from '@/app/auth/welcome-page'
+import { LivingColorChromeLayout } from '@/components/livingcolor-chrome-layout'
+import { LivingColorLogo } from '@/components/livingcolor-logo'
 import { useFirebaseAuth } from '@/hooks/use-firebase-auth'
-
-function FirebaseSetupBanner() {
-  return (
-    <div className="flex min-h-[50vh] items-center justify-center bg-background px-6 py-12">
-      <div className="w-full max-w-lg space-y-4 rounded-xl border border-border bg-card p-8 shadow-sm">
-        <h1 className="text-xl font-semibold tracking-tight">Firebase team workspaces</h1>
-        <p className="text-sm text-muted-foreground">
-          Team collaboration requires Firebase Admin credentials on the machine running the Hermes
-          dashboard. Add a service account JSON and restart the dashboard.
-        </p>
-        <pre className="overflow-x-auto rounded-md bg-muted px-3 py-2 text-xs">
-          {`# ~/.hermes/livingcolor/.env
-FIREBASE_SERVICE_ACCOUNT_PATH=~/.hermes/livingcolor/firebase-sa.json`}
-        </pre>
-        <p className="text-sm text-muted-foreground">
-          See the plugin README for download steps from the Firebase console (<code>livingcolor-app</code>{' '}
-          project).
-        </p>
-      </div>
-    </div>
-  )
-}
+import { readStoredWorkspaceScope, switchToLocalWorkspace } from '@/store/workspace-scope'
 
 export function FirebaseAuthGate({ children }: { children: ReactNode }) {
   const { enabled, status } = useFirebaseAuth()
+  const [showLogin, setShowLogin] = useState(false)
+  const [localChosen, setLocalChosen] = useState(
+    () => readStoredWorkspaceScope()?.mode === 'local'
+  )
 
-  if (status === 'disabled') {
-    return <FirebaseSetupBanner />
-  }
-
-  if (!enabled) {
+  if (!enabled || status === 'signed-in') {
     return children
   }
 
   if (status === 'loading') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <p className="text-sm text-muted-foreground">Signing in…</p>
-      </div>
+      <LivingColorChromeLayout>
+        <div className="flex h-full flex-col items-center justify-center gap-6">
+          <LivingColorLogo height={32} />
+          <p className="text-sm text-muted-foreground">Signing in…</p>
+        </div>
+      </LivingColorChromeLayout>
     )
   }
 
   if (status === 'signed-out') {
-    return <FirebaseLoginPage />
+    if (localChosen) {
+      return children
+    }
+
+    if (showLogin) {
+      return (
+        <LivingColorChromeLayout>
+          <FirebaseLoginPage />
+        </LivingColorChromeLayout>
+      )
+    }
+
+    return (
+      <LivingColorChromeLayout>
+        <WelcomePage
+          onContinueLocal={() => {
+            switchToLocalWorkspace()
+            setLocalChosen(true)
+            setShowLogin(false)
+          }}
+          onSignIn={() => setShowLogin(true)}
+        />
+      </LivingColorChromeLayout>
+    )
   }
 
   return children

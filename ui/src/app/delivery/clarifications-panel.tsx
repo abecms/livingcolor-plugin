@@ -46,7 +46,7 @@ export function ClarificationsPanel({
               const proposalId = item.proposal?.id
               const busy = proposalId != null && actionId === proposalId
               return (
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4" key={item.record.id}>
+                <div className="rounded-xl border border-border bg-card p-4" key={item.record.id}>
                   <TicketKeyBadge>{item.record.jiraKey}</TicketKeyBadge>
                   <JiraTicketTitleLink
                     className="mt-2 block text-sm font-medium text-foreground"
@@ -58,7 +58,7 @@ export function ClarificationsPanel({
                     <ul className="mt-3 space-y-1.5 text-xs text-(--ui-text-secondary)">
                       {item.detectedIssues.map(issue => (
                         <li className="flex gap-2" key={issue}>
-                          <span className="mt-1.5 size-1 shrink-0 rounded-full bg-white/45" />
+                          <span className="mt-1.5 size-1 shrink-0 rounded-full bg-muted-foreground" />
                           <span>{issue}</span>
                         </li>
                       ))}
@@ -109,7 +109,7 @@ export function ClarificationsPanel({
                 const proposalId = item.proposalId!
                 const busy = actionId === proposalId
                 return (
-                  <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4" key={proposalId}>
+                  <div className="rounded-xl border border-border bg-card p-4" key={proposalId}>
                     {item.jiraKey ? <TicketKeyBadge>{item.jiraKey}</TicketKeyBadge> : null}
                     <div className="mt-2 text-sm font-medium text-foreground">{item.label}</div>
                     {item.body ? <ProseBlock>{item.body}</ProseBlock> : null}

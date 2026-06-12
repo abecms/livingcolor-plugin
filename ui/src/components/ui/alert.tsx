@@ -9,12 +9,9 @@ const alertVariants = cva(
     variants: {
       variant: {
         default: 'border-border',
-        destructive:
-          'border-destructive/35 bg-[color-mix(in_srgb,var(--dt-card)_96%,var(--dt-destructive)_4%)] [&>svg]:text-destructive',
-        warning:
-          'border-primary/30 bg-[color-mix(in_srgb,var(--dt-card)_96%,var(--dt-primary)_4%)] [&>svg]:text-primary',
-        success:
-          'border-primary/25 bg-[color-mix(in_srgb,var(--dt-card)_97%,var(--dt-primary)_3%)] [&>svg]:text-primary'
+        destructive: 'border-destructive/35 bg-destructive/10 [&>svg]:text-destructive',
+        warning: 'border-primary/30 bg-primary/10 [&>svg]:text-primary',
+        success: 'border-primary/25 bg-primary/10 [&>svg]:text-primary'
       }
     },
     defaultVariants: {

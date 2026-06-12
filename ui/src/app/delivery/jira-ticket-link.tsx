@@ -26,7 +26,7 @@ export function JiraTicketTitleLink({
   return (
     <a
       className={cn(
-        'group inline-flex cursor-pointer items-start gap-1.5 text-inherit no-underline decoration-white/35 underline-offset-[3px] transition-colors hover:text-foreground hover:underline',
+        'group inline-flex cursor-pointer items-start gap-1.5 text-inherit no-underline decoration-muted-foreground underline-offset-[3px] transition-colors hover:text-foreground hover:underline',
         className
       )}
       href={href}

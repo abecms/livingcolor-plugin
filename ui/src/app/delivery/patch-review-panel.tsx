@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { dashboardOutlineButtonProps, dashboardPrimaryButtonProps, DASHBOARD_SHEET_BODY_CLASS, DASHBOARD_SHEET_HEADER_CLASS } from './dashboard-ui'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Textarea } from '@/components/ui/textarea'
+import { useWorkOrderLock } from '@/hooks/use-work-order-lock'
 import { approveDeliveryGate, rejectDeliveryGate } from '@/lib/delivery'
 import { notify, notifyError } from '@/store/notifications'
 
@@ -11,6 +12,7 @@ import { sectionsFromPatchStats } from './gate-payload-formatters'
 import { GatePayloadSections } from './gate-payload-sections'
 import { asCodeReviewPayload } from './patch-payload'
 import type { DeliveryGate, WorkOrder } from './types'
+import { WorkOrderLockNotice } from './work-order-lock-notice'
 
 export function PatchReviewPanel({
   gate,
@@ -27,6 +29,7 @@ export function PatchReviewPanel({
 }) {
   const [feedback, setFeedback] = useState('')
   const [busy, setBusy] = useState(false)
+  const { canWrite, lockMessage } = useWorkOrderLock(workOrder?.id)
 
   if (!workOrder || !gate) {
     return null
@@ -85,6 +88,7 @@ export function PatchReviewPanel({
         </SheetHeader>
 
         <div className={DASHBOARD_SHEET_BODY_CLASS} data-testid="patch-review-panel">
+          <WorkOrderLockNotice message={lockMessage} />
           <Section label="Patch summary" value={payload.summary} />
           <Section label="Implementation plan" preformatted value={payload.implementationPlan} />
           <ListSection items={touchedFiles} label="Modified files" />
@@ -122,10 +126,10 @@ export function PatchReviewPanel({
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button data-testid="patch-approve-button" disabled={busy} onClick={() => void approve()} {...dashboardPrimaryButtonProps()}>
+            <Button data-testid="patch-approve-button" disabled={busy || !canWrite} onClick={() => void approve()} {...dashboardPrimaryButtonProps()}>
               Approve patch
             </Button>
-            <Button data-testid="patch-reject-button" disabled={busy} onClick={() => void reject()} {...dashboardOutlineButtonProps()}>
+            <Button data-testid="patch-reject-button" disabled={busy || !canWrite} onClick={() => void reject()} {...dashboardOutlineButtonProps()}>
               Reject patch
             </Button>
           </div>

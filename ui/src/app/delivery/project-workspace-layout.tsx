@@ -4,6 +4,7 @@ import { Link, Navigate, Outlet, useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ChevronLeft, ChevronRight, Plus } from '@/lib/icons'
+import { LivingColorSidebarBrand } from '@/components/livingcolor-logo'
 import { cn } from '@/lib/utils'
 import { useFirebaseAuth } from '@/hooks/use-firebase-auth'
 
@@ -23,34 +24,6 @@ import { projectRoute, projectTabRoute } from './project-navigation'
 
 const SIDEBAR_WIDTH_EXPANDED = 'w-60'
 const SIDEBAR_WIDTH_COLLAPSED = 'w-14'
-
-function brandAssetPath(path: string): string {
-  return `${import.meta.env.BASE_URL}${path.replace(/^\/+/, '')}`
-}
-
-function LivingColorBrandMark({ collapsed }: { collapsed: boolean }) {
-  if (collapsed) {
-    return (
-      <img
-        alt="LivingColor"
-        className="size-8 object-contain"
-        height={32}
-        src={brandAssetPath('livingcolor-frog.png')}
-        width={32}
-      />
-    )
-  }
-
-  return (
-    <img
-      alt="LivingColor"
-      className="h-7 w-auto max-w-[9.5rem] object-contain object-left"
-      height={28}
-      src={brandAssetPath('livingcolor-logo-white.png')}
-      width={152}
-    />
-  )
-}
 
 function ProjectWorkspaceEmptyState({ onCreateProject }: { onCreateProject: () => void }) {
   const { enabled, status } = useFirebaseAuth()
@@ -116,7 +89,7 @@ function ProjectWorkspaceSidebar() {
     <>
       <div
         className={cn(
-          'relative flex flex-col justify-center gap-2 border-b border-white/10',
+          'relative flex flex-col justify-center gap-2 border-b border-border',
           collapsed ? 'items-center px-2 pb-3' : 'px-4 pb-3'
         )}
       >
@@ -126,7 +99,7 @@ function ProjectWorkspaceSidebar() {
               className={cn('flex items-center', collapsed ? 'size-9 justify-center' : 'min-h-7')}
               to={DASHBOARD_ROUTE}
             >
-              <LivingColorBrandMark collapsed={collapsed} />
+              <LivingColorSidebarBrand collapsed={collapsed} />
             </Link>
           </SidebarTooltipItem>
         </div>
@@ -144,9 +117,9 @@ function ProjectWorkspaceSidebar() {
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           className={cn(
             'absolute -right-[14px] bottom-2 z-10 flex size-6 items-center justify-center',
-            'rounded-full border border-white/20 bg-black text-white/60 shadow-sm',
-            'transition-colors hover:bg-white/10 hover:text-white/90',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25'
+            'rounded-full border border-border bg-card text-muted-foreground shadow-sm',
+            'transition-colors hover:bg-accent hover:text-foreground',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
           )}
           onClick={toggleCollapsed}
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -170,7 +143,7 @@ function ProjectWorkspaceSidebar() {
   return (
     <aside
       className={cn(
-        'flex h-full flex-col border-r border-white/10 bg-black pt-[calc(var(--titlebar-height)+1rem)] transition-[width] duration-300 ease-in-out',
+        'flex h-full flex-col border-r border-border bg-card pt-3 transition-[width] duration-300 ease-in-out',
         collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED
       )}
     >
@@ -185,7 +158,7 @@ function ProjectWorkspaceShell({
   targetTab?: '' | '/settings' | '/integrations'
 }) {
   return (
-    <div className="flex h-full min-w-0 overflow-hidden bg-black">
+    <div className="flex h-full min-w-0 overflow-hidden">
       <ProjectWorkspaceSidebar />
       <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
         <ProjectWorkspaceMain targetTab={targetTab} />

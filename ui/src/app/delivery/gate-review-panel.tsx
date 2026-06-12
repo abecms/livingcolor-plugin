@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { dashboardOutlineButtonProps, dashboardPrimaryButtonProps, DASHBOARD_SHEET_BODY_CLASS, DASHBOARD_SHEET_HEADER_CLASS } from './dashboard-ui'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Textarea } from '@/components/ui/textarea'
+import { useWorkOrderLock } from '@/hooks/use-work-order-lock'
 import { approveDeliveryGate, rejectDeliveryGate } from '@/lib/delivery'
 import { notify, notifyError } from '@/store/notifications'
 
@@ -11,6 +12,7 @@ import { asAnalysisPlanPayload } from './gate-payload'
 import { sectionsFromJiraContextUsed } from './gate-payload-formatters'
 import { GatePayloadSections } from './gate-payload-sections'
 import type { DeliveryGate, WorkOrder } from './types'
+import { WorkOrderLockNotice } from './work-order-lock-notice'
 
 export function GateReviewPanel({
   gate,
@@ -27,6 +29,7 @@ export function GateReviewPanel({
 }) {
   const [feedback, setFeedback] = useState('')
   const [busy, setBusy] = useState(false)
+  const { canWrite, lockMessage } = useWorkOrderLock(workOrder?.id)
 
   if (!workOrder || !gate) {
     return null
@@ -81,6 +84,7 @@ export function GateReviewPanel({
         </SheetHeader>
 
         <div className={DASHBOARD_SHEET_BODY_CLASS} data-testid="gate-review-panel">
+          <WorkOrderLockNotice message={lockMessage} />
           <PlanSection label="Ticket understanding" value={payload.ticketUnderstanding} />
           <PlanSection label="Target repository" value={payload.targetRepo} />
           <PlanSection label="Implementation plan" value={payload.implementationPlan} preformatted />
@@ -113,10 +117,10 @@ export function GateReviewPanel({
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button data-testid="gate-approve-button" disabled={busy} onClick={() => void approve()} {...dashboardPrimaryButtonProps()}>
+            <Button data-testid="gate-approve-button" disabled={busy || !canWrite} onClick={() => void approve()} {...dashboardPrimaryButtonProps()}>
               Approve plan
             </Button>
-            <Button data-testid="gate-reject-button" disabled={busy} onClick={() => void reject()} {...dashboardOutlineButtonProps()}>
+            <Button data-testid="gate-reject-button" disabled={busy || !canWrite} onClick={() => void reject()} {...dashboardOutlineButtonProps()}>
               Reject and replan
             </Button>
           </div>

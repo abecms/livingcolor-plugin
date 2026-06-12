@@ -74,8 +74,8 @@ export function readFirebaseWebConfig(): FirebaseWebConfig | null {
  *
  * Order:
  * 1. VITE_* (local dev override, gitignored .env.local)
- * 2. LivingColor backend `/api/firebase/client-config` (requires admin configured)
- * 3. Committed cloud defaults when backend reports enabled but omits fields
+ * 2. Hermes plugin `/api/firebase/client-config` when admin is configured (optional)
+ * 3. Embedded `livingcolor-app` defaults (always available — no local service account)
  */
 export async function resolveFirebaseWebConfig(): Promise<FirebaseWebConfig | null> {
   if (_resolvedConfig !== undefined) {
@@ -95,25 +95,21 @@ export async function resolveFirebaseWebConfig(): Promise<FirebaseWebConfig | nu
 
     try {
       const payload = await fetchFirebaseClientConfig()
-      if (!payload.enabled) {
-        _resolvedConfig = null
-        _resolvedSource = 'none'
-        return null
+      if (payload.enabled) {
+        const fromBackend = normalizeBackendConfig(payload.config)
+        if (fromBackend) {
+          _resolvedConfig = fromBackend
+          _resolvedSource = 'backend'
+          return fromBackend
+        }
       }
-      const fromBackend = normalizeBackendConfig(payload.config)
-      if (fromBackend) {
-        _resolvedConfig = fromBackend
-        _resolvedSource = 'backend'
-        return fromBackend
-      }
-      _resolvedConfig = LIVINGCOLOR_CLOUD_FIREBASE_CONFIG
-      _resolvedSource = 'cloud-defaults'
-      return LIVINGCOLOR_CLOUD_FIREBASE_CONFIG
     } catch {
-      _resolvedConfig = null
-      _resolvedSource = 'none'
-      return null
+      // Local Hermes plugin may not mount firebase routes — use embedded defaults.
     }
+
+    _resolvedConfig = LIVINGCOLOR_CLOUD_FIREBASE_CONFIG
+    _resolvedSource = 'cloud-defaults'
+    return LIVINGCOLOR_CLOUD_FIREBASE_CONFIG
   })()
 
   return _resolvePromise

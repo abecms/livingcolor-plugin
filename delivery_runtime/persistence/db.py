@@ -18,7 +18,7 @@ from delivery_runtime.persistence.paths import (
     get_project_mapping_path,
 )
 
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 
 LOCAL_ORG_ID = "local"
 
@@ -221,6 +221,18 @@ CREATE TABLE IF NOT EXISTS sprint_state (
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_sprint_state_org_project
     ON sprint_state(org_id, project_key);
+
+CREATE TABLE IF NOT EXISTS pending_cloud_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    org_id TEXT NOT NULL,
+    wo_id TEXT NOT NULL,
+    payload_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    flushed_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_pending_cloud_events_org_pending
+    ON pending_cloud_events(org_id, flushed_at, id);
 """
 
 _SCHEMA_V5_SQL = """
@@ -316,6 +328,20 @@ CREATE TABLE IF NOT EXISTS project_memory (
     highlights_json TEXT NOT NULL DEFAULT '[]',
     updated_at TEXT NOT NULL
 );
+"""
+
+_SCHEMA_V11_SQL = """
+CREATE TABLE IF NOT EXISTS pending_cloud_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    org_id TEXT NOT NULL,
+    wo_id TEXT NOT NULL,
+    payload_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    flushed_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_pending_cloud_events_org_pending
+    ON pending_cloud_events(org_id, flushed_at, id);
 """
 
 _SCHEMA_V6_SQL = """
@@ -564,6 +590,9 @@ def _apply_schema_migrations(conn: sqlite3.Connection) -> None:
 
     if current < 8:
         _migrate_org_id_columns(conn)
+
+    if current < 11:
+        conn.executescript(_SCHEMA_V11_SQL)
 
 
 def _configure_connection(conn: sqlite3.Connection, *, busy_timeout_ms: int = _BUSY_TIMEOUT_MS) -> None:

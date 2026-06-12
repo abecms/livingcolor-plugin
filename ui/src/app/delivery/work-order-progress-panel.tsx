@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { useWorkOrderLock } from '@/hooks/use-work-order-lock'
 import { fetchMrDraft, fetchWorkOrder, findLatestApprovedAnalysisGate, workOrderNeedsResume } from '@/lib/delivery'
 import { ExternalLink } from '@/lib/external-link'
 
@@ -9,6 +10,7 @@ import { dashboardPrimaryButtonProps, DASHBOARD_SHEET_BODY_CLASS, DASHBOARD_SHEE
 import { asAnalysisPlanPayload } from './gate-payload'
 import { formatGraphNodeLabel, formatWorkOrderStage } from './stage-labels'
 import type { GraphNode, MrDraftRecord, WorkOrder } from './types'
+import { WorkOrderLockNotice } from './work-order-lock-notice'
 
 const NODE_LABELS: Record<string, string> = {
   implementation_plan: 'Analysis & plan',
@@ -56,6 +58,7 @@ export function WorkOrderProgressPanel({
   const [resuming, setResuming] = useState(false)
   const [workOrder, setWorkOrder] = useState<WorkOrder | null>(initialWorkOrder)
   const [mrDraft, setMrDraft] = useState<MrDraftRecord | null>(null)
+  const { canWrite, lockMessage } = useWorkOrderLock(workOrder?.id)
 
   useEffect(() => {
     setWorkOrder(initialWorkOrder)
@@ -153,6 +156,7 @@ export function WorkOrderProgressPanel({
         </SheetHeader>
 
         <div className={DASHBOARD_SHEET_BODY_CLASS} data-testid="work-order-progress-panel">
+          <WorkOrderLockNotice message={lockMessage} />
           <div className="rounded-lg border border-(--ui-border-subtle) bg-(--ui-chat-surface-background) p-3">
             <div className="text-xs font-medium uppercase tracking-[0.14em] text-(--ui-text-tertiary)">Current state</div>
             <div className="mt-2 flex flex-wrap gap-2">
@@ -180,7 +184,7 @@ export function WorkOrderProgressPanel({
                 </p>
                 <Button
                   data-testid="work-order-resume-button"
-                  disabled={resuming || agentRunning}
+                  disabled={resuming || agentRunning || !canWrite}
                   onClick={() => void handleResume()}
                   size="sm"
                   {...dashboardPrimaryButtonProps()}

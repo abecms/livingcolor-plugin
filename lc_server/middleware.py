@@ -6,7 +6,14 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
-from lc_server.context import parse_project_context_headers, set_project_context
+from lc_server.context import (
+    parse_project_context_headers,
+    reset_project_context,
+    reset_request_bearer_token,
+    set_project_context,
+    set_request_bearer_token,
+)
+from lc_server.integrations.firebase_auth import extract_bearer_token
 from lc_server.integrations.project_mcp_runtime import apply_project_mcp_runtime
 
 
@@ -22,7 +29,8 @@ class ProjectContextMiddleware(BaseHTTPMiddleware):
             project_key=project_key,
             user_id=token_uid,
         )
-        token = set_project_context(ctx)
+        context_token = set_project_context(ctx)
+        auth_token = set_request_bearer_token(extract_bearer_token(request.headers.get("authorization")))
         try:
             if ctx.normalized_project_key():
                 from delivery_runtime.automation.project_context import try_activate_local_project
@@ -31,4 +39,5 @@ class ProjectContextMiddleware(BaseHTTPMiddleware):
                 apply_project_mcp_runtime(ctx.normalized_project_key())
             return await call_next(request)
         finally:
-            set_project_context(token)
+            reset_request_bearer_token(auth_token)
+            reset_project_context(context_token)

@@ -32,8 +32,8 @@ function NavItem({
         'flex items-center rounded-md text-sm transition-colors',
         collapsed ? 'size-9 justify-center' : 'gap-2 px-2 py-1.5',
         active
-          ? 'bg-white/10 font-medium text-white'
-          : 'text-white/55 hover:bg-white/5 hover:text-white/90'
+          ? 'bg-accent font-medium text-foreground'
+          : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
       )}
       title={collapsed ? label : undefined}
       to={projectTabRoute(projectKey, href)}
@@ -64,7 +64,7 @@ function SectionHeading({ label, collapsed }: { label: string; collapsed?: boole
 
   return (
     <div className="flex items-center justify-between px-2 pb-1 pt-3 first:pt-1">
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-white/40">{label}</span>
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
     </div>
   )
 }

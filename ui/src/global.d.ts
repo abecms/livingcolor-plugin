@@ -11,6 +11,11 @@ interface LivingColorDesktopBridge {
   touchBackend?: () => Promise<void> | void
 }
 
+declare module '*.png' {
+  const src: string
+  export default src
+}
+
 declare global {
   interface Window {
     livingColorDesktop?: LivingColorDesktopBridge

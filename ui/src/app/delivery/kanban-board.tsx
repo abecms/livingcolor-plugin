@@ -10,9 +10,9 @@ import type { KanbanCard, KanbanColumn } from './kanban-routing'
 import { formatWorkOrderStage } from './stage-labels'
 
 const COLUMN_ACCENTS = {
-  neutral: 'text-white/45',
-  warning: 'text-white/75',
-  muted: 'text-white/35'
+  neutral: 'text-muted-foreground',
+  warning: 'text-foreground',
+  muted: 'text-muted-foreground/70'
 } as const
 
 export const KANBAN_COLUMN_MIN_WIDTH = '15.12rem'
@@ -53,7 +53,7 @@ export function KanbanBoard({
           </div>
           <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-y-contain pr-1">
             {column.cards.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-white/[0.08] px-3 py-8 text-center text-[11px] text-(--ui-text-tertiary) opacity-60">
+              <div className="rounded-xl border border-dashed border-border px-3 py-8 text-center text-[11px] text-muted-foreground opacity-60">
                 Empty
               </div>
             ) : (
@@ -121,10 +121,10 @@ function KanbanCardView({
   return (
     <div
       className={cn(
-        'w-full rounded-xl border bg-white/[0.03] p-4 transition-colors',
-        isGate ? 'border-white/25' : 'border-white/[0.08]',
+        'w-full rounded-xl border bg-card p-4 transition-colors',
+        isGate ? 'border-ring/50' : 'border-border',
         isDone ? 'opacity-55' : null,
-        clickable ? 'cursor-pointer hover:border-white/25' : null
+        clickable ? 'cursor-pointer hover:border-ring/40' : null
       )}
       onClick={handleCardClick}
       onKeyDown={clickable ? handleKeyDown : undefined}
@@ -132,7 +132,7 @@ function KanbanCardView({
       tabIndex={clickable ? 0 : undefined}
     >
       <TicketKeyBadge>{card.jiraKey}</TicketKeyBadge>
-      <div className="mt-2 text-sm font-medium leading-snug text-white/90">
+      <div className="mt-2 text-sm font-medium leading-snug text-foreground">
         {card.workOrderId ? (
           card.title
         ) : (
@@ -140,7 +140,7 @@ function KanbanCardView({
         )}
         {isDone ? ' ✓' : ''}
       </div>
-      <div className="mt-1.5 space-y-0.5 text-[10px] text-white/45">
+      <div className="mt-1.5 space-y-0.5 text-[10px] text-muted-foreground">
         {card.estimatedDays != null ? <div>Estim. {formatTicketEstimationHours(card.estimatedDays)}</div> : null}
         {card.priorityRank != null ? <div>Prio #{card.priorityRank}</div> : null}
         {card.currentStage ? <div>⚙ {formatWorkOrderStage(card.currentStage)}</div> : null}

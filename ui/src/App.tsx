@@ -10,6 +10,7 @@ import {
 import { ProjectDeliveryDashboardView } from './app/delivery/project-dashboard'
 import { DASHBOARD_ROUTE, DELIVERY_ROUTE } from './app/routes'
 import { FirebaseAuthGate } from '@/components/firebase-auth-gate'
+import { OfflineBanner } from '@/components/offline-banner'
 import { FirebaseAuthProvider } from '@/contexts/firebase-auth-provider'
 import { I18nProvider } from '@/i18n'
 
@@ -57,6 +58,7 @@ export default function App() {
   return (
     <FirebaseAuthProvider>
       <FirebaseAuthGate>
+        <OfflineBanner />
         <DeliveryApp />
       </FirebaseAuthGate>
     </FirebaseAuthProvider>

@@ -30,11 +30,29 @@ class EventStore:
 
         if conn is not None:
             record["id"] = self._insert(conn, record)
+            self._mirror_team_event(record)
             return record
 
         with connect() as owned:
             record["id"] = self._insert(owned, record)
+        self._mirror_team_event(record)
         return record
+
+    def _mirror_team_event(self, record: dict[str, Any]) -> None:
+        work_order_id = record.get("work_order_id")
+        if not work_order_id:
+            return
+        try:
+            from lc_server.integrations.cloud_sync import publish_team_delivery_event
+
+            publish_team_delivery_event(
+                work_order_id=work_order_id,
+                event_type=str(record.get("event_type") or "state_change"),
+                payload=dict(record.get("payload") or {}),
+            )
+        except Exception:
+            logger = __import__("logging").getLogger(__name__)
+            logger.debug("Team cloud sync skipped for %s", work_order_id, exc_info=True)
 
     def list_for_work_order(
         self,

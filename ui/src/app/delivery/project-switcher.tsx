@@ -94,10 +94,7 @@ export function ProjectSwitcher({
           size={collapsed ? 'icon' : 'sm'}
           title={collapsed ? 'Create project' : undefined}
           variant="outline"
-          className={cn(
-            'border-white/15 bg-transparent text-white/65 shadow-none hover:border-white/20 hover:bg-white/5 hover:text-white/90',
-            collapsed ? 'size-9' : 'w-full justify-start gap-2'
-          )}
+          className={cn(collapsed ? 'size-9' : 'w-full justify-start gap-2')}
         >
           <Plus className="size-4" />
           {!collapsed ? 'Create project' : null}
@@ -113,7 +110,6 @@ export function ProjectSwitcher({
           <Button
             aria-label="Select project"
             className={cn(
-              'border-white/15 bg-black text-white/90 shadow-none hover:border-white/25 hover:bg-white/5',
               collapsed ? 'size-9' : 'h-9 w-full justify-between gap-2 px-2.5 font-normal'
             )}
             size={collapsed ? 'icon' : 'default'}

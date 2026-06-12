@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { dashboardOutlineButtonProps, dashboardPrimaryButtonProps, DASHBOARD_SHEET_BODY_CLASS, DASHBOARD_SHEET_HEADER_CLASS } from './dashboard-ui'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Textarea } from '@/components/ui/textarea'
+import { useWorkOrderLock } from '@/hooks/use-work-order-lock'
 import { approveMrDraft, rejectMrDraft } from '@/lib/delivery'
 import { ExternalLink } from '@/lib/external-link'
 import { notify, notifyError } from '@/store/notifications'
@@ -12,6 +13,7 @@ import { sectionsFromQaChecklist } from './gate-payload-formatters'
 import { GatePayloadSections } from './gate-payload-sections'
 import type { DecisionTraceFileDecision, DecisionTracePayload } from './types'
 import type { DeliveryGate, WorkOrder } from './types'
+import { WorkOrderLockNotice } from './work-order-lock-notice'
 
 export interface MrDraftPayload {
   draftId?: string
@@ -48,6 +50,7 @@ export function MrDraftReviewPanel({
 }) {
   const [feedback, setFeedback] = useState('')
   const [busy, setBusy] = useState(false)
+  const { canWrite, lockMessage } = useWorkOrderLock(workOrder?.id)
 
   if (!workOrder || !gate) {
     return null
@@ -112,6 +115,7 @@ export function MrDraftReviewPanel({
         </SheetHeader>
 
         <div className={DASHBOARD_SHEET_BODY_CLASS} data-testid="mr-draft-review-panel">
+          <WorkOrderLockNotice message={lockMessage} />
           {payload.mrUrl ? (
             <p className="text-sm" data-testid="mr-draft-gitlab-link">
               <ExternalLink href={payload.mrUrl}>
@@ -154,10 +158,10 @@ export function MrDraftReviewPanel({
           </div>
 
           <div className="flex gap-2">
-            <Button data-testid="mr-draft-approve" disabled={busy} onClick={() => void approve()} {...dashboardPrimaryButtonProps()}>
+            <Button data-testid="mr-draft-approve" disabled={busy || !canWrite} onClick={() => void approve()} {...dashboardPrimaryButtonProps()}>
               Approve Draft
             </Button>
-            <Button data-testid="mr-draft-reject" disabled={busy} onClick={() => void reject()} {...dashboardOutlineButtonProps()}>
+            <Button data-testid="mr-draft-reject" disabled={busy || !canWrite} onClick={() => void reject()} {...dashboardOutlineButtonProps()}>
               Reject Draft
             </Button>
           </div>
