@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
 from typing import Any
@@ -105,3 +106,36 @@ def _fetch_github_repositories(mcp_config: dict) -> list[dict]:
 
 def discover_github_repos_for_project(project_key: str, mcp_config: dict) -> GitHubDiscoveryResult:
     return discover_github_repos(project_key, _fetch_github_repositories(mcp_config))
+
+
+def repo_path_and_number_from_pr_url(pr_url: str) -> tuple[str, int]:
+    parsed = urllib.parse.urlparse(pr_url)
+    parts = [part for part in parsed.path.strip("/").split("/") if part]
+    if parsed.netloc.lower() != "github.com" or len(parts) != 4 or parts[2] != "pull":
+        raise ValueError(f"not a GitHub PR url: {pr_url}")
+    return f"{parts[0]}/{parts[1]}", int(parts[3])
+
+
+def verify_pull_request_exists(*, mcp_config: dict, repo_path: str, pr_number: int) -> dict[str, Any] | None:
+    token = github_token_from_config(mcp_config)
+    if not token:
+        raise ValueError("GitHub token is required in MCP config env (GITHUB_TOKEN)")
+    url = f"{_GITHUB_API_URL}/repos/{repo_path.strip('/')}/pulls/{int(pr_number)}"
+    request = urllib.request.Request(
+        url,
+        headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"},
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=_FETCH_TIMEOUT_SECONDS) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            return None
+        body = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"GitHub PR verification failed ({exc.code}): {body}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"GitHub PR verification failed: {exc.reason}") from exc
+    if not isinstance(payload, dict):
+        raise RuntimeError("GitHub API returned an unexpected pull request payload")
+    return payload

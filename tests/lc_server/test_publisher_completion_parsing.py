@@ -8,6 +8,23 @@ from lc_server.agent_bridge.hermes_publisher import (
 )
 
 
+def test_parses_provider_neutral_github_completion():
+    text = (
+        "Pushed and created the PR.\n"
+        '```json\n{"reviewRequestUrl": "https://github.com/org/app/pull/42", '
+        '"reviewRequestNumber": 42, "targetBranch": "main", '
+        '"provider": "github", "status": "published"}\n```'
+    )
+
+    result = parse_publisher_completion(text)
+
+    assert result["reviewRequestUrl"] == "https://github.com/org/app/pull/42"
+    assert result["reviewRequestNumber"] == 42
+    assert result["reviewRequestProvider"] == "github"
+    assert result["mrUrl"] == "https://github.com/org/app/pull/42"
+    assert result["mrIid"] == 42
+
+
 def test_parses_published_block():
     text = (
         "Pushed and created the MR.\n"

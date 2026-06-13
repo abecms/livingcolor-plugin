@@ -66,14 +66,18 @@ def parse_publisher_completion(text: str) -> dict[str, Any]:
     if status != "published":
         raise PublisherCompletionError(f"unexpected publisher status: {status!r}")
 
-    mr_iid = payload.get("mrIid")
-    mr_url = str(payload.get("mrUrl") or "")
-    if not isinstance(mr_iid, int) or isinstance(mr_iid, bool) or not mr_url:
-        raise PublisherCompletionError("publisher completion missing mrUrl/mrIid")
+    review_url = str(payload.get("reviewRequestUrl") or payload.get("mrUrl") or "")
+    review_number = payload.get("reviewRequestNumber", payload.get("mrIid"))
+    provider = str(payload.get("provider") or payload.get("reviewRequestProvider") or "gitlab")
+    if not isinstance(review_number, int) or isinstance(review_number, bool) or not review_url:
+        raise PublisherCompletionError("publisher completion missing review request url/number")
 
     return {
-        "mrUrl": mr_url,
-        "mrIid": mr_iid,
+        "reviewRequestUrl": review_url,
+        "reviewRequestNumber": review_number,
+        "reviewRequestProvider": provider,
+        "mrUrl": review_url,
+        "mrIid": review_number,
         "targetBranch": str(payload.get("targetBranch") or ""),
         "status": "published",
     }
@@ -206,6 +210,29 @@ class HermesPublisherAgent:
 
     @staticmethod
     def _verify_mr_exists(project_key: str | None, completion: dict[str, Any]) -> None:
+        provider = str(completion.get("reviewRequestProvider") or "gitlab")
+        if provider == "github":
+            from delivery_runtime.readiness.project_settings import resolve_project_mcp_server
+            from lc_server.integrations.vcs.github import (
+                repo_path_and_number_from_pr_url,
+                verify_pull_request_exists,
+            )
+
+            mcp_config = resolve_project_mcp_server(project_key or "", "github")
+            try:
+                repo_path, pr_number = repo_path_and_number_from_pr_url(completion["reviewRequestUrl"])
+            except ValueError as exc:
+                raise PublisherCompletionError(str(exc)) from exc
+
+            found = verify_pull_request_exists(
+                mcp_config=mcp_config,
+                repo_path=repo_path,
+                pr_number=pr_number,
+            )
+            if found is None:
+                raise PublisherCompletionError("PR not found in GitHub after publication")
+            return
+
         from lc_server.integrations.gitlab_mr_verification import (
             load_project_gitlab_mcp_config,
             repo_path_from_mr_url,
