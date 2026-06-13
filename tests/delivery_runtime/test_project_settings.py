@@ -138,7 +138,7 @@ def test_persist_project_default_repo_updates_all_agent_manifests_and_automation
     assert automation["defaultRepo"] == target_repo
 
 
-def test_project_vcs_provider_defaults_to_gitlab(tmp_path, monkeypatch):
+def test_project_vcs_provider_defaults_to_gitlab(livingcolor_home):
     from delivery_runtime.readiness.project_settings import load_project_vcs_provider
 
     assert load_project_vcs_provider("BN") == "gitlab"
@@ -154,3 +154,34 @@ def test_persist_project_vcs_provider_writes_mapping(livingcolor_home):
     assert persist_project_vcs_provider("BN", "github") == "github"
     assert load_project_vcs_provider("BN") == "github"
     assert load_project_mapping()["BN"]["vcs"] == "github"
+
+
+def test_project_config_update_rejects_unsupported_vcs_provider(monkeypatch):
+    from fastapi import HTTPException
+
+    from delivery_runtime.api.routes import update_project_config
+    from delivery_runtime.api.schemas import ProjectConfigUpdateRequest
+
+    monkeypatch.setattr(
+        "delivery_runtime.api.routes._activate_local_project_from_request",
+        lambda _request: "BN",
+    )
+    monkeypatch.setattr(
+        "delivery_runtime.automation.config.save_delivery_project_config",
+        lambda **_kwargs: None,
+    )
+
+    request = ProjectConfigUpdateRequest(
+        sprintDurationDays=14,
+        sprintCapacityDays=15,
+        communicationLanguage="fr",
+        vcs="bitbucket",
+    )
+
+    try:
+        update_project_config(request, None)  # type: ignore[arg-type]
+    except HTTPException as exc:
+        assert exc.status_code == 400
+        assert "Unsupported VCS provider" in str(exc.detail)
+    else:
+        raise AssertionError("Expected unsupported VCS provider to return HTTP 400")

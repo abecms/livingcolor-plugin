@@ -550,7 +550,10 @@ def update_project_config(body: ProjectConfigUpdateRequest, request: Request) ->
         if branch:
             persist_project_integration_branch(target_key, branch)
     if body.vcs is not None:
-        persist_project_vcs_provider(target_key, body.vcs)
+        try:
+            persist_project_vcs_provider(target_key, body.vcs)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
     config = load_delivery_automation_config(project_key=request_key)
     project_key = request_key or config.project_key
     project_name = _project_name_for_key(project_key, config.project_name)
