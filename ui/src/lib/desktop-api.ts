@@ -55,6 +55,27 @@ function isFirebaseTokenApiError(error: unknown): boolean {
   )
 }
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs?: number): Promise<T> {
+  if (!timeoutMs || timeoutMs <= 0) {
+    return promise
+  }
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      reject(new Error(`Request timed out after ${Math.round(timeoutMs / 1000)}s`))
+    }, timeoutMs)
+    promise.then(
+      value => {
+        window.clearTimeout(timer)
+        resolve(value)
+      },
+      error => {
+        window.clearTimeout(timer)
+        reject(error)
+      }
+    )
+  })
+}
+
 export async function callDesktopApi<T>(request: LivingColorApiRequest): Promise<T> {
   const sdk = (window as any).__HERMES_PLUGIN_SDK__
   if (!sdk) {
@@ -71,8 +92,10 @@ export async function callDesktopApi<T>(request: LivingColorApiRequest): Promise
     return sdk.fetchJSON(rewrite(request.path), init) as Promise<T>
   }
 
+  const run = async () => withTimeout(execute(), request.timeoutMs)
+
   try {
-    return await execute()
+    return await run()
   } catch (error) {
     if (!isFirebaseTokenApiError(error)) {
       throw error
@@ -82,6 +105,6 @@ export async function callDesktopApi<T>(request: LivingColorApiRequest): Promise
       throw error
     }
     setFirebaseIdToken(freshToken)
-    return execute()
+    return run()
   }
 }

@@ -104,12 +104,20 @@ export async function resolveFirebaseWebConfig(): Promise<FirebaseWebConfig | nu
         }
       }
     } catch {
-      // Local Hermes plugin may not mount firebase routes — use embedded defaults.
+      // Hermes plugin without Firebase Admin — Personal mode only.
     }
 
-    _resolvedConfig = LIVINGCOLOR_CLOUD_FIREBASE_CONFIG
-    _resolvedSource = 'cloud-defaults'
-    return LIVINGCOLOR_CLOUD_FIREBASE_CONFIG
+    // Shipped dashboard bundle: enable Team sign-in via cloud API (Personal still works).
+    // Local Hermes firebase routes return enabled:false; session calls go to VisualQ.
+    if (import.meta.env.PROD || import.meta.env.VITE_LC_ENABLE_TEAM_AUTH === 'true') {
+      _resolvedConfig = LIVINGCOLOR_CLOUD_FIREBASE_CONFIG
+      _resolvedSource = 'cloud-defaults'
+      return LIVINGCOLOR_CLOUD_FIREBASE_CONFIG
+    }
+
+    _resolvedConfig = null
+    _resolvedSource = 'none'
+    return null
   })()
 
   return _resolvePromise

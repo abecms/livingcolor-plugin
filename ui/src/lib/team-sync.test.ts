@@ -16,7 +16,24 @@ vi.mock('@/store/notifications', () => ({
   notifyError: vi.fn()
 }))
 
-import { flushPendingEvents } from '@/lib/team-sync'
+import { flushPendingEvents, pingCloudHealth } from '@/lib/team-sync'
+
+describe('pingCloudHealth', () => {
+  beforeEach(() => {
+    callCloudApi.mockReset()
+  })
+
+  it('uses the cloud API client (Hermes proxy in dashboard tab)', async () => {
+    callCloudApi.mockResolvedValueOnce({ status: 'ok' })
+    await expect(pingCloudHealth()).resolves.toBe(true)
+    expect(callCloudApi).toHaveBeenCalledWith({ path: '/v1/health', public: true })
+  })
+
+  it('returns false when the health probe fails', async () => {
+    callCloudApi.mockRejectedValueOnce(new Error('503'))
+    await expect(pingCloudHealth()).resolves.toBe(false)
+  })
+})
 
 describe('flushPendingEvents', () => {
   beforeEach(() => {

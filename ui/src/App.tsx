@@ -17,7 +17,8 @@ import { I18nProvider } from '@/i18n'
 function DeliveryApp() {
   return (
     <I18nProvider configClient={null}>
-      <BrowserRouter basename="/livingcolor">
+      <div className="flex h-full min-h-0 flex-1 flex-col">
+        <BrowserRouter basename="/livingcolor">
         <Routes>
           <Route element={<ProjectWorkspaceLandingRedirect />} index />
           <Route
@@ -32,7 +33,8 @@ function DeliveryApp() {
           </Route>
           <Route element={<Navigate replace to="/" />} path="*" />
         </Routes>
-      </BrowserRouter>
+        </BrowserRouter>
+      </div>
     </I18nProvider>
   )
 }
@@ -58,8 +60,12 @@ export default function App() {
   return (
     <FirebaseAuthProvider>
       <FirebaseAuthGate>
-        <OfflineBanner />
-        <DeliveryApp />
+        <div className="lc-app">
+          <OfflineBanner />
+          <div className="lc-app-body">
+            <DeliveryApp />
+          </div>
+        </div>
       </FirebaseAuthGate>
     </FirebaseAuthProvider>
   )

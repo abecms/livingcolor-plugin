@@ -16,7 +16,8 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
-import { Check, Layers3, Plus } from '@/lib/icons'
+import { FirebaseLoginPage } from '@/app/auth/firebase-login-page'
+import { Check, Layers3, LogIn, Plus } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import { notifyError } from '@/store/notifications'
 import { useStore } from '@nanostores/react'
@@ -33,10 +34,19 @@ export function WorkspaceOrgSwitcher({
   className?: string
   iconOnly?: boolean
 }) {
-  const { activeOrg, activeOrgId, organizations, createTeam, switchOrganization, switchToLocalProjects } =
-    useFirebaseAuth()
+  const {
+    activeOrg,
+    activeOrgId,
+    enabled,
+    organizations,
+    status,
+    createTeam,
+    switchOrganization,
+    switchToLocalProjects
+  } = useFirebaseAuth()
   const workspaceScope = useStore($workspaceScope)
   const [createOpen, setCreateOpen] = useState(false)
+  const [signInOpen, setSignInOpen] = useState(false)
   const [teamName, setTeamName] = useState('')
   const [creating, setCreating] = useState(false)
   const isLocal = isLocalWorkspaceScope(workspaceScope)
@@ -82,6 +92,12 @@ export function WorkspaceOrgSwitcher({
             {isLocal ? <Check className="size-4 shrink-0 text-foreground" /> : null}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
+          {enabled && status === 'signed-out' && organizations.length === 0 ? (
+            <DropdownMenuItem onClick={() => setSignInOpen(true)}>
+              <LogIn className="mr-2 size-4" />
+              Sign in to load team workspaces
+            </DropdownMenuItem>
+          ) : null}
           {organizations.map(org => (
             <DropdownMenuItem key={org.id} onClick={() => void switchOrganization(org.id)}>
               <div className="min-w-0 flex-1">
@@ -96,12 +112,18 @@ export function WorkspaceOrgSwitcher({
             </DropdownMenuItem>
           ))}
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => setCreateOpen(true)}>
+          <DropdownMenuItem disabled={!enabled || status !== 'signed-in'} onClick={() => setCreateOpen(true)}>
             <Plus className="mr-2 size-4" />
             Create team workspace
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <Dialog onOpenChange={setSignInOpen} open={signInOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
+          <FirebaseLoginPage />
+        </DialogContent>
+      </Dialog>
 
       <Dialog onOpenChange={setCreateOpen} open={createOpen}>
         <DialogContent className="sm:max-w-md">

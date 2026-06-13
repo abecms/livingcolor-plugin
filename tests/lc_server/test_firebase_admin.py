@@ -28,3 +28,26 @@ def test_firebase_admin_configured_from_service_account_file(tmp_path, monkeypat
     payload = firebase_admin._load_service_account_dict()
     assert payload["client_email"] == "test@livingcolor-app.iam.gserviceaccount.com"
     assert payload["project_id"] == "livingcolor-app"
+
+
+def test_firebase_admin_configured_from_default_livingcolor_home(tmp_path, monkeypatch):
+    key_path = tmp_path / "firebase-service-account.json"
+    key_path.write_text(
+        json.dumps(
+            {
+                "type": "service_account",
+                "project_id": "livingcolor-app",
+                "private_key": "-----BEGIN PRIVATE KEY-----\\nabc\\n-----END PRIVATE KEY-----\\n",
+                "client_email": "test@livingcolor-app.iam.gserviceaccount.com",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("FIREBASE_SERVICE_ACCOUNT_PATH", raising=False)
+    monkeypatch.delenv("GOOGLE_APPLICATION_CREDENTIALS", raising=False)
+    monkeypatch.setattr(
+        firebase_admin,
+        "_default_service_account_candidates",
+        lambda: [key_path],
+    )
+    assert firebase_admin.firebase_admin_configured() is True

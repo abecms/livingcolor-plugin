@@ -1,6 +1,11 @@
 import { useCallback, useState } from 'react'
 
-import { runDailyAnalysis, type DailyAnalysisResult } from '@/lib/delivery'
+import {
+  fetchPmInbox,
+  runDailyAnalysis,
+  type DailyAnalysisResult,
+  type PmInboxPayload
+} from '@/lib/delivery'
 import { bumpProjectConfigRevision } from '@/store/project-config'
 import { notifyError, notify } from '@/store/notifications'
 
@@ -13,6 +18,8 @@ export type DailyAnalysisLastRun = {
 
 const TIME_FMT = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' })
 const DATE_FMT = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
+const POLL_INTERVAL_MS = 2_000
+const POLL_TIMEOUT_MS = 600_000
 
 function isSameCalendarDay(left: Date, right: Date): boolean {
   return (
@@ -75,6 +82,45 @@ function analysisSuccessMessage(result: DailyAnalysisResult): string {
   return `Daily analysis complete: ${inScope} ticket(s) in scope${fetchDetail}, ${analyzed} analyzed, ${estimated} ready with estimate, ${sprintTickets} in sprint.`
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => {
+    window.setTimeout(resolve, ms)
+  })
+}
+
+async function waitForDailyAnalysisCompletion(projectKey?: string): Promise<PmInboxPayload> {
+  const deadline = Date.now() + POLL_TIMEOUT_MS
+  let sawRunning = false
+
+  while (Date.now() < deadline) {
+    await sleep(POLL_INTERVAL_MS)
+    const inbox = await fetchPmInbox(projectKey)
+    const lastRun = inbox.lastRun
+    if (!lastRun) {
+      continue
+    }
+
+    if (lastRun.status === 'running') {
+      sawRunning = true
+      continue
+    }
+
+    if (lastRun.status === 'failed') {
+      throw new Error(lastRun.errorMessage?.trim() || 'Daily analysis failed')
+    }
+
+    if (lastRun.status === 'completed') {
+      return inbox
+    }
+
+    if (sawRunning) {
+      return inbox
+    }
+  }
+
+  throw new Error('Daily analysis timed out after 10 minutes')
+}
+
 export function useDailyAnalysis(onSuccess?: () => void | Promise<void>) {
   const [running, setRunning] = useState(false)
 
@@ -82,11 +128,24 @@ export function useDailyAnalysis(onSuccess?: () => void | Promise<void>) {
     async (projectKey?: string) => {
       setRunning(true)
       try {
-        const result = await runDailyAnalysis(projectKey)
+        const started = await runDailyAnalysis(projectKey)
+        if (started.status !== 'started') {
+          bumpProjectConfigRevision()
+          notify({ kind: 'success', message: analysisSuccessMessage(started) })
+          await onSuccess?.()
+          return started
+        }
+
+        const inbox = await waitForDailyAnalysisCompletion(projectKey)
         bumpProjectConfigRevision()
-        notify({ kind: 'success', message: analysisSuccessMessage(result) })
+        const lastRun = inbox.lastRun
+        const summary =
+          lastRun != null
+            ? `Daily analysis complete: ${lastRun.jiraSynced ?? 0} in scope, ${lastRun.analyzed ?? 0} analyzed, ${lastRun.estimated ?? 0} estimated.`
+            : 'Daily analysis complete.'
+        notify({ kind: 'success', message: summary })
         await onSuccess?.()
-        return result
+        return { status: 'completed', projectKey: inbox.projectKey }
       } catch (error) {
         notifyError(error, 'Daily analysis failed')
         throw error

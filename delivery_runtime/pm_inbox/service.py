@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import threading
 from typing import Any
+
+_ANALYSIS_LOCK = threading.Lock()
 
 from delivery_runtime.automation.config import load_delivery_automation_config
 from delivery_runtime.events.store import EventStore
@@ -29,12 +32,33 @@ class PmInboxService:
 
     def get_inbox(self, project_key: str | None = None) -> dict[str, Any]:
         key = (project_key or self.config.project_key).strip().upper()
+        from delivery_runtime.persistence.db import connect
+
+        with connect() as conn:
+            pm_store.fail_stale_daily_runs(conn)
         return build_pm_inbox(project_key=key, queue_consumer=self.queue_consumer)
+
+    def precheck_daily_analysis(self, project_key: str | None = None) -> str:
+        key = (project_key or self.config.project_key).strip().upper()
+        if not key:
+            raise ValueError("project_key is required")
+        from delivery_runtime.persistence.db import connect
+        from delivery_runtime.pm_inbox import store as pm_store
+
+        with connect() as conn:
+            pm_store.fail_stale_daily_runs(conn)
+            if pm_store.has_running_daily_run(conn):
+                raise ValueError(
+                    "Another daily analysis is already running. "
+                    "Wait for it to finish, then retry."
+                )
+        return key
 
     def run_daily_analysis(self, project_key: str | None = None) -> dict[str, Any]:
         key = (project_key or self.config.project_key).strip().upper()
-        result = self.pipeline.run(key)
-        auto_start = self.queue_consumer.try_consume(key)
+        with _ANALYSIS_LOCK:
+            result = self.pipeline.run(key)
+            auto_start = self.queue_consumer.try_consume(key)
         result["autoStart"] = auto_start
         return result
 

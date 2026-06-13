@@ -6,7 +6,9 @@ import asyncio
 import sqlite3
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+import logging
+
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 
 from delivery_runtime.api.deps import get_services
 from delivery_runtime.api.schemas import (
@@ -49,6 +51,7 @@ from delivery_runtime.api.schemas import (
 from delivery_runtime.readiness.errors import ReadinessIntegrationError
 
 router = APIRouter(tags=["delivery"])
+_log = logging.getLogger(__name__)
 
 
 def _delivery_db_unavailable_detail(exc: Exception) -> str:
@@ -607,17 +610,31 @@ def get_pm_inbox(project: str | None = None) -> PmInboxResponse:
     return PmInboxResponse.model_validate(payload)
 
 
+def _run_daily_analysis_background(services, project_key: str) -> None:
+    try:
+        services.pm_inbox.run_daily_analysis(project_key)
+    except Exception:
+        _log.exception("Background daily analysis failed for %s", project_key)
+
+
 @router.post("/pm-inbox/daily-analysis/run")
-async def run_daily_analysis(body: DailyAnalysisRunRequest | None = None) -> dict[str, Any]:
+async def run_daily_analysis(
+    background_tasks: BackgroundTasks,
+    body: DailyAnalysisRunRequest | None = None,
+) -> dict[str, Any]:
     services = get_services()
     project_key = body.projectKey.strip().upper() if body and body.projectKey else None
     try:
-        result = await asyncio.to_thread(services.pm_inbox.run_daily_analysis, project_key)
+        resolved_key = await asyncio.to_thread(services.pm_inbox.precheck_daily_analysis, project_key)
     except ReadinessIntegrationError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except sqlite3.OperationalError as exc:
+        raise HTTPException(status_code=503, detail=_delivery_db_unavailable_detail(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return result
+
+    background_tasks.add_task(_run_daily_analysis_background, services, resolved_key)
+    return {"status": "started", "projectKey": resolved_key}
 
 
 @router.get("/projects/{jira_project_key}/share-payload")

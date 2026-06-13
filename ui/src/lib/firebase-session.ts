@@ -187,6 +187,12 @@ export interface FirebaseClientConfigResponse {
   config: Record<string, string> | null
 }
 
-export function fetchFirebaseClientConfig(): Promise<FirebaseClientConfigResponse> {
-  return callCloudApi({ path: '/v1/config/firebase-client', public: true })
+export async function fetchFirebaseClientConfig(): Promise<FirebaseClientConfigResponse> {
+  try {
+    return await callDesktopApi<FirebaseClientConfigResponse>({
+      path: '/api/firebase/client-config'
+    })
+  } catch {
+    return callCloudApi({ path: '/v1/config/firebase-client', public: true })
+  }
 }

@@ -25,8 +25,24 @@ class FirebaseClientConfigResponse(BaseModel):
 
 
 class FirebaseBootstrapResponse(BaseModel):
+    enabled: bool = True
+    reason: str | None = None
     user: dict[str, Any]
     organizations: list[dict[str, Any]]
+
+
+class FirebaseDisabledPreferencesResponse(BaseModel):
+    enabled: bool = False
+    reason: str = "firebase_admin_not_configured"
+    orgId: str = "local"
+    preferences: dict[str, Any] = {}
+
+
+class FirebaseDisabledMeResponse(BaseModel):
+    enabled: bool = False
+    reason: str = "firebase_admin_not_configured"
+    user: dict[str, Any] | None = None
+    organizations: list[dict[str, Any]] = []
 
 
 class UserPreferencesUpdate(BaseModel):
@@ -65,9 +81,26 @@ def _store() -> FirestoreStore:
     return FirestoreStore()
 
 
+def _local_mode_bootstrap_response() -> FirebaseBootstrapResponse:
+    return FirebaseBootstrapResponse(
+        enabled=False,
+        reason="local_mode",
+        user={
+            "uid": "local",
+            "email": "",
+            "displayName": "Local workspace",
+            "activeOrgId": "local",
+        },
+        organizations=[],
+    )
+
+
 def _require_firebase_user(request: Request) -> FirebaseUser:
     if not firebase_auth_enabled():
-        raise HTTPException(status_code=503, detail="Firebase auth is not configured on this server")
+        raise HTTPException(
+            status_code=503,
+            detail="Firebase auth is not configured on this server",
+        )
     token = extract_bearer_token(request.headers.get("authorization"))
     if not token:
         raise HTTPException(status_code=401, detail="Missing Firebase ID token")
@@ -77,6 +110,18 @@ def _require_firebase_user(request: Request) -> FirebaseUser:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=401, detail="Invalid Firebase ID token") from exc
+
+
+def _optional_firebase_user(request: Request) -> FirebaseUser | None:
+    if not firebase_auth_enabled():
+        return None
+    token = extract_bearer_token(request.headers.get("authorization"))
+    if not token:
+        return None
+    try:
+        return verify_firebase_id_token(token)
+    except Exception:
+        return None
 
 
 def _active_org_id(request: Request, user: FirebaseUser) -> str:
@@ -103,7 +148,10 @@ def get_firebase_config() -> FirebaseClientConfigResponse:
 
 
 @router.post("/bootstrap", response_model=FirebaseBootstrapResponse)
-def bootstrap_session(user: FirebaseUser = Depends(_require_firebase_user)) -> FirebaseBootstrapResponse:
+def bootstrap_session(request: Request) -> FirebaseBootstrapResponse:
+    if not firebase_auth_enabled():
+        return _local_mode_bootstrap_response()
+    user = _require_firebase_user(request)
     try:
         payload = _store().bootstrap_user(user)
     except RuntimeError as exc:
@@ -112,10 +160,16 @@ def bootstrap_session(user: FirebaseUser = Depends(_require_firebase_user)) -> F
 
 
 @router.get("/me")
-def get_me(user: FirebaseUser = Depends(_require_firebase_user)) -> dict[str, Any]:
+def get_me(request: Request) -> dict[str, Any]:
+    if not firebase_auth_enabled():
+        return FirebaseDisabledMeResponse().model_dump()
+    user = _optional_firebase_user(request)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Missing Firebase ID token")
     store = _store()
     active_org_id = store.resolve_active_org_id(user)
     return {
+        "enabled": True,
         "user": {
             "uid": user.uid,
             "email": user.email,
@@ -154,13 +208,15 @@ def put_project_config(
 
 
 @router.get("/preferences")
-def get_preferences(
-    request: Request,
-    user: FirebaseUser = Depends(_require_firebase_user),
-) -> dict[str, Any]:
+def get_preferences(request: Request) -> dict[str, Any]:
+    if not firebase_auth_enabled():
+        return FirebaseDisabledPreferencesResponse().model_dump()
+    user = _optional_firebase_user(request)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Missing Firebase ID token")
     org_id = _active_org_id(request, user)
     prefs = _store().get_user_preferences(org_id, user.uid) or {}
-    return {"orgId": org_id, "preferences": prefs}
+    return {"enabled": True, "orgId": org_id, "preferences": prefs}
 
 
 @router.put("/preferences")

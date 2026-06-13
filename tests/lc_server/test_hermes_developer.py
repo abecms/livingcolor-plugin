@@ -73,7 +73,7 @@ def test_hermes_developer_agent_runs_against_workspace(_isolate_hermes_home, tmp
 
 def test_hermes_developer_requires_checkout(_isolate_hermes_home):
     agent = HermesDeveloperAgent(agent_factory=lambda **kwargs: _FakeAgent(Path(".")))
-    with pytest.raises(ValueError, match="checkout"):
+    with pytest.raises(ValueError, match="target repository"):
         agent.execute(
             "WO-HERMES-2",
             {
@@ -83,3 +83,41 @@ def test_hermes_developer_requires_checkout(_isolate_hermes_home):
                 "contextPack": {},
             },
         )
+
+
+def test_hermes_developer_auto_clones_managed_checkout(_isolate_hermes_home, tmp_path: Path):
+    checkout = tmp_path / "livingcolor" / "TVP" / "tv5monde" / "demo-app"
+    (checkout / "src" / "auth").mkdir(parents=True)
+    (checkout / "src" / "auth" / "oauth_callback.ts").write_text(
+        "export function handleCallback() {}\n",
+        encoding="utf-8",
+    )
+    (checkout / "package.json").write_text('{"scripts":{"test":"node -e \\"process.exit(0)\\""}}', encoding="utf-8")
+
+    def factory(**kwargs):
+        workspace = get_work_orders_root() / kwargs["work_order_id"] / "workspace"
+        return _FakeAgent(workspace)
+
+    agent = HermesDeveloperAgent(agent_factory=factory)
+    context = {
+        "projectKey": "TVP",
+        "workOrder": {"jiraKey": "TVP-2246", "projectKey": "TVP"},
+        "approvedAnalysisPlan": {
+            "targetRepo": "tv5monde/demo-app",
+            "likelyImpactedFiles": ["src/auth/oauth_callback.ts"],
+        },
+        "contextPack": {
+            "identified_repo": "tv5monde/demo-app",
+        },
+    }
+
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setattr(
+            "lc_server.agent_bridge.hermes_developer.ensure_managed_checkout",
+            lambda **kwargs: str(checkout),
+        )
+        result = agent.execute("WO-HERMES-3", context)
+
+    assert context["contextPack"]["repo_checkout_path"] == str(checkout)
+    assert result["backend"] == "hermes"
+    assert "src/auth/oauth_callback.ts" in result["filesModified"] + result["filesCreated"]

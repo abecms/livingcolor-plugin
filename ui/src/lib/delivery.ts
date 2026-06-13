@@ -509,7 +509,14 @@ export function fetchPmInbox(projectKey?: string): Promise<PmInboxPayload> {
   })
 }
 
+export interface DailyAnalysisStartResponse {
+  status: 'started'
+  projectKey: string
+}
+
 export interface DailyAnalysisResult {
+  status?: string
+  projectKey?: string
   scan?: {
     fetched?: number
     scanned?: number
@@ -529,13 +536,15 @@ export interface DailyAnalysisResult {
   autoStart?: Record<string, unknown> | null
 }
 
-export function runDailyAnalysis(projectKey?: string): Promise<DailyAnalysisResult> {
-  return callDesktopApi<DailyAnalysisResult>({
+export function runDailyAnalysis(
+  projectKey?: string
+): Promise<DailyAnalysisResult | DailyAnalysisStartResponse> {
+  return callDesktopApi<DailyAnalysisResult | DailyAnalysisStartResponse>({
     ...profileScoped(),
     path: '/api/delivery/pm-inbox/daily-analysis/run',
     method: 'POST',
     body: projectKey ? { projectKey } : {},
-    timeoutMs: 120_000
+    timeoutMs: 30_000
   })
 }
 

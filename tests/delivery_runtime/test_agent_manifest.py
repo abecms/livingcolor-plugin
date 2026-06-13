@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 
 def test_project_agent_manifest_path(livingcolor_home):
     from delivery_runtime.agents.paths import get_agent_manifest_path

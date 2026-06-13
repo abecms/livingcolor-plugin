@@ -37,13 +37,19 @@ class DailyAnalysisPipeline:
         if not project_key:
             raise ValueError("project_key is required")
 
+        with connect() as conn:
+            pm_store.fail_stale_daily_runs(conn)
+            if pm_store.has_running_daily_run(conn):
+                raise ValueError(
+                    "Another daily analysis is already running. "
+                    "Wait for it to finish, then retry."
+                )
+            run_id = pm_store.create_daily_run(conn, project_key=project_key)
+
         self.events.append(
             event_type="DAILY_ANALYSIS_STARTED",
-            payload={"projectKey": project_key},
+            payload={"projectKey": project_key, "runId": run_id},
         )
-
-        with connect() as conn:
-            run_id = pm_store.create_daily_run(conn, project_key=project_key)
 
         try:
             if self.scanner._issue_fetcher is None:

@@ -6,7 +6,7 @@ templateChecksum: "{{ template_checksum }}"
 manuallyEdited: false
 runtime:
   type: hermes
-  maxIterations: 8
+  maxIterations: 16
   toolsets: [terminal, skills]
 identity:
   displayName: Publisher Agent
@@ -19,6 +19,12 @@ prompt:
     push the branch, ensure the integration branch exists, and create the merge request.
     The MR content was written and approved by a human — reproduce it verbatim.
   rules:
+    - id: mcp-only-publication
+      content: |
+        You MUST create and manage the merge request exclusively via GitLab MCP tools
+        (create_merge_request, create_branch, and read/list branch tools).
+        NEVER use curl, wget, httpie, python -c, or direct GitLab REST API calls.
+        NEVER write MR payloads to /tmp or any path outside the Workspace Root.
     - id: publication-protocol
       content: |
         Follow the agent-mr-publisher skill protocol exactly, in order:

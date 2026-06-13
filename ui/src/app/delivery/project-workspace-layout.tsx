@@ -90,7 +90,7 @@ function ProjectWorkspaceSidebar() {
       <div
         className={cn(
           'relative flex flex-col justify-center gap-2 border-b border-border',
-          collapsed ? 'items-center px-2 pb-3' : 'px-4 pb-3'
+          collapsed ? 'items-center px-2 py-3' : 'px-4 py-3'
         )}
       >
         <div className={cn('flex items-center', collapsed ? 'mx-auto justify-center' : 'w-full')}>
@@ -143,7 +143,7 @@ function ProjectWorkspaceSidebar() {
   return (
     <aside
       className={cn(
-        'flex h-full flex-col border-r border-border bg-card pt-3 transition-[width] duration-300 ease-in-out',
+        'flex h-full flex-col border-r border-border bg-card transition-[width] duration-300 ease-in-out',
         collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED
       )}
     >

@@ -19,10 +19,31 @@ _FETCH_TIMEOUT_SECONDS = 30
 
 def load_project_gitlab_mcp_config(project_key: str) -> dict[str, Any] | None:
     """Return the project's GitLab MCP server config, falling back to global config."""
-    from delivery_runtime.readiness.project_settings import resolve_project_mcp_server
+    from delivery_runtime.readiness.project_settings import (
+        load_project_mcp_servers,
+        resolve_project_mcp_server,
+    )
 
-    config = resolve_project_mcp_server(project_key, "gitlab")
-    return config or None
+    for server_name in ("gitlab", "gitlab-tv5"):
+        config = resolve_project_mcp_server(project_key, server_name)
+        if config:
+            return config
+
+    stored = load_project_mcp_servers(project_key)
+    for server_name, config in stored.items():
+        if "gitlab" in str(server_name).lower() and isinstance(config, dict) and config:
+            return dict(config)
+
+    try:
+        from hermes_cli.mcp_config import _get_mcp_servers
+
+        for server_name, config in _get_mcp_servers().items():
+            if "gitlab" in str(server_name).lower() and isinstance(config, dict) and config:
+                return dict(config)
+    except ImportError:
+        pass
+
+    return None
 
 
 def repo_path_from_mr_url(mr_url: str) -> str:

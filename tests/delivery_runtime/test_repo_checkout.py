@@ -79,6 +79,38 @@ def test_ensure_managed_checkout_without_gitlab_token_returns_none(_isolate_herm
     assert result is None
 
 
+def test_ensure_managed_checkout_uses_global_gitlab_mcp_fallback(_isolate_hermes_home, tmp_path: Path):
+    target = managed_checkout_path("TVP", "tv5monde/demo-repo")
+
+    def fake_clone(url: str, destination: Path) -> bool:
+        destination.mkdir(parents=True, exist_ok=True)
+        (destination / ".git").mkdir()
+        return True
+
+    global_gitlab = {
+        "env": {
+            "GITLAB_API_URL": "https://gitlab.tv5monde.com/api/v4",
+            "GITLAB_PERSONAL_ACCESS_TOKEN": "global-token",
+        }
+    }
+
+    with patch("delivery_runtime.context.repo_checkout.managed_checkout_path", return_value=target), patch(
+        "delivery_runtime.readiness.project_settings.resolve_project_mcp_server",
+        return_value=global_gitlab,
+    ), patch(
+        "delivery_runtime.context.repo_checkout._clone_repository", side_effect=fake_clone
+    ) as clone_mock:
+        result = ensure_managed_checkout(
+            project_key="TVP",
+            repo_id="tv5monde/demo-repo",
+            project_cfg={"integrations": {}},
+        )
+
+    assert result == str(target)
+    clone_mock.assert_called_once()
+    assert "oauth2:global-token@gitlab.tv5monde.com/tv5monde/demo-repo.git" in clone_mock.call_args.args[0]
+
+
 def test_fetch_managed_checkout_fetches_without_reset(_isolate_hermes_home, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     hermes_home = _isolate_hermes_home
     livingcolor_home = hermes_home / "livingcolor"

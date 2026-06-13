@@ -10,6 +10,7 @@ from delivery_runtime.development.path_tokens import (
     extract_command_path_arguments,
     is_path_like_command_token,
 )
+from delivery_runtime.shadow.context import current_delivery_agent_role
 
 PolicyDecision = Literal["allow", "deny", "allow_with_post_check"]
 
@@ -41,6 +42,13 @@ _GIT_WRITE_PATTERNS = (
 )
 
 _GIT_PUSH_PATTERN = re.compile(r"(?:^|\s)git\s+push\b", re.I)
+
+_HTTP_CLI_PATTERNS = (
+    re.compile(r"(?:^|\s)curl\b", re.I),
+    re.compile(r"(?:^|\s)wget\b", re.I),
+    re.compile(r"(?:^|\s)httpie\b", re.I),
+)
+_INLINE_PYTHON_PATTERN = re.compile(r"(?:^|\s)python3?\s+-c\b", re.I)
 
 _GIT_PUSH_FORCE_FLAGS = frozenset({"-f", "--force", "--force-with-lease", "--force-if-includes"})
 
@@ -77,6 +85,18 @@ def evaluate_terminal_command(
 
     if _is_force_push(normalized):
         return CommandPolicyResult("deny", "force push is never allowed.")
+
+    if current_delivery_agent_role() == "publisher":
+        if any(pattern.search(normalized) for pattern in _HTTP_CLI_PATTERNS):
+            return CommandPolicyResult(
+                "deny",
+                "HTTP CLI tools (curl/wget/httpie) are forbidden for the publisher; use GitLab MCP tools.",
+            )
+        if _INLINE_PYTHON_PATTERN.search(normalized):
+            return CommandPolicyResult(
+                "deny",
+                "Inline python is forbidden for the publisher; use GitLab MCP tools.",
+            )
 
     if (
         not allow_git_push

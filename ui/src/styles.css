@@ -45,6 +45,11 @@
   /* No Electron titlebar in the Hermes dashboard tab */
   --titlebar-height: 0px;
 
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+
   /* Legacy LivingColor --ui-* → Hermes/Nous tokens */
   --ui-base: var(--midground);
   --ui-accent: var(--midground);
@@ -79,7 +84,22 @@
 
   color: var(--color-foreground);
   font-family: var(--theme-font-sans);
-  min-height: 100%;
+}
+
+.lc-root .lc-app {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.lc-root .lc-app-body {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .lc-root .codicon,

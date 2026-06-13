@@ -8,6 +8,7 @@ import { createRoot } from 'react-dom/client'
 import { createElement } from 'react'
 import App from './App'
 import { installHermesNavBrand } from '@/lib/hermes-nav-brand'
+import { findHermesPluginShell, syncLcRootToHermesHost } from '@/lib/hermes-host-layout'
 import './styles.css'
 
 const SDK = (window as any).__HERMES_PLUGIN_SDK__
@@ -22,14 +23,38 @@ if (!SDK || !REGISTRY) {
 
 if (SDK && REGISTRY) {
   const HostReact = SDK.React
+
   function LivingColorTab() {
-    const ref = HostReact.useRef(null)
+    const ref = HostReact.useRef<HTMLDivElement | null>(null)
     HostReact.useEffect(() => {
       if (!ref.current) return
-      const root = createRoot(ref.current)
-      root.render(createElement(App))
-      return () => root.unmount()
+      const mount = createRoot(ref.current)
+      mount.render(createElement(App))
+      return () => mount.unmount()
     }, [])
+
+    HostReact.useEffect(() => {
+      const root = ref.current
+      if (!root) return
+
+      const update = () => syncLcRootToHermesHost(root)
+      update()
+
+      window.addEventListener('resize', update)
+      const observer = new ResizeObserver(update)
+      observer.observe(document.documentElement)
+      const shell = findHermesPluginShell(root)
+      if (shell) {
+        observer.observe(shell.panel)
+        observer.observe(shell.header)
+      }
+
+      return () => {
+        window.removeEventListener('resize', update)
+        observer.disconnect()
+      }
+    }, [])
+
     return HostReact.createElement('div', { ref, className: 'lc-root' })
   }
   REGISTRY.register('livingcolor', LivingColorTab)

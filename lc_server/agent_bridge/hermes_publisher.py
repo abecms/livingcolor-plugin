@@ -29,6 +29,10 @@ The MR content was written and approved by a human — reproduce it verbatim.
 
 Rules:
 - Follow the agent-mr-publisher skill protocol exactly, in order.
+- You MUST create and manage the merge request exclusively via GitLab MCP tools
+  (create_merge_request, create_branch, and read/list branch tools).
+- NEVER use curl, wget, httpie, python -c, or any direct GitLab REST API call.
+- NEVER write MR payloads to /tmp or any path outside the Workspace Root.
 - Never rewrite, summarize, or translate the MR title or description.
 - Never edit files, commit, merge, rebase, or modify the repository content.
   The only git command you may run is git push.
@@ -108,7 +112,7 @@ def build_publisher_prompt(context: dict[str, Any]) -> str:
             "",
             "Follow the agent-mr-publisher skill protocol exactly: push the delivery branch, "
             "ensure the integration branch exists on the remote, then create the merge request "
-            "with the GitLab MCP create_merge_request tool.",
+            "ONLY with the GitLab MCP create_merge_request tool (no curl, no REST fallbacks).",
             "Finish with the JSON completion block described in your instructions.",
         ]
     )
@@ -251,24 +255,46 @@ def _default_publisher_agent_factory(
     from hermes_cli.config import load_config
     from hermes_cli.fallback_config import get_fallback_chain
     from hermes_cli.runtime_provider import resolve_runtime_provider
-    from lc_server.env_loader import load_livingcolor_dotenv
+    from lc_server.env_loader import prepare_delivery_agent_environment
     from run_agent import AIAgent
 
-    load_livingcolor_dotenv(override=True)
+    prepare_delivery_agent_environment()
+
+    from lc_server.integrations.project_mcp_runtime import apply_project_mcp_runtime
+
+    apply_project_mcp_runtime(project_key)
+
+    # MCP toolsets (mcp-gitlab-*) are registered only after discover_mcp_tools().
+    # Without this, validate_toolset rejects them and the publisher never sees
+    # create_merge_request — it falls back to curl/python in the terminal tool.
+    try:
+        from tools.mcp_tool import discover_mcp_tools
+
+        discover_mcp_tools()
+    except Exception:
+        logger.warning("Publisher MCP tool discovery failed", exc_info=True)
 
     os.environ.setdefault("HERMES_YOLO_MODE", "1")
     os.environ.setdefault("HERMES_ACCEPT_HOOKS", "1")
 
     if manifest:
         system_prompt = render_manifest_system_prompt(manifest)
-        toolsets = list(manifest.runtime.toolsets) or list(PUBLISHER_TOOLSETS)
-        max_iterations = manifest.runtime.max_iterations or 8
+        base_toolsets = list(manifest.runtime.toolsets) or list(PUBLISHER_TOOLSETS)
+        max_iterations = manifest.runtime.max_iterations or 16
         platform = manifest.identity.platform
     else:
         system_prompt = PUBLISHER_SYSTEM_PROMPT
-        toolsets = list(PUBLISHER_TOOLSETS)
-        max_iterations = 8
+        base_toolsets = list(PUBLISHER_TOOLSETS)
+        max_iterations = 16
         platform = "livingcolor-delivery"
+
+    from lc_server.agent_bridge.delivery_toolsets import resolve_publisher_toolsets
+
+    toolsets = resolve_publisher_toolsets(
+        base_toolsets=base_toolsets,
+        manifest=manifest,
+        project_key=project_key,
+    )
 
     from lc_server.agent_bridge.inference_config import resolve_delivery_inference
     from lc_server.model_defaults import (

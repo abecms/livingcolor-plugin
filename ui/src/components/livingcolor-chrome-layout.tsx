@@ -15,7 +15,7 @@ export function LivingColorChromeLayout({
   className?: string
 }) {
   return (
-    <div className={cn('flex h-full min-h-[70vh] min-w-0 overflow-hidden', className)}>
+    <div className={cn('flex h-full min-h-0 min-w-0 overflow-hidden', className)}>
       <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-card">
         <div className="flex min-h-[3.5rem] items-center border-b border-border px-4 py-3">
           <LivingColorSidebarBrand />

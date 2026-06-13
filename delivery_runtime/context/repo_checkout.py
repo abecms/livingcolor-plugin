@@ -104,12 +104,14 @@ def ensure_managed_checkout(
             return str(target)
         return None
 
-    clone_url = _build_clone_url(repo_id, project_cfg)
+    clone_url = _build_clone_url(repo_id, project_cfg, project_key=project_key)
     if not clone_url:
         logger.warning(
-            "Cannot clone %s for project %s: GitLab credentials missing in project_mapping.yaml",
+            "Cannot clone %s for project %s into %s: GitLab credentials missing "
+            "(project_mapping.yaml integrations or global Hermes MCP gitlab config)",
             repo_id,
             project_key,
+            target,
         )
         return None
 
@@ -178,8 +180,23 @@ def _refresh_checkout(path: Path) -> bool:
     return _is_git_checkout(path)
 
 
-def _build_clone_url(repo_id: str, project_cfg: dict[str, Any]) -> str | None:
-    env = _gitlab_env(project_cfg)
+def has_gitlab_clone_credentials(
+    project_cfg: dict[str, Any],
+    *,
+    project_key: str | None = None,
+) -> bool:
+    """Return True when GitLab token env is available for managed clone."""
+    env = _gitlab_env(project_cfg, project_key=project_key)
+    return bool(env.get("GITLAB_PERSONAL_ACCESS_TOKEN") or env.get("GITLAB_TOKEN"))
+
+
+def _build_clone_url(
+    repo_id: str,
+    project_cfg: dict[str, Any],
+    *,
+    project_key: str | None = None,
+) -> str | None:
+    env = _gitlab_env(project_cfg, project_key=project_key)
     token = env.get("GITLAB_PERSONAL_ACCESS_TOKEN") or env.get("GITLAB_TOKEN")
     if not token:
         return None
@@ -193,19 +210,7 @@ def _build_clone_url(repo_id: str, project_cfg: dict[str, Any]) -> str | None:
     return f"{scheme}://oauth2:{safe_token}@{host}/{repo_path}.git"
 
 
-def _gitlab_env(project_cfg: dict[str, Any]) -> dict[str, str]:
-    integrations = project_cfg.get("integrations") or {}
-    if not isinstance(integrations, dict):
-        return {}
-    mcp_servers = integrations.get("mcp_servers") or {}
-    if not isinstance(mcp_servers, dict):
-        return {}
-    gitlab = mcp_servers.get("gitlab") or {}
-    if not isinstance(gitlab, dict):
-        return {}
-    env = gitlab.get("env") or {}
-    if not isinstance(env, dict):
-        return {}
+def _normalize_gitlab_env(env: dict[str, Any]) -> dict[str, str]:
     out: dict[str, str] = {}
     for key, value in env.items():
         if value is None:
@@ -213,4 +218,34 @@ def _gitlab_env(project_cfg: dict[str, Any]) -> dict[str, str]:
         text = str(value).strip()
         if text:
             out[str(key)] = text
+    return out
+
+
+def _gitlab_env(project_cfg: dict[str, Any], *, project_key: str | None = None) -> dict[str, str]:
+    integrations = project_cfg.get("integrations") or {}
+    if not isinstance(integrations, dict):
+        integrations = {}
+    mcp_servers = integrations.get("mcp_servers") or {}
+    if not isinstance(mcp_servers, dict):
+        mcp_servers = {}
+    gitlab = mcp_servers.get("gitlab") or {}
+    if not isinstance(gitlab, dict):
+        gitlab = {}
+    env = gitlab.get("env") or {}
+    if not isinstance(env, dict):
+        env = {}
+    out = _normalize_gitlab_env(env)
+    if out.get("GITLAB_PERSONAL_ACCESS_TOKEN") or out.get("GITLAB_TOKEN"):
+        return out
+
+    key = (project_key or "").strip().upper()
+    if not key:
+        return out
+
+    from delivery_runtime.readiness.project_settings import resolve_project_mcp_server
+
+    fallback_cfg = resolve_project_mcp_server(key, "gitlab")
+    fallback_env = fallback_cfg.get("env") if isinstance(fallback_cfg, dict) else None
+    if isinstance(fallback_env, dict):
+        return _normalize_gitlab_env(fallback_env)
     return out

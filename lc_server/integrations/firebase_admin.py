@@ -16,6 +16,19 @@ _auth: Auth | None = None
 _init_attempted = False
 
 
+def _default_service_account_candidates() -> list[Path]:
+    """Well-known locations for the LivingColor Firebase service account."""
+    home = Path.home()
+    candidates = [
+        home / ".livingcolor" / "firebase-service-account.json",
+        home / ".hermes" / "livingcolor" / "firebase-service-account.json",
+    ]
+    override = os.environ.get("LIVINGCOLOR_HOME", "").strip()
+    if override:
+        candidates.insert(0, Path(override).expanduser() / "firebase-service-account.json")
+    return candidates
+
+
 def _service_account_path() -> Path | None:
     for key in ("FIREBASE_SERVICE_ACCOUNT_PATH", "GOOGLE_APPLICATION_CREDENTIALS"):
         raw = os.getenv(key, "").strip()
@@ -23,6 +36,9 @@ def _service_account_path() -> Path | None:
             path = Path(raw).expanduser()
             if path.is_file():
                 return path
+    for candidate in _default_service_account_candidates():
+        if candidate.is_file():
+            return candidate
     return None
 
 

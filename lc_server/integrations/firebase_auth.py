@@ -6,7 +6,11 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
-from lc_server.integrations.firebase_admin import firebase_admin_configured, get_firebase_auth
+from lc_server.integrations.firebase_admin import (
+    _ensure_initialized,
+    firebase_admin_configured,
+    get_firebase_auth,
+)
 
 
 @dataclass(frozen=True)
@@ -18,8 +22,8 @@ class FirebaseUser:
 
 
 def firebase_auth_enabled() -> bool:
-    """True when server-side Firebase credentials are available."""
-    return firebase_admin_configured()
+    """True when Firebase Admin is configured and can initialize in this process."""
+    return firebase_admin_configured() and _ensure_initialized()
 
 
 def client_firebase_config() -> dict[str, str] | None:

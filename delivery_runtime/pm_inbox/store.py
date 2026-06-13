@@ -56,6 +56,31 @@ def _row_to_estimation(row) -> dict[str, Any]:
     }
 
 
+def fail_stale_daily_runs(conn, *, max_age_minutes: int = 15) -> int:
+    """Mark abandoned ``running`` rows as failed so new analyses can proceed."""
+    from datetime import UTC, datetime, timedelta
+
+    cutoff = (datetime.now(UTC) - timedelta(minutes=max_age_minutes)).isoformat()
+    conn.execute(
+        """
+        UPDATE daily_analysis_runs
+        SET status = 'failed',
+            completed_at = ?,
+            error_message = ?
+        WHERE status = 'running' AND started_at < ?
+        """,
+        (utc_now_iso(), "Stale daily analysis run timed out", cutoff),
+    )
+    return conn.total_changes
+
+
+def has_running_daily_run(conn) -> bool:
+    row = conn.execute(
+        "SELECT 1 FROM daily_analysis_runs WHERE status = 'running' LIMIT 1"
+    ).fetchone()
+    return row is not None
+
+
 def create_daily_run(conn, *, project_key: str) -> str:
     run_id = next_public_id(conn, "DA")
     now = utc_now_iso()

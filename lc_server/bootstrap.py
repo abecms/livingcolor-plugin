@@ -28,9 +28,9 @@ def bootstrap_livingcolor_server() -> None:
 
     install_hermes_cli_jira_dashboard_shim()
 
-    from lc_server.env_loader import load_livingcolor_dotenv
+    from lc_server.env_loader import prepare_delivery_agent_environment
 
-    load_livingcolor_dotenv(override=True)
+    prepare_delivery_agent_environment()
 
     from delivery_runtime.api import deps
     from delivery_runtime.persistence.db import init_db

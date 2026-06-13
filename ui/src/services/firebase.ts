@@ -93,7 +93,7 @@ async function completePendingGoogleRedirect(): Promise<User | null> {
   }
 }
 
-function getFirebaseApp(): FirebaseApp {
+export function getFirebaseApp(): FirebaseApp {
   const config = getCachedFirebaseWebConfig()
   if (!config || !_app) {
     throw new Error('Firebase client is not initialized yet')

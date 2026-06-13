@@ -86,10 +86,10 @@ def _default_analyst_agent_factory(
     from hermes_cli.config import load_config
     from hermes_cli.fallback_config import get_fallback_chain
     from hermes_cli.runtime_provider import resolve_runtime_provider
-    from lc_server.env_loader import load_livingcolor_dotenv
+    from lc_server.env_loader import prepare_delivery_agent_environment
     from run_agent import AIAgent
 
-    load_livingcolor_dotenv(override=True)
+    prepare_delivery_agent_environment()
 
     os.environ.setdefault("HERMES_YOLO_MODE", "1")
     os.environ.setdefault("HERMES_ACCEPT_HOOKS", "1")

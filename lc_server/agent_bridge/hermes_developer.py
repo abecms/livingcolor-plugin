@@ -12,7 +12,10 @@ from delivery_runtime.development.feedback import parse_reviewer_feedback
 from delivery_runtime.development.patch_store import save_patch_artifact
 from delivery_runtime.development.prompt_context import build_developer_user_prompt, parse_developer_completion
 from delivery_runtime.context.repo_checkout import (
+    ensure_managed_checkout,
+    has_gitlab_clone_credentials,
     is_managed_repo_checkout,
+    managed_checkout_path,
     managed_project_environment_root,
 )
 from delivery_runtime.development.scope_contract import build_runtime_scope_contract
@@ -99,9 +102,20 @@ class HermesDeveloperAgent:
             reviewer_feedback = parse_reviewer_feedback(reviewer_feedback)
 
         repo_id = str(approved_plan.get("targetRepo") or context_pack.get("identified_repo") or "")
-        checkout_path = str(context_pack.get("repo_checkout_path") or "")
-        if not checkout_path or not Path(checkout_path).is_dir():
-            raise ValueError("Developer Agent requires a local repository checkout in the Context Pack")
+        jira_key = str(
+            (context.get("workOrder") or {}).get("jiraKey")
+            or approved_plan.get("jiraContextUsed", {}).get("jiraKey")
+            or work_order_id
+        )
+        project_key = _resolve_developer_project_key(context, context_pack, approved_plan, jira_key)
+        checkout_path = _resolve_repo_checkout_path(
+            checkout_path=str(context_pack.get("repo_checkout_path") or ""),
+            repo_id=repo_id,
+            project_key=project_key,
+            context_pack=context_pack,
+        )
+        context_pack["repo_checkout_path"] = checkout_path
+        context["contextPack"] = context_pack
 
         primary_files = [str(item) for item in approved_plan.get("likelyImpactedFiles") or []]
         if not primary_files:
@@ -109,11 +123,6 @@ class HermesDeveloperAgent:
         if not primary_files:
             raise ValueError("Developer Agent requires concrete target files from the approved plan")
 
-        jira_key = str(
-            (context.get("workOrder") or {}).get("jiraKey")
-            or approved_plan.get("jiraContextUsed", {}).get("jiraKey")
-            or work_order_id
-        )
         issue_type = str(
             context_pack.get("issueType")
             or context_pack.get("issue_type")
@@ -206,7 +215,6 @@ class HermesDeveloperAgent:
             scope_contract=runtime_scope.to_dict() if runtime_scope else None,
             allow_git_write=developer_phase == DEVELOPER_PHASE_MERGE_CONFLICT_RESOLUTION,
         )
-        project_key = str(context.get("projectKey") or "").strip() or None
         agent = self._agent_factory(
             task_id=task_id,
             work_order_id=work_order_id,
@@ -373,6 +381,79 @@ class HermesDeveloperAgent:
         clear_task_env_overrides(task_id)
 
 
+def _resolve_developer_project_key(
+    context: dict[str, Any],
+    context_pack: dict[str, Any],
+    approved_plan: dict[str, Any],
+    jira_key: str,
+) -> str | None:
+    work_order = context.get("workOrder") or {}
+    jira_ticket = context_pack.get("jira_ticket") or {}
+    jira_context = approved_plan.get("jiraContextUsed") or {}
+    for candidate in (
+        context.get("projectKey"),
+        work_order.get("projectKey"),
+        jira_ticket.get("projectKey"),
+        jira_context.get("projectKey"),
+    ):
+        key = str(candidate or "").strip().upper()
+        if key:
+            return key
+    parts = jira_key.split("-")
+    if len(parts) >= 2 and parts[0].strip():
+        return parts[0].strip().upper()
+    return None
+
+
+def _resolve_repo_checkout_path(
+    *,
+    checkout_path: str,
+    repo_id: str,
+    project_key: str | None,
+    context_pack: dict[str, Any],
+) -> str:
+    if checkout_path and Path(checkout_path).is_dir():
+        return checkout_path
+
+    if not repo_id:
+        raise ValueError(
+            "Developer Agent requires a target repository (targetRepo or identified_repo in the Context Pack)"
+        )
+
+    if not project_key:
+        raise ValueError(
+            "Developer Agent requires a project key to clone the repository into the managed checkout path"
+        )
+
+    from delivery_runtime.readiness.project_mapping import load_project_mapping
+
+    mapping = load_project_mapping()
+    project_cfg = mapping.get(project_key) or mapping.get(project_key.lower()) or {}
+    if not isinstance(project_cfg, dict):
+        project_cfg = {}
+
+    expected_path = managed_checkout_path(project_key, repo_id)
+    cloned = ensure_managed_checkout(
+        project_key=project_key,
+        repo_id=repo_id,
+        project_cfg=project_cfg,
+    )
+    if cloned and Path(cloned).is_dir():
+        context_pack["repo_checkout_path"] = cloned
+        return cloned
+
+    if not has_gitlab_clone_credentials(project_cfg, project_key=project_key):
+        raise ValueError(
+            "Developer Agent requires a local repository checkout at "
+            f"{expected_path}. GitLab credentials are missing for project {project_key} "
+            "(configure integrations.mcp_servers.gitlab in project_mapping.yaml or global Hermes MCP)."
+        )
+    raise ValueError(
+        "Developer Agent requires a local repository checkout at "
+        f"{expected_path}. git clone failed for {repo_id}."
+    )
+
+
 def _blocked_workspace_development_result(
     *,
     work_order_id: str,
@@ -519,10 +600,10 @@ def _default_agent_factory(
     from hermes_cli.config import load_config
     from hermes_cli.fallback_config import get_fallback_chain
     from hermes_cli.runtime_provider import resolve_runtime_provider
-    from lc_server.env_loader import load_livingcolor_dotenv
+    from lc_server.env_loader import prepare_delivery_agent_environment
     from run_agent import AIAgent
 
-    load_livingcolor_dotenv(override=True)
+    prepare_delivery_agent_environment()
 
     os.environ.setdefault("HERMES_YOLO_MODE", "1")
     os.environ.setdefault("HERMES_ACCEPT_HOOKS", "1")

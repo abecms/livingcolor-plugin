@@ -1,4 +1,4 @@
-import { callCloudApi, LIVINGCOLOR_CLOUD_API_URL } from '@/lib/cloud-api'
+import { callCloudApi } from '@/lib/cloud-api'
 import { callDesktopApi } from '@/lib/desktop-api'
 import { notify, notifyError } from '@/store/notifications'
 
@@ -85,8 +85,8 @@ export async function enqueuePendingCloudEvent(
 
 export async function pingCloudHealth(): Promise<boolean> {
   try {
-    const response = await fetch(`${LIVINGCOLOR_CLOUD_API_URL}/v1/health`)
-    return response.ok
+    await callCloudApi<{ status?: string }>({ path: '/v1/health', public: true })
+    return true
   } catch {
     return false
   }
