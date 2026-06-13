@@ -189,7 +189,7 @@ def check_mcp_tool(server_name: str, tool_name: str) -> ShadowViolation | None:
         return None
 
     if "gitlab" in normalized_server:
-        if normalized_tool in _GITLAB_WRITE_TOOLS or _looks_like_write_tool(normalized_tool):
+        if _is_vcs_write_tool(normalized_tool, _GITLAB_WRITE_TOOLS):
             violation = ShadowViolation(
                 category="gitlab",
                 operation=normalized_tool,
@@ -200,12 +200,13 @@ def check_mcp_tool(server_name: str, tool_name: str) -> ShadowViolation | None:
         return None
 
     if normalized_server == "github" or "github" in normalized_server:
-        if normalized_tool in _GITHUB_WRITE_TOOLS or _looks_like_write_tool(normalized_tool):
+        if _is_vcs_write_tool(normalized_tool, _GITHUB_WRITE_TOOLS):
             if current_delivery_agent_role() == "publisher":
                 return None
+            operation = _compact_tool_name(normalized_tool)
             violation = ShadowViolation(
                 category="github",
-                operation=normalized_tool,
+                operation=operation,
                 detail=f"Blocked GitHub write MCP tool {tool_name} in shadow mode",
             )
             _audit_log.record(violation)
@@ -237,14 +238,19 @@ def _check_standard_mode_vcs_write(
         label = "GitHub"
     else:
         return None
-    if normalized_tool not in write_tools and not _looks_like_write_tool(normalized_tool):
+    if not _is_vcs_write_tool(normalized_tool, write_tools):
         return None
     role = current_delivery_agent_role()
     if role == "publisher":
         return None
+    operation = (
+        _compact_tool_name(normalized_tool)
+        if category == "github"
+        else normalized_tool
+    )
     violation = ShadowViolation(
         category=category,
-        operation=normalized_tool,
+        operation=operation,
         detail=(
             f"{label} write tools are reserved for the publisher agent "
             f"(current role: {role or 'none'})"
@@ -275,7 +281,11 @@ def mcp_block_response(violation: ShadowViolation) -> dict[str, Any]:
 
 
 def _normalize_tool_name(tool_name: str) -> str:
-    return re.sub(r"[^a-z0-9]", "", (tool_name or "").strip().lower())
+    return re.sub(r"[^a-z0-9_]", "", (tool_name or "").strip().lower())
+
+
+def _compact_tool_name(tool_name: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", tool_name)
 
 
 def _looks_like_read_tool(tool_name: str) -> bool:
@@ -286,6 +296,14 @@ def _looks_like_write_tool(tool_name: str) -> bool:
     if _looks_like_read_tool(tool_name):
         return False
     return any(hint in tool_name for hint in _MCP_WRITE_HINTS)
+
+
+def _is_vcs_write_tool(tool_name: str, write_tools: set[str]) -> bool:
+    return (
+        tool_name in write_tools
+        or _compact_tool_name(tool_name) in write_tools
+        or _looks_like_write_tool(tool_name)
+    )
 
 
 def _append_violation_file(violation: ShadowViolation) -> None:

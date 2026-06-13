@@ -47,6 +47,16 @@ def test_standard_mode_leaves_non_gitlab_tools_untouched(monkeypatch):
     assert check_mcp_tool("slack", "post_message") is None
 
 
+def test_shadow_mode_blocks_generic_post_message_tool(monkeypatch):
+    monkeypatch.setenv("LIVINGCOLOR_SHADOW_MODE", "1")
+
+    violation = check_mcp_tool("slack", "post_message")
+
+    assert violation is not None
+    assert violation.category == "mcp"
+    assert violation.operation == "post_message"
+
+
 def test_shadow_mode_blocks_gitlab_write_even_for_publisher(monkeypatch):
     monkeypatch.setenv("LIVINGCOLOR_SHADOW_MODE", "true")
     with delivery_agent_role("publisher"):
