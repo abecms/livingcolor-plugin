@@ -13,6 +13,7 @@ from delivery_runtime.agents.registry import AgentManifestRegistry
 from delivery_runtime.agents.schema import AgentManifest
 from delivery_runtime.shadow.context import delivery_agent_role
 from lc_server.agent_bridge.manifest_prompt import render_manifest_system_prompt
+from lc_server.integrations.vcs.provider import normalize_vcs_provider
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +69,10 @@ def parse_publisher_completion(text: str) -> dict[str, Any]:
 
     review_url = str(payload.get("reviewRequestUrl") or payload.get("mrUrl") or "")
     review_number = payload.get("reviewRequestNumber", payload.get("mrIid"))
-    provider = str(payload.get("provider") or payload.get("reviewRequestProvider") or "gitlab")
+    try:
+        provider = normalize_vcs_provider(payload.get("provider") or payload.get("reviewRequestProvider"))
+    except ValueError as exc:
+        raise PublisherCompletionError(str(exc)) from exc
     if not isinstance(review_number, int) or isinstance(review_number, bool) or not review_url:
         raise PublisherCompletionError("publisher completion missing review request url/number")
 
@@ -210,15 +214,21 @@ class HermesPublisherAgent:
 
     @staticmethod
     def _verify_mr_exists(project_key: str | None, completion: dict[str, Any]) -> None:
-        provider = str(completion.get("reviewRequestProvider") or "gitlab")
+        try:
+            provider = normalize_vcs_provider(completion.get("reviewRequestProvider"))
+        except ValueError as exc:
+            raise PublisherCompletionError(str(exc)) from exc
         if provider == "github":
             from delivery_runtime.readiness.project_settings import resolve_project_mcp_server
             from lc_server.integrations.vcs.github import (
+                github_token_from_config,
                 repo_path_and_number_from_pr_url,
                 verify_pull_request_exists,
             )
 
             mcp_config = resolve_project_mcp_server(project_key or "", "github")
+            if not mcp_config or not github_token_from_config(mcp_config):
+                raise PublisherCompletionError("No GitHub MCP config found for project")
             try:
                 repo_path, pr_number = repo_path_and_number_from_pr_url(completion["reviewRequestUrl"])
             except ValueError as exc:

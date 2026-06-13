@@ -25,6 +25,31 @@ def test_parses_provider_neutral_github_completion():
     assert result["mrIid"] == 42
 
 
+def test_parses_provider_neutral_github_completion_normalizes_provider():
+    text = (
+        "Pushed and created the PR.\n"
+        '```json\n{"reviewRequestUrl": "https://github.com/org/app/pull/42", '
+        '"reviewRequestNumber": 42, "targetBranch": "main", '
+        '"provider": " GitHub ", "status": "published"}\n```'
+    )
+
+    result = parse_publisher_completion(text)
+
+    assert result["reviewRequestProvider"] == "github"
+
+
+def test_parse_publisher_completion_rejects_unknown_provider():
+    text = (
+        "Pushed and created the review request.\n"
+        '```json\n{"reviewRequestUrl": "https://example.com/reviews/42", '
+        '"reviewRequestNumber": 42, "targetBranch": "main", '
+        '"provider": "bitbucket", "status": "published"}\n```'
+    )
+
+    with pytest.raises(PublisherCompletionError, match="Unsupported VCS provider"):
+        parse_publisher_completion(text)
+
+
 def test_parses_published_block():
     text = (
         "Pushed and created the MR.\n"
@@ -65,6 +90,29 @@ def test_repo_path_from_mr_url_rejects_non_mr_url():
 
     with pytest.raises(ValueError, match="not a GitLab MR url"):
         repo_path_from_mr_url("https://gitlab.example.com/group/project/-/issues/1")
+
+
+def test_verify_github_review_request_requires_mcp_config(monkeypatch):
+    from lc_server.agent_bridge.hermes_publisher import HermesPublisherAgent
+
+    monkeypatch.setattr(
+        "delivery_runtime.readiness.project_settings.resolve_project_mcp_server",
+        lambda project_key, provider: {},
+    )
+
+    with pytest.raises(PublisherCompletionError, match="No GitHub MCP config found for project"):
+        HermesPublisherAgent._verify_mr_exists(
+            "AAC",
+            {
+                "reviewRequestUrl": "https://github.com/org/app/pull/42",
+                "reviewRequestNumber": 42,
+                "reviewRequestProvider": "github",
+                "mrUrl": "https://github.com/org/app/pull/42",
+                "mrIid": 42,
+                "targetBranch": "main",
+                "status": "published",
+            },
+        )
 
 
 class _FakePublisherAgent:
