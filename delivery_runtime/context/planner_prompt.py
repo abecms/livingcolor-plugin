@@ -155,6 +155,10 @@ def build_planner_user_prompt(pack: ContextPack) -> str:
         sections.extend(["", "## Build notes"])
         sections.extend(f"- {note}" for note in pack.build_notes)
 
+    context_pack_reference = pack.to_dict()
+    if pack.skills_context_markdown:
+        context_pack_reference["skills_context_markdown"] = "(see External skills context section above)"
+
     sections.extend(
         [
             "",
@@ -182,7 +186,7 @@ def build_planner_user_prompt(pack: ContextPack) -> str:
             "```",
             "",
             "### Context pack JSON (reference)",
-            json.dumps(pack.to_dict(), indent=2, sort_keys=True),
+            json.dumps(context_pack_reference, indent=2, sort_keys=True),
         ]
     )
     return "\n".join(sections)

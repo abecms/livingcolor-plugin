@@ -93,3 +93,5 @@ def test_planner_user_prompt_includes_external_skills_context():
     assert "## External skills context" in prompt
     assert "Use this context when applying generic LivingColor role skills." in prompt
     assert "## Project Stack" in prompt
+    assert prompt.count("## Project Stack") == 1
+    assert "(see External skills context section above)" in prompt
