@@ -151,3 +151,53 @@ def test_dispatch_blocks_gitlab_write_in_shadow_mode_even_for_publisher(
     assert parsed.get("blocked") is True
     assert parsed.get("shadowMode") is True
     assert call_count["n"] == 0
+
+
+# ── GitHub write tool enforcement ─────────────────────────────────────────────
+
+
+def test_github_create_pull_request_blocked_without_publisher_role(monkeypatch):
+    monkeypatch.setenv("LIVINGCOLOR_SHADOW_MODE", "1")
+
+    violation = check_mcp_tool("github", "create_pull_request")
+
+    assert violation is not None
+    assert violation.category == "github"
+    assert violation.operation == "createpullrequest"
+
+
+def test_github_create_pull_request_allowed_for_publisher(monkeypatch):
+    monkeypatch.setenv("LIVINGCOLOR_SHADOW_MODE", "1")
+
+    with delivery_agent_role("publisher"):
+        assert check_mcp_tool("github", "create_pull_request") is None
+
+
+def test_standard_mode_blocks_github_write_for_default_role(monkeypatch):
+    monkeypatch.delenv("LIVINGCOLOR_SHADOW_MODE", raising=False)
+    violation = check_mcp_tool("github", "create_pull_request")
+    assert violation is not None
+    assert violation.category == "github"
+    assert "publisher" in violation.detail
+    assert "none" in violation.detail
+
+
+def test_standard_mode_allows_github_write_for_publisher(monkeypatch):
+    monkeypatch.delenv("LIVINGCOLOR_SHADOW_MODE", raising=False)
+    with delivery_agent_role("publisher"):
+        violation = check_mcp_tool("github", "create_pull_request")
+    assert violation is None
+
+
+def test_standard_mode_blocks_github_write_for_developer_role(monkeypatch):
+    monkeypatch.delenv("LIVINGCOLOR_SHADOW_MODE", raising=False)
+    with delivery_agent_role("developer"):
+        violation = check_mcp_tool("github", "create_pull_request")
+    assert violation is not None
+    assert "developer" in violation.detail
+
+
+def test_standard_mode_allows_github_reads_for_any_role(monkeypatch):
+    monkeypatch.delenv("LIVINGCOLOR_SHADOW_MODE", raising=False)
+    violation = check_mcp_tool("github", "get_pull_request")
+    assert violation is None

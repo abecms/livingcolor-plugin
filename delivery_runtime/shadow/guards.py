@@ -51,6 +51,24 @@ _GITLAB_WRITE_TOOLS = {
     "push",
 }
 
+_GITHUB_WRITE_TOOLS = {
+    "create_pull_request",
+    "createpullrequest",
+    "create_branch",
+    "createbranch",
+    "create_ref",
+    "createref",
+    "update_pull_request",
+    "updatepullrequest",
+    "merge_pull_request",
+    "mergepullrequest",
+    "close_pull_request",
+    "closepullrequest",
+    "create_issue_comment",
+    "createissuecomment",
+    "push",
+}
+
 _MCP_WRITE_HINTS = (
     "create",
     "update",
@@ -157,7 +175,7 @@ def check_mcp_tool(server_name: str, tool_name: str) -> ShadowViolation | None:
         return None
 
     if not is_shadow_mode():
-        return _check_standard_mode_gitlab_write(normalized_server, normalized_tool)
+        return _check_standard_mode_vcs_write(normalized_server, normalized_tool)
 
     if normalized_server in {"jira", "atlassian", "user-jira mcp", "user-jira_mcp"} or "jira" in normalized_server:
         if normalized_tool in _JIRA_WRITE_TOOLS or _looks_like_write_tool(normalized_tool):
@@ -181,6 +199,19 @@ def check_mcp_tool(server_name: str, tool_name: str) -> ShadowViolation | None:
             return violation
         return None
 
+    if normalized_server == "github" or "github" in normalized_server:
+        if normalized_tool in _GITHUB_WRITE_TOOLS or _looks_like_write_tool(normalized_tool):
+            if current_delivery_agent_role() == "publisher":
+                return None
+            violation = ShadowViolation(
+                category="github",
+                operation=normalized_tool,
+                detail=f"Blocked GitHub write MCP tool {tool_name} in shadow mode",
+            )
+            _audit_log.record(violation)
+            return violation
+        return None
+
     if _looks_like_write_tool(normalized_tool) and not _looks_like_read_tool(normalized_tool):
         violation = ShadowViolation(
             category="mcp",
@@ -192,22 +223,30 @@ def check_mcp_tool(server_name: str, tool_name: str) -> ShadowViolation | None:
     return None
 
 
-def _check_standard_mode_gitlab_write(
+def _check_standard_mode_vcs_write(
     normalized_server: str, normalized_tool: str
 ) -> ShadowViolation | None:
-    """In standard mode, GitLab write tools are reserved for the publisher agent."""
-    if "gitlab" not in normalized_server:
+    """In standard mode, VCS write tools are reserved for the publisher agent."""
+    if "gitlab" in normalized_server:
+        category = "gitlab"
+        write_tools = _GITLAB_WRITE_TOOLS
+        label = "GitLab"
+    elif normalized_server == "github" or "github" in normalized_server:
+        category = "github"
+        write_tools = _GITHUB_WRITE_TOOLS
+        label = "GitHub"
+    else:
         return None
-    if normalized_tool not in _GITLAB_WRITE_TOOLS and not _looks_like_write_tool(normalized_tool):
+    if normalized_tool not in write_tools and not _looks_like_write_tool(normalized_tool):
         return None
     role = current_delivery_agent_role()
     if role == "publisher":
         return None
     violation = ShadowViolation(
-        category="gitlab",
+        category=category,
         operation=normalized_tool,
         detail=(
-            "GitLab write tools are reserved for the publisher agent "
+            f"{label} write tools are reserved for the publisher agent "
             f"(current role: {role or 'none'})"
         ),
     )
@@ -236,7 +275,7 @@ def mcp_block_response(violation: ShadowViolation) -> dict[str, Any]:
 
 
 def _normalize_tool_name(tool_name: str) -> str:
-    return re.sub(r"[^a-z0-9_]", "", (tool_name or "").strip().lower())
+    return re.sub(r"[^a-z0-9]", "", (tool_name or "").strip().lower())
 
 
 def _looks_like_read_tool(tool_name: str) -> bool:
