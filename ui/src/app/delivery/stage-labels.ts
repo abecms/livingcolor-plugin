@@ -1,3 +1,8 @@
+import {
+  formatGraphNodeTypeLabel,
+  formatWorkOrderStageLabel,
+  type ReviewRequestProvider
+} from './review-request-labels'
 import type { GraphNode, WorkOrderStage } from './types'
 
 const WORK_ORDER_STAGE_LABELS: Record<WorkOrderStage | string, string> = {
@@ -23,16 +28,24 @@ const GRAPH_NODE_LABELS: Record<string, string> = {
   jira_update: 'Jira update'
 }
 
-export function formatWorkOrderStage(stage: string): string {
+const PROVIDER_AWARE_STAGES = new Set(['mr_draft', 'mr_review', 'mr_publication'])
+
+export function formatWorkOrderStage(stage: string, provider?: ReviewRequestProvider): string {
+  if (provider && PROVIDER_AWARE_STAGES.has(stage)) {
+    return formatWorkOrderStageLabel(stage, provider)
+  }
   return WORK_ORDER_STAGE_LABELS[stage] ?? stage.replaceAll('_', ' ')
 }
 
-export function formatGraphNodeLabel(node: GraphNode): string {
+export function formatGraphNodeLabel(node: GraphNode, provider?: ReviewRequestProvider): string {
   if (node.nodeType === 'development') {
     const phase = String(node.payload?.developerPhase ?? '')
     if (phase === 'merge_conflict_resolution') {
       return WORK_ORDER_STAGE_LABELS.merge_conflict_resolution
     }
+  }
+  if (provider && node.nodeType === 'mr_creation') {
+    return formatGraphNodeTypeLabel(node.nodeType, provider)
   }
   return GRAPH_NODE_LABELS[node.nodeType] ?? node.nodeType.replaceAll('_', ' ')
 }

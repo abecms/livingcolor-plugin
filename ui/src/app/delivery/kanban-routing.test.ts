@@ -62,6 +62,14 @@ describe('columnForGateType', () => {
 })
 
 describe('buildKanbanColumns', () => {
+  it('uses provider-aware code review column titles', () => {
+    const gitlabColumns = buildKanbanColumns(makeInbox(), [])
+    const githubColumns = buildKanbanColumns(makeInbox(), [], 'github')
+
+    expect(gitlabColumns.find(column => column.id === 'code_mr')?.title).toBe('Code/MR')
+    expect(githubColumns.find(column => column.id === 'code_mr')?.title).toBe('Code/PR')
+  })
+
   it('returns six columns in pipeline order even when empty', () => {
     const columns = buildKanbanColumns(makeInbox(), [])
     expect(columns.map(column => column.id)).toEqual(['sprint', 'plan', 'dev', 'code_mr', 'jira', 'done'])

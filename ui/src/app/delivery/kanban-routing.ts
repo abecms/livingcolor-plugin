@@ -1,5 +1,6 @@
-import type { PmInboxPayload } from '@/lib/delivery'
+import type { PmInboxPayload, VcsProvider } from '@/lib/delivery'
 
+import { formatCodeReviewColumnTitle } from './review-request-labels'
 import type { WorkOrder } from './types'
 
 export type KanbanColumnId = 'sprint' | 'plan' | 'dev' | 'code_mr' | 'jira' | 'done'
@@ -48,7 +49,8 @@ export function columnForGateType(gateType: string): KanbanColumnId {
 
 export function buildKanbanColumns(
   inbox: PmInboxPayload | null,
-  completedWorkOrders: WorkOrder[]
+  completedWorkOrders: WorkOrder[],
+  vcsProvider: VcsProvider = 'gitlab'
 ): KanbanColumn[] {
   const columns: Record<KanbanColumnId, KanbanCard[]> = {
     sprint: [],
@@ -130,7 +132,12 @@ export function buildKanbanColumns(
     { id: 'sprint', title: 'Sprint', accent: 'neutral', cards: columns.sprint },
     { id: 'plan', title: 'Plan', accent: columns.plan.length ? 'warning' : 'neutral', cards: columns.plan },
     { id: 'dev', title: 'Dev', accent: 'neutral', cards: columns.dev },
-    { id: 'code_mr', title: 'Code/MR', accent: columns.code_mr.length ? 'warning' : 'neutral', cards: columns.code_mr },
+    {
+      id: 'code_mr',
+      title: formatCodeReviewColumnTitle(vcsProvider),
+      accent: columns.code_mr.length ? 'warning' : 'neutral',
+      cards: columns.code_mr
+    },
     { id: 'jira', title: 'Jira', accent: columns.jira.length ? 'warning' : 'neutral', cards: columns.jira },
     { id: 'done', title: 'Done', accent: 'muted', cards: columns.done }
   ]

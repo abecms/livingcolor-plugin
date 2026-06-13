@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { TicketKeyBadge, dashboardPrimaryButtonProps } from './dashboard-ui'
 import { JiraTicketTitleLink } from './jira-ticket-link'
 import type { KanbanCard, KanbanColumn } from './kanban-routing'
+import type { ReviewRequestProvider } from './review-request-labels'
 import { formatWorkOrderStage } from './stage-labels'
 
 const COLUMN_ACCENTS = {
@@ -25,13 +26,15 @@ export function KanbanBoard({
   columns,
   onApproveTicket,
   onOpenCard,
-  onReviewGate
+  onReviewGate,
+  vcsProvider
 }: {
   className?: string
   columns: KanbanColumn[]
   onApproveTicket: (readinessId: string, jiraKey: string) => void
   onOpenCard: (workOrderId: string) => void
   onReviewGate: (input: { workOrderId: string; gateId: string; gateType: string }) => void
+  vcsProvider?: ReviewRequestProvider
 }) {
   return (
     <div
@@ -66,6 +69,7 @@ export function KanbanBoard({
                   onApproveTicket={onApproveTicket}
                   onOpenCard={onOpenCard}
                   onReviewGate={onReviewGate}
+                  vcsProvider={vcsProvider}
                 />
               ))
             )}
@@ -82,7 +86,8 @@ function KanbanCardView({
   isGate,
   onApproveTicket,
   onOpenCard,
-  onReviewGate
+  onReviewGate,
+  vcsProvider
 }: {
   card: KanbanCard
   isDone: boolean
@@ -90,6 +95,7 @@ function KanbanCardView({
   onApproveTicket: (readinessId: string, jiraKey: string) => void
   onOpenCard: (workOrderId: string) => void
   onReviewGate: (input: { workOrderId: string; gateId: string; gateType: string }) => void
+  vcsProvider?: ReviewRequestProvider
 }) {
   const clickable = Boolean(card.workOrderId)
   const ctaProps = dashboardPrimaryButtonProps()
@@ -143,7 +149,7 @@ function KanbanCardView({
       <div className="mt-1.5 space-y-0.5 text-[10px] text-muted-foreground">
         {card.estimatedDays != null ? <div>Estim. {formatTicketEstimationHours(card.estimatedDays)}</div> : null}
         {card.priorityRank != null ? <div>Prio #{card.priorityRank}</div> : null}
-        {card.currentStage ? <div>⚙ {formatWorkOrderStage(card.currentStage)}</div> : null}
+        {card.currentStage ? <div>⚙ {formatWorkOrderStage(card.currentStage, vcsProvider)}</div> : null}
       </div>
       {card.ctaLabel ? (
         <Button

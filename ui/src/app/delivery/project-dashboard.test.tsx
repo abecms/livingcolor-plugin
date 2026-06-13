@@ -123,6 +123,16 @@ const emptyInboxPayload = {
 
 vi.mock('@/lib/delivery', () => ({
   fetchPmInbox: vi.fn(),
+  fetchProjectConfig: vi.fn().mockResolvedValue({
+    projectKey: 'BN',
+    projectName: 'Bibliothèque Numérique',
+    sprintDurationDays: 14,
+    sprintCapacityDays: 15,
+    communicationLanguage: 'en',
+    ticketScope: { statusGroups: ['todo'], assignees: [], includeUnassigned: true, matchMode: 'all' },
+    configPath: '/tmp/project.yaml',
+    vcs: 'gitlab'
+  }),
   fetchDeliveryOverview: vi.fn().mockResolvedValue({
     readiness: { items: [] },
     workOrders: { items: [] },

@@ -1,3 +1,11 @@
+import {
+  formatReviewRequestLinkLabel,
+  resolveReviewRequestNumber,
+  resolveReviewRequestProvider,
+  resolveReviewRequestUrl,
+  reviewRequestFullLabel
+} from './review-request-labels'
+
 export type GatePayloadSection =
   | { kind: 'text'; label: string; value: string; preformatted?: boolean }
   | { kind: 'list'; label: string; items: string[] }
@@ -224,27 +232,36 @@ function sectionsFromJiraUpdatePayload(payload: Record<string, unknown>): GatePa
     sections.push({ kind: 'text', label: 'Jira key', value: jiraKey })
   }
 
-  const mrUrl = asNonEmptyString(payload.mrUrl)
-  if (mrUrl) {
-    const mrIid = payload.mrIid
-    const linkText =
-      typeof mrIid === 'number' || typeof mrIid === 'string'
-        ? `View merge request !${mrIid}`
-        : 'View merge request'
-    sections.push({ kind: 'link', label: 'Merge request', href: mrUrl, text: linkText })
+  const reviewRequestUrl = resolveReviewRequestUrl(payload)
+  const reviewRequestProvider = resolveReviewRequestProvider(payload)
+  const reviewRequestNumber = resolveReviewRequestNumber(payload)
+  if (reviewRequestUrl) {
+    const linkText = formatReviewRequestLinkLabel(reviewRequestProvider, reviewRequestNumber ?? undefined)
+    sections.push({
+      kind: 'link',
+      label: reviewRequestFullLabel(reviewRequestProvider),
+      href: reviewRequestUrl,
+      text: linkText
+    })
   }
 
   const detailPayload = { ...payload }
   delete detailPayload.proposedComment
   delete detailPayload.mrUrl
+  delete detailPayload.reviewRequestUrl
   delete detailPayload.jiraKey
-  if (mrUrl) {
+  if (reviewRequestUrl) {
     delete detailPayload.mrIid
+    delete detailPayload.reviewRequestNumber
+    delete detailPayload.reviewRequestProvider
   }
 
+  const reviewNumberLabel =
+    reviewRequestProvider === 'github' ? 'PR number' : 'MR number'
   const entries = formatRecordEntries(detailPayload, {
     targetBranch: 'Target branch',
-    mrIid: 'MR number',
+    mrIid: reviewNumberLabel,
+    reviewRequestNumber: reviewNumberLabel,
     nodeId: 'Pipeline node'
   })
 

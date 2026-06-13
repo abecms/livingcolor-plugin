@@ -111,6 +111,9 @@ export interface MrDraftRecord {
   decisionTrace?: DecisionTracePayload
   mrUrl?: string
   mrIid?: number | null
+  reviewRequestUrl?: string
+  reviewRequestNumber?: number | null
+  reviewRequestProvider?: 'gitlab' | 'github' | string
   status: string
   createdAt: string
   updatedAt: string

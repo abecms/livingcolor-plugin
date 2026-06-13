@@ -63,7 +63,7 @@ describe('buildGatePayloadSections', () => {
     })
 
     expect(sections.some(section => section.kind === 'text' && section.label === 'Proposed Jira comment')).toBe(true)
-    expect(sections.some(section => section.kind === 'link' && section.label === 'Merge request')).toBe(true)
+    expect(sections.some(section => section.kind === 'link' && section.label === 'Merge Request')).toBe(true)
     expect(
       sections.some(
         section =>
@@ -71,6 +71,20 @@ describe('buildGatePayloadSections', () => {
           section.entries.some(entry => entry.key === 'Target branch' && entry.value === 'main')
       )
     ).toBe(true)
+  })
+
+  it('formats GitHub review request payloads as PR links', () => {
+    const sections = buildGatePayloadSections('jira_update', {
+      reviewRequestProvider: 'github',
+      reviewRequestUrl: 'https://github.com/org/app/pull/42',
+      reviewRequestNumber: 42,
+      jiraKey: 'GH-1'
+    })
+
+    const serialized = JSON.stringify(sections)
+    expect(serialized).toContain('PR')
+    expect(serialized).toContain('https://github.com/org/app/pull/42')
+    expect(sections.some(section => section.kind === 'link' && section.label === 'Pull Request')).toBe(true)
   })
 })
 

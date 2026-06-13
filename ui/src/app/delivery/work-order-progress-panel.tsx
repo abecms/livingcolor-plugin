@@ -9,14 +9,24 @@ import { ExternalLink } from '@/lib/external-link'
 import { dashboardPrimaryButtonProps, DASHBOARD_SHEET_BODY_CLASS, DASHBOARD_SHEET_HEADER_CLASS, StatusPill } from './dashboard-ui'
 import { asAnalysisPlanPayload } from './gate-payload'
 import { formatGraphNodeLabel, formatWorkOrderStage } from './stage-labels'
+import {
+  formatReviewRequestLinkLabelFr,
+  formatReviewRequestPublicationPendingLabel,
+  resolveReviewRequestNumber,
+  resolveReviewRequestProvider,
+  resolveReviewRequestUrl,
+  type ReviewRequestFields,
+  type ReviewRequestProvider
+} from './review-request-labels'
 import type { GraphNode, MrDraftRecord, WorkOrder } from './types'
 import { WorkOrderLockNotice } from './work-order-lock-notice'
+
+const NODE_SORT_ORDER = ['implementation_plan', 'development', 'qa_validation', 'mr_creation', 'jira_update']
 
 const NODE_LABELS: Record<string, string> = {
   implementation_plan: 'Analysis & plan',
   development: 'Development',
   qa_validation: 'QA validation',
-  mr_creation: 'MR draft',
   jira_update: 'Jira update'
 }
 
@@ -120,16 +130,23 @@ export function WorkOrderProgressPanel({
   const approvedPlan = findLatestApprovedAnalysisGate(workOrder)
   const planPayload = approvedPlan ? asAnalysisPlanPayload(approvedPlan.payload) : null
   const nodes = [...(workOrder.graphNodes ?? [])].sort((left, right) => {
-    const order = Object.keys(NODE_LABELS)
-    return order.indexOf(left.nodeType) - order.indexOf(right.nodeType)
+    return NODE_SORT_ORDER.indexOf(left.nodeType) - NODE_SORT_ORDER.indexOf(right.nodeType)
   })
   const developmentNode = nodes.find(node => node.nodeType === 'development')
   const mrCreationNode = nodes.find(node => node.nodeType === 'mr_creation')
-  const mrUrlFromNode = String((mrCreationNode?.payload as { mrUrl?: string } | undefined)?.mrUrl ?? '').trim()
+  const mrCreationPayload = (mrCreationNode?.payload ?? {}) as ReviewRequestFields
   const showResume = workOrderNeedsResume(workOrder) && Boolean(onResume)
   const agentRunning = developmentNode?.status === 'running'
-  const publishedMrUrl = mrDraft?.mrUrl || mrUrlFromNode || undefined
-  const publishedMrIid = mrDraft?.mrIid ?? (mrCreationNode?.payload as { mrIid?: number } | undefined)?.mrIid
+  const reviewRequestSource: ReviewRequestFields = {
+    reviewRequestUrl: mrDraft?.reviewRequestUrl,
+    reviewRequestNumber: mrDraft?.reviewRequestNumber,
+    reviewRequestProvider: mrDraft?.reviewRequestProvider,
+    mrUrl: mrDraft?.mrUrl ?? mrCreationPayload.mrUrl,
+    mrIid: mrDraft?.mrIid ?? mrCreationPayload.mrIid
+  }
+  const provider = resolveReviewRequestProvider(reviewRequestSource)
+  const publishedReviewUrl = resolveReviewRequestUrl(reviewRequestSource)
+  const publishedReviewNumber = resolveReviewRequestNumber(reviewRequestSource)
 
   async function handleResume() {
     if (!onResume || resuming || !workOrder) {
@@ -161,18 +178,18 @@ export function WorkOrderProgressPanel({
             <div className="text-xs font-medium uppercase tracking-[0.14em] text-(--ui-text-tertiary)">Current state</div>
             <div className="mt-2 flex flex-wrap gap-2">
               <StatusPill tone="neutral">{workOrder.status.replace(/_/g, ' ')}</StatusPill>
-              <StatusPill tone="neutral">{formatWorkOrderStage(workOrder.currentStage)}</StatusPill>
+              <StatusPill tone="neutral">{formatWorkOrderStage(workOrder.currentStage, provider)}</StatusPill>
             </div>
             <p className="mt-3 text-sm text-(--ui-text-secondary)">{workOrder.title}</p>
-            {publishedMrUrl ? (
-              <p className="mt-3 text-sm" data-testid="work-order-mr-link">
-                <ExternalLink href={publishedMrUrl}>
-                  Voir la MR {publishedMrIid != null ? `!${publishedMrIid} ` : ''}sur GitLab
+            {publishedReviewUrl ? (
+              <p className="mt-3 text-sm" data-testid="work-order-review-link">
+                <ExternalLink href={publishedReviewUrl}>
+                  {formatReviewRequestLinkLabelFr(provider, publishedReviewNumber ?? undefined)}
                 </ExternalLink>
               </p>
             ) : workOrder.currentStage === 'mr_publication' ? (
-              <p className="mt-3 text-xs text-(--ui-text-tertiary)" data-testid="work-order-mr-publication-pending">
-                Publication de la MR en cours…
+              <p className="mt-3 text-xs text-(--ui-text-tertiary)" data-testid="work-order-review-publication-pending">
+                {formatReviewRequestPublicationPendingLabel(provider)}
               </p>
             ) : null}
             {showResume ? (
@@ -201,7 +218,7 @@ export function WorkOrderProgressPanel({
             <div className="text-xs font-medium uppercase tracking-[0.14em] text-(--ui-text-tertiary)">Pipeline</div>
             <div className="space-y-2">
               {nodes.map(node => (
-                <GraphNodeRow key={node.id} node={node} />
+                <GraphNodeRow key={node.id} node={node} provider={provider} />
               ))}
             </div>
           </div>
@@ -220,8 +237,8 @@ export function WorkOrderProgressPanel({
   )
 }
 
-function GraphNodeRow({ node }: { node: GraphNode }) {
-  const label = formatGraphNodeLabel(node)
+function GraphNodeRow({ node, provider }: { node: GraphNode; provider?: ReviewRequestProvider }) {
+  const label = formatGraphNodeLabel(node, provider)
   return (
     <div className="flex items-center justify-between rounded-lg border border-(--ui-border-subtle) bg-(--ui-chat-surface-background) px-3 py-2">
       <span className="text-sm text-foreground">{label}</span>

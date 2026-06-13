@@ -6,13 +6,15 @@ import {
   decideCommentProposal,
   fetchDeliveryOverview,
   fetchPmInbox,
+  fetchProjectConfig,
   fetchWorkOrder,
   findPendingAnalysisGate,
   findPendingCodeReviewGate,
   findReviewableMrDraftGate,
   promoteReadinessRecord,
   resumeWorkOrder,
-  type PmInboxPayload
+  type PmInboxPayload,
+  type VcsProvider
 } from '@/lib/delivery'
 import { RefreshCw } from '@/lib/icons'
 import { $projectConfigRevision } from '@/store/project-config'
@@ -65,6 +67,7 @@ export function ProjectDeliveryDashboardView() {
   const { activeProject, activeProjectKey } = useProjectWorkspace()
   const [inbox, setInbox] = useState<PmInboxPayload | null>(null)
   const [localWorkOrders, setLocalWorkOrders] = useState<WorkOrder[]>([])
+  const [vcsProvider, setVcsProvider] = useState<VcsProvider>('gitlab')
   const [actionId, setActionId] = useState<string | null>(null)
   const [clarificationsOpen, setClarificationsOpen] = useState(false)
   const [reviewOpen, setReviewOpen] = useState(false)
@@ -100,12 +103,17 @@ export function ProjectDeliveryDashboardView() {
     const seq = ++requestSeq.current
     try {
       const projectKey = parseProjectKeyFromPath(location.pathname) ?? undefined
-      const [payload, overview] = await Promise.all([fetchPmInbox(projectKey), fetchDeliveryOverview()])
+      const [payload, overview, projectConfig] = await Promise.all([
+        fetchPmInbox(projectKey),
+        fetchDeliveryOverview(),
+        fetchProjectConfig().catch(() => null)
+      ])
       if (seq !== requestSeq.current) {
         return
       }
       setInbox(payload)
       setLocalWorkOrders(overview.workOrders.items)
+      setVcsProvider(projectConfig?.vcs === 'github' ? 'github' : 'gitlab')
     } catch (error) {
       if (seq === requestSeq.current) {
         notifyError(error, 'Execution queue is not ready yet')
@@ -127,7 +135,10 @@ export function ProjectDeliveryDashboardView() {
     () => visibleWorkOrders.filter(item => item.status === 'completed'),
     [visibleWorkOrders]
   )
-  const columns = useMemo(() => buildKanbanColumns(inbox, completedWorkOrders), [inbox, completedWorkOrders])
+  const columns = useMemo(
+    () => buildKanbanColumns(inbox, completedWorkOrders, vcsProvider),
+    [inbox, completedWorkOrders, vcsProvider]
+  )
 
   const pendingProposals = useMemo(
     () => (inbox?.waitingForApproval ?? []).filter(item => item.kind !== 'gate' && item.proposalId),
@@ -301,6 +312,7 @@ export function ProjectDeliveryDashboardView() {
             onApproveTicket={(readinessId, jiraKey) => void handleApproveTicket(readinessId, jiraKey)}
             onOpenCard={workOrderId => void handleReviewWorkOrder(workOrderId)}
             onReviewGate={input => void handleReviewGate(input)}
+            vcsProvider={vcsProvider}
           />
           <ClarificationsPanel
             actionId={actionId}

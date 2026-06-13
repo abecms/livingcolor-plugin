@@ -11,6 +11,13 @@ import { notify, notifyError } from '@/store/notifications'
 
 import { sectionsFromQaChecklist } from './gate-payload-formatters'
 import { GatePayloadSections } from './gate-payload-sections'
+import {
+  formatReviewRequestLinkLabelFr,
+  resolveReviewRequestNumber,
+  resolveReviewRequestProvider,
+  resolveReviewRequestUrl,
+  reviewRequestShortLabel
+} from './review-request-labels'
 import type { DecisionTraceFileDecision, DecisionTracePayload } from './types'
 import type { DeliveryGate, WorkOrder } from './types'
 import { WorkOrderLockNotice } from './work-order-lock-notice'
@@ -29,6 +36,9 @@ export interface MrDraftPayload {
   decisionTrace?: DecisionTracePayload
   mrUrl?: string
   mrIid?: number | null
+  reviewRequestUrl?: string
+  reviewRequestNumber?: number | null
+  reviewRequestProvider?: 'gitlab' | 'github' | string
 }
 
 export function asMrDraftPayload(payload: Record<string, unknown>): MrDraftPayload {
@@ -59,21 +69,25 @@ export function MrDraftReviewPanel({
   const payload = asMrDraftPayload(gate.payload)
   const draftId = payload.draftId ?? ''
   const decisionTrace = payload.decisionTrace
+  const provider = resolveReviewRequestProvider(payload)
+  const requestLabel = reviewRequestShortLabel(provider)
+  const requestUrl = resolveReviewRequestUrl(payload)
+  const requestNumber = resolveReviewRequestNumber(payload)
 
   const approve = async () => {
     if (!draftId) {
-      notifyError(new Error('Missing draft id'), 'Could not approve MR draft')
+      notifyError(new Error('Missing draft id'), `Could not approve ${requestLabel} draft`)
       return
     }
     setBusy(true)
     try {
       await approveMrDraft(draftId)
-      notify({ kind: 'success', message: `MR draft approved for ${workOrder.id}.` })
+      notify({ kind: 'success', message: `${requestLabel} draft approved for ${workOrder.id}.` })
       setFeedback('')
       onOpenChange(false)
       await onDecision()
     } catch (error) {
-      notifyError(error, 'Could not approve MR draft')
+      notifyError(error, `Could not approve ${requestLabel} draft`)
     } finally {
       setBusy(false)
     }
@@ -86,19 +100,19 @@ export function MrDraftReviewPanel({
       return
     }
     if (!draftId) {
-      notifyError(new Error('Missing draft id'), 'Could not reject MR draft')
+      notifyError(new Error('Missing draft id'), `Could not reject ${requestLabel} draft`)
       return
     }
 
     setBusy(true)
     try {
       await rejectMrDraft(draftId, trimmed)
-      notify({ kind: 'success', message: `MR draft rejected for ${workOrder.id}.` })
+      notify({ kind: 'success', message: `${requestLabel} draft rejected for ${workOrder.id}.` })
       setFeedback('')
       onOpenChange(false)
       await onDecision()
     } catch (error) {
-      notifyError(error, 'Could not reject MR draft')
+      notifyError(error, `Could not reject ${requestLabel} draft`)
     } finally {
       setBusy(false)
     }
@@ -108,18 +122,18 @@ export function MrDraftReviewPanel({
     <Sheet onOpenChange={onOpenChange} open={open}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-xl" side="right">
         <SheetHeader className={DASHBOARD_SHEET_HEADER_CLASS}>
-          <SheetTitle>MR Draft Review</SheetTitle>
+          <SheetTitle>{requestLabel} Draft Review</SheetTitle>
           <SheetDescription>
-            {workOrder.id} · {workOrder.jiraKey} · Is this MR ready to exist?
+            {workOrder.id} · {workOrder.jiraKey} · Is this {requestLabel} ready to exist?
           </SheetDescription>
         </SheetHeader>
 
         <div className={DASHBOARD_SHEET_BODY_CLASS} data-testid="mr-draft-review-panel">
           <WorkOrderLockNotice message={lockMessage} />
-          {payload.mrUrl ? (
-            <p className="text-sm" data-testid="mr-draft-gitlab-link">
-              <ExternalLink href={payload.mrUrl}>
-                Voir la MR {payload.mrIid != null ? `!${payload.mrIid} ` : ''}sur GitLab
+          {requestUrl ? (
+            <p className="text-sm" data-testid="mr-draft-review-link">
+              <ExternalLink href={requestUrl}>
+                {formatReviewRequestLinkLabelFr(provider, requestNumber ?? undefined)}
               </ExternalLink>
             </p>
           ) : null}
@@ -152,7 +166,7 @@ export function MrDraftReviewPanel({
               data-testid="mr-draft-feedback-input"
               id="mr-draft-feedback"
               onChange={event => setFeedback(event.target.value)}
-              placeholder="Explain why this draft MR is not ready."
+              placeholder={`Explain why this draft ${requestLabel} is not ready.`}
               value={feedback}
             />
           </div>
