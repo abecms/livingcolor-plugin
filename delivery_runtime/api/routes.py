@@ -357,6 +357,7 @@ def _project_config_response(project_key: str, project_name: str, config) -> Pro
     from delivery_runtime.readiness.project_settings import (
         load_project_default_repo,
         load_project_integration_branch,
+        load_project_vcs_provider,
         resolve_jira_project_key,
     )
 
@@ -371,6 +372,7 @@ def _project_config_response(project_key: str, project_name: str, config) -> Pro
         defaultRepo=load_project_default_repo(project_key),
         jiraProjectKey=resolve_jira_project_key(project_key),
         integrationBranch=load_project_integration_branch(project_key),
+        vcs=load_project_vcs_provider(project_key),
     )
 
 
@@ -521,6 +523,7 @@ def update_project_config(body: ProjectConfigUpdateRequest, request: Request) ->
         persist_project_default_repo,
         persist_project_integration_branch,
         persist_project_jira_project_key,
+        persist_project_vcs_provider,
     )
     from delivery_runtime.readiness.ticket_scope import parse_ticket_scope
 
@@ -546,6 +549,8 @@ def update_project_config(body: ProjectConfigUpdateRequest, request: Request) ->
         branch = body.integration_branch.strip()
         if branch:
             persist_project_integration_branch(target_key, branch)
+    if body.vcs is not None:
+        persist_project_vcs_provider(target_key, body.vcs)
     config = load_delivery_automation_config(project_key=request_key)
     project_key = request_key or config.project_key
     project_name = _project_name_for_key(project_key, config.project_name)

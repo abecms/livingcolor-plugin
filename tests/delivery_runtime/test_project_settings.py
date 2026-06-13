@@ -136,3 +136,21 @@ def test_persist_project_default_repo_updates_all_agent_manifests_and_automation
 
     automation = yaml.safe_load(get_automation_state_path("TVP").read_text(encoding="utf-8"))
     assert automation["defaultRepo"] == target_repo
+
+
+def test_project_vcs_provider_defaults_to_gitlab(tmp_path, monkeypatch):
+    from delivery_runtime.readiness.project_settings import load_project_vcs_provider
+
+    assert load_project_vcs_provider("BN") == "gitlab"
+
+
+def test_persist_project_vcs_provider_writes_mapping(livingcolor_home):
+    from delivery_runtime.readiness.project_mapping import load_project_mapping
+    from delivery_runtime.readiness.project_settings import (
+        load_project_vcs_provider,
+        persist_project_vcs_provider,
+    )
+
+    assert persist_project_vcs_provider("BN", "github") == "github"
+    assert load_project_vcs_provider("BN") == "github"
+    assert load_project_mapping()["BN"]["vcs"] == "github"

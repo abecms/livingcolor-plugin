@@ -196,6 +196,27 @@ def persist_project_jira_project_key(project_key: str, jira_project_key: str) ->
     return linked
 
 
+def load_project_vcs_provider(project_key: str) -> str:
+    """Return the configured VCS provider for a project; defaults to GitLab."""
+    from lc_server.integrations.vcs.provider import normalize_vcs_provider
+
+    entry = _mapping_entry(_normalize_project_key(project_key))
+    return normalize_vcs_provider(entry.get("vcs"))
+
+
+def persist_project_vcs_provider(project_key: str, vcs_provider: str) -> str:
+    from lc_server.integrations.vcs.provider import normalize_vcs_provider
+
+    key = _normalize_project_key(project_key)
+    provider = normalize_vcs_provider(vcs_provider)
+
+    def _update(entry: dict[str, Any]) -> None:
+        entry["vcs"] = provider
+
+    _upsert_mapping_entry(key, _update)
+    return provider
+
+
 def load_project_gitlab_repos(project_key: str) -> list[dict[str, Any]]:
     entry = _mapping_entry(_normalize_project_key(project_key))
     repos = entry.get("repos")

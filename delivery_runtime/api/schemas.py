@@ -361,6 +361,7 @@ class ProjectConfigResponse(BaseModel):
     default_repo: str | None = Field(default=None, alias="defaultRepo")
     jira_project_key: str | None = Field(default=None, alias="jiraProjectKey")
     integration_branch: str | None = Field(default=None, alias="integrationBranch")
+    vcs: str = "gitlab"
 
 
 class LocalProjectResponse(BaseModel):
@@ -387,6 +388,7 @@ class ProjectConfigUpdateRequest(BaseModel):
     default_repo: str | None = Field(default=None, alias="defaultRepo")
     jira_project_key: str | None = Field(default=None, alias="jiraProjectKey")
     integration_branch: str | None = Field(default=None, alias="integrationBranch")
+    vcs: str | None = None
 
     @field_validator("communicationLanguage")
     @classmethod
