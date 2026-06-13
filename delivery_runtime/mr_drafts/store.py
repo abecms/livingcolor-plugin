@@ -104,17 +104,33 @@ def load_mr_draft_for_work_order(work_order_id: str) -> MergeRequestDraft | None
     return _row_to_draft(row)
 
 
-def set_mr_draft_publication(draft_id: str, *, mr_url: str, mr_iid: int) -> MergeRequestDraft | None:
-    """Record the published GitLab MR location on the draft."""
+def set_mr_draft_publication(
+    draft_id: str,
+    *,
+    mr_url: str | None = None,
+    mr_iid: int | None = None,
+    review_request_url: str | None = None,
+    review_request_number: int | None = None,
+    review_request_provider: str = "gitlab",
+) -> MergeRequestDraft | None:
+    """Record the published review request location on the draft."""
+    resolved_url = review_request_url or mr_url or ""
+    resolved_number = review_request_number if review_request_number is not None else mr_iid
     now = utc_now_iso()
     with connect() as conn:
+        row = conn.execute(
+            "SELECT decision_trace_json FROM merge_request_drafts WHERE id = ?",
+            (draft_id,),
+        ).fetchone()
+        decision_trace = json_loads(row["decision_trace_json"], {}) if row else {}
+        decision_trace["reviewRequestProvider"] = review_request_provider
         conn.execute(
             """
             UPDATE merge_request_drafts
-            SET mr_url = ?, mr_iid = ?, updated_at = ?
+            SET mr_url = ?, mr_iid = ?, decision_trace_json = ?, updated_at = ?
             WHERE id = ?
             """,
-            (mr_url, mr_iid, now, draft_id),
+            (resolved_url, resolved_number, json_dumps(decision_trace), now, draft_id),
         )
     return load_mr_draft(draft_id)
 
@@ -134,6 +150,10 @@ def update_mr_draft_status(draft_id: str, status: str) -> MergeRequestDraft | No
 
 
 def _row_to_draft(row) -> MergeRequestDraft:
+    decision_trace = json_loads(row["decision_trace_json"], {}) if "decision_trace_json" in row.keys() else {}
+    mr_url = str(row["mr_url"]) if "mr_url" in row.keys() else ""
+    mr_iid = int(row["mr_iid"]) if "mr_iid" in row.keys() and row["mr_iid"] is not None else None
+    review_request_provider = str(decision_trace.get("reviewRequestProvider") or "gitlab")
     return MergeRequestDraft(
         id=str(row["id"]),
         work_order_id=str(row["work_order_id"]),
@@ -145,11 +165,12 @@ def _row_to_draft(row) -> MergeRequestDraft:
         risks=json_loads(row["risks_json"], []),
         reviewers=json_loads(row["reviewers_json"], []),
         qa_checklist=json_loads(row["qa_checklist_json"], {}),
-        decision_trace=json_loads(row["decision_trace_json"], {})
-        if "decision_trace_json" in row.keys()
-        else {},
-        mr_url=str(row["mr_url"]) if "mr_url" in row.keys() else "",
-        mr_iid=int(row["mr_iid"]) if "mr_iid" in row.keys() and row["mr_iid"] is not None else None,
+        decision_trace=decision_trace,
+        mr_url=mr_url,
+        mr_iid=mr_iid,
+        review_request_url=mr_url,
+        review_request_number=mr_iid,
+        review_request_provider=review_request_provider,
         status=str(row["status"]),  # type: ignore[arg-type]
         created_at=str(row["created_at"]),
         updated_at=str(row["updated_at"]),

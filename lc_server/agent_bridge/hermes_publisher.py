@@ -241,7 +241,12 @@ class HermesPublisherAgent:
 
         draft_id = str(context.get("draftId") or "")
         if draft_id:
-            set_mr_draft_publication(draft_id, mr_url=completion["mrUrl"], mr_iid=completion["mrIid"])
+            set_mr_draft_publication(
+                draft_id,
+                review_request_url=completion["reviewRequestUrl"],
+                review_request_number=completion["reviewRequestNumber"],
+                review_request_provider=completion["reviewRequestProvider"],
+            )
         return completion
 
     @staticmethod

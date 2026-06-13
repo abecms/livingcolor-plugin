@@ -139,6 +139,9 @@ class MrDraftResponse(BaseModel):
     decisionTrace: dict[str, Any] = Field(default_factory=dict)
     mrUrl: str = ""
     mrIid: int | None = None
+    reviewRequestUrl: str = ""
+    reviewRequestNumber: int | None = None
+    reviewRequestProvider: str = "gitlab"
     status: str
     createdAt: str
     updatedAt: str
