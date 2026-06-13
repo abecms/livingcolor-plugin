@@ -119,6 +119,26 @@ def test_resolve_external_bundle_reports_missing_prompt(tmp_path):
     assert "skill prompt not found: ticket-analyst" in bundle.error
 
 
+def test_resolve_external_bundle_reports_invalid_prompt(tmp_path):
+    from lc_server.integrations.skills.registry import resolve_external_bundle
+
+    registry = tmp_path / "registry"
+    registry.mkdir()
+    _write_registry(registry)
+    (registry / "ticket-analyst" / "prompt.md").write_bytes(b"\xff\xfe\xfa")
+
+    bundle = resolve_external_bundle(
+        registry_path=registry,
+        bundle_name="code-review-pipeline",
+        required_skills=("ticket-analyst",),
+        resolved_commit=RESOLVED_COMMIT,
+    )
+
+    assert bundle.available is False
+    assert "invalid skill prompt" in bundle.error
+    assert "ticket-analyst" in bundle.error
+
+
 def test_resolve_external_bundle_reports_skill_name_mismatch(tmp_path):
     from lc_server.integrations.skills.registry import resolve_external_bundle
 

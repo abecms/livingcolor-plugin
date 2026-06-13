@@ -91,11 +91,15 @@ def _load_skill(registry_path: Path, skill_name: str) -> ExternalSkill | str:
     if name != skill_name:
         return f"skill name mismatch: expected {skill_name}, got {name or '(missing)'}"
     version = str(manifest.get("version") or "").strip()
+    try:
+        prompt = prompt_path.read_text(encoding="utf-8")
+    except Exception as exc:
+        return f"invalid skill prompt for {skill_name}: {exc}"
     return ExternalSkill(
         name=skill_name,
         version=version,
         root_path=root,
-        prompt=prompt_path.read_text(encoding="utf-8"),
+        prompt=prompt,
     )
 
 
