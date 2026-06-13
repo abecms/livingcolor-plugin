@@ -24,23 +24,25 @@ _JSON_BLOCK_RE = re.compile(r"\{[^{}]*\"status\"[^{}]*\}", re.DOTALL)
 PUBLISHER_TOOLSETS = ["terminal", "skills"]
 PUBLISHER_SYSTEM_PROMPT = """You are the LivingColor Publisher Agent.
 
-Your ONLY job is to publish an already-approved delivery branch to GitLab:
-push the branch, ensure the integration branch exists, and create the merge request.
-The MR content was written and approved by a human — reproduce it verbatim.
+Your ONLY job is to publish an already-approved delivery branch to the configured VCS provider:
+push the branch, ensure the integration branch exists, and create the review request.
+The review request content was written and approved by a human — reproduce it verbatim.
 
 Rules:
 - Follow the agent-mr-publisher skill protocol exactly, in order.
-- You MUST create and manage the merge request exclusively via GitLab MCP tools
-  (create_merge_request, create_branch, and read/list branch tools).
-- NEVER use curl, wget, httpie, python -c, or any direct GitLab REST API call.
-- NEVER write MR payloads to /tmp or any path outside the Workspace Root.
-- Never rewrite, summarize, or translate the MR title or description.
+- You MUST create and manage the review request exclusively via the configured VCS MCP tools
+  (create_pull_request or create_merge_request, create_branch, and read/list branch tools).
+- NEVER use curl, wget, httpie, python -c, or any direct VCS REST API call.
+- NEVER write review-request payloads to /tmp or any path outside the Workspace Root.
+- Never rewrite, summarize, or translate the review request title or description.
 - Never edit files, commit, merge, rebase, or modify the repository content.
   The only git command you may run is git push.
 - Stay inside the Workspace Root checkout. Never access parent directories.
-- When finished, output a JSON completion block:
-  {"mrUrl": "...", "mrIid": 0, "targetBranch": "...", "status": "published"}
-  If publication failed, use {"status": "failed", "error": "..."} instead.
+- When finished, output a JSON completion block with provider-neutral fields when possible:
+  {"reviewRequestUrl": "...", "reviewRequestNumber": 0, "targetBranch": "...",
+   "provider": "github", "status": "published"}
+  Legacy GitLab fields (mrUrl, mrIid) remain accepted. If publication failed, use
+  {"status": "failed", "error": "..."} instead.
 """
 
 
@@ -95,35 +97,53 @@ def build_publisher_prompt(context: dict[str, Any]) -> str:
     mr_title = str(context.get("mrTitle") or "")
     mr_description = str(context.get("mrDescription") or "")
 
+    provider = normalize_vcs_provider(
+        context.get("vcs") or context.get("reviewRequestProvider")
+    )
+    is_github = provider == "github"
+    provider_label = "GitHub" if is_github else "GitLab"
+    request_label = "Pull Request" if is_github else "Merge request"
+    mcp_create_tool = "create_pull_request" if is_github else "create_merge_request"
+
     if integration_branch:
-        integration_section = f"Integration branch (MR target): `{integration_branch}`"
+        integration_section = f"Integration branch ({request_label} target): `{integration_branch}`"
     else:
         integration_section = (
-            "Integration branch (MR target): not configured. Resolve the first existing "
+            f"Integration branch ({request_label} target): not configured. Resolve the first existing "
             "remote branch among staging, dev, develop, preprod, test; if none exists, "
             "create 'develop' from the repository default branch."
         )
 
-    return "\n".join(
-        [
-            "Publish the approved delivery branch to GitLab.",
-            "",
-            f"Workspace Root: {workspace_path}",
-            f"Delivery branch to push: `{delivery_branch}`",
-            integration_section,
-            "",
-            "Merge request title (use verbatim, no edits):",
-            mr_title,
-            "",
-            "Merge request description (use verbatim, no edits):",
-            mr_description,
-            "",
-            "Follow the agent-mr-publisher skill protocol exactly: push the delivery branch, "
-            "ensure the integration branch exists on the remote, then create the merge request "
-            "ONLY with the GitLab MCP create_merge_request tool (no curl, no REST fallbacks).",
-            "Finish with the JSON completion block described in your instructions.",
-        ]
-    )
+    lines = [
+        f"Publish the approved delivery branch to {provider_label}.",
+        "",
+        f"Workspace Root: {workspace_path}",
+        f"Delivery branch to push: `{delivery_branch}`",
+        integration_section,
+        "",
+        f"{request_label} title (use verbatim, no edits):",
+        mr_title,
+        "",
+        f"{request_label} description (use verbatim, no edits):",
+        mr_description,
+        "",
+        "Follow the agent-mr-publisher skill protocol exactly: push the delivery branch, "
+        f"ensure the integration branch exists on the remote, then create the {request_label.lower()} "
+        f"ONLY with the {provider_label} MCP {mcp_create_tool} tool (no curl, no REST fallbacks).",
+        "Finish with the JSON completion block described in your instructions.",
+    ]
+
+    if is_github:
+        lines.extend(
+            [
+                "",
+                "Your JSON completion block must include provider-neutral fields with provider github:",
+                '{"reviewRequestUrl": "...", "reviewRequestNumber": 0, "targetBranch": "...", '
+                '"provider": "github", "status": "published"}',
+            ]
+        )
+
+    return "\n".join(lines)
 
 
 class HermesPublisherAgent:

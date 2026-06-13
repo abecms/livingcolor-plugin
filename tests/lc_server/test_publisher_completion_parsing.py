@@ -292,6 +292,26 @@ def test_publisher_execute_requires_delivery_branch(tmp_path):
         )
 
 
+def test_build_publisher_prompt_uses_github_terms():
+    from lc_server.agent_bridge.hermes_publisher import build_publisher_prompt
+
+    prompt = build_publisher_prompt(
+        {
+            "workspacePath": "/repo",
+            "deliveryBranch": "feature/GH-1",
+            "integrationBranch": "main",
+            "mrTitle": "GH-1: change",
+            "mrDescription": "Approved body",
+            "vcs": "github",
+        }
+    )
+
+    assert "Publish the approved delivery branch to GitHub" in prompt
+    assert "Pull Request title" in prompt
+    assert "GitHub MCP create_pull_request" in prompt
+    assert "Merge request" not in prompt
+
+
 def test_publisher_execute_fails_on_wrong_branch(_git_identity, tmp_path):
     from lc_server.agent_bridge.hermes_publisher import HermesPublisherAgent
 

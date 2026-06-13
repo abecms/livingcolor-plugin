@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from delivery_runtime.readiness.project_settings import load_project_vcs_provider
+
 if TYPE_CHECKING:
     from delivery_runtime.agents.schema import AgentManifest
 
@@ -67,12 +69,13 @@ def resolve_delivery_toolsets(
     return _append_mcp_toolsets(toolsets, server_names)
 
 
-def _gitlab_mcp_server_names(project_key: str | None) -> list[str]:
+def _vcs_mcp_server_names(project_key: str | None) -> list[str]:
+    provider = load_project_vcs_provider(project_key or "") if project_key else "gitlab"
     names: list[str] = []
     for server_name in dict.fromkeys(_project_mcp_server_names(project_key) + _configured_mcp_server_names()):
-        if "gitlab" in server_name.lower():
+        if provider in server_name.lower():
             names.append(server_name)
-    return names or ["gitlab"]
+    return names or [provider]
 
 
 def resolve_publisher_toolsets(
@@ -81,10 +84,10 @@ def resolve_publisher_toolsets(
     manifest: AgentManifest | None,
     project_key: str | None,
 ) -> list[str]:
-    """Publisher must load GitLab MCP toolsets so MR creation never falls back to curl."""
+    """Publisher must load VCS MCP toolsets so review-request creation never falls back to curl."""
     toolsets = resolve_delivery_toolsets(
         base_toolsets=base_toolsets,
         manifest=manifest,
         project_key=project_key,
     )
-    return _append_mcp_toolsets(toolsets, _gitlab_mcp_server_names(project_key))
+    return _append_mcp_toolsets(toolsets, _vcs_mcp_server_names(project_key))
