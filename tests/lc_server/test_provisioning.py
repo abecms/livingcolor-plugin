@@ -248,6 +248,53 @@ def test_prerequisites_ok_when_all_configured():
     assert missing == []
 
 
+def test_prerequisites_require_github_when_project_uses_github(monkeypatch):
+    from lc_server.provisioning.prerequisites import check_provisioning_prerequisites
+
+    servers = {
+        "jira": {"env": {"JIRA_URL": "https://jira.example.com", "JIRA_API_TOKEN": "token"}},
+        "github": {"env": {"GITHUB_TOKEN": "ghp_test"}},
+    }
+
+    monkeypatch.setattr(
+        "lc_server.provisioning.prerequisites.load_project_vcs_provider",
+        lambda project_key: "github",
+    )
+    monkeypatch.setattr(
+        "lc_server.provisioning.prerequisites.resolve_project_mcp_server",
+        lambda _project_key, server_name: servers.get(server_name),
+    )
+    monkeypatch.setattr(
+        "lc_server.provisioning.prerequisites.is_delivery_llm_available",
+        lambda: True,
+    )
+
+    assert check_provisioning_prerequisites("GH") == []
+
+
+def test_prerequisites_do_not_require_gitlab_for_github(monkeypatch):
+    from lc_server.provisioning.prerequisites import check_provisioning_prerequisites
+
+    servers = {
+        "jira": {"env": {"JIRA_URL": "https://jira.example.com", "JIRA_API_TOKEN": "token"}},
+    }
+
+    monkeypatch.setattr(
+        "lc_server.provisioning.prerequisites.load_project_vcs_provider",
+        lambda project_key: "github",
+    )
+    monkeypatch.setattr(
+        "lc_server.provisioning.prerequisites.resolve_project_mcp_server",
+        lambda _project_key, server_name: servers.get(server_name),
+    )
+    monkeypatch.setattr(
+        "lc_server.provisioning.prerequisites.is_delivery_llm_available",
+        lambda: True,
+    )
+
+    assert check_provisioning_prerequisites("GH") == ["github_mcp"]
+
+
 def test_prerequisites_missing_jira():
     from unittest.mock import patch
 
