@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import urllib.request
 import zipfile
 
 
@@ -94,3 +95,38 @@ def test_materialize_rejects_archive_path_traversal(livingcolor_home):
     assert result.available is False
     assert "Unsafe archive member" in result.error
     assert not (livingcolor_home / "skills-cache" / "escaped.txt").exists()
+
+
+def test_github_archive_source_fetches_resolved_commit(monkeypatch):
+    from lc_server.integrations.skills.source import GitHubArchiveSkillsSource
+
+    requested_urls: list[str] = []
+
+    class FakeResponse:
+        def __enter__(self) -> FakeResponse:
+            return self
+
+        def __exit__(self, exc_type, exc, traceback) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return b"archive"
+
+    def fake_urlopen(request: urllib.request.Request, timeout: int) -> FakeResponse:
+        assert timeout == 30
+        requested_urls.append(request.full_url)
+        return FakeResponse()
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+
+    archive = GitHubArchiveSkillsSource().fetch_archive(
+        repo="Tamsi/livingcolor-skills",
+        ref="v0.1.0",
+        resolved_commit="fdf1be62d61ef74b51d91ae81ed718350dce20d5",
+    )
+
+    assert archive == b"archive"
+    assert requested_urls == [
+        "https://github.com/Tamsi/livingcolor-skills/archive/fdf1be62d61ef74b51d91ae81ed718350dce20d5.zip"
+    ]
+    assert "v0.1.0" not in requested_urls[0]

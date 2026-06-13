@@ -15,8 +15,8 @@ class GitHubArchiveSkillsSource:
     """Fetch public GitHub repository archives without embedding credentials."""
 
     def fetch_archive(self, *, repo: str, ref: str, resolved_commit: str) -> bytes:
-        del resolved_commit
-        url = f"https://github.com/{repo}/archive/{ref}.zip"
+        del ref
+        url = f"https://github.com/{repo}/archive/{resolved_commit}.zip"
         request = urllib.request.Request(url, headers={"User-Agent": "livingcolor-plugin"})
         with urllib.request.urlopen(request, timeout=30) as response:
             return response.read()
