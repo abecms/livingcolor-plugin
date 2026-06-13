@@ -43,7 +43,7 @@ def parse_external_skills_lock(payload: dict[str, Any]) -> ExternalSkillsLock:
     if ref.lower() in FORBIDDEN_MOVING_REFS:
         raise ValueError("External skills ref must not be a moving branch")
 
-    resolved_commit = _require_str(payload, "resolvedCommit").lower()
+    resolved_commit = _require_str(payload, "resolvedCommit")
     if not FULL_SHA_RE.fullmatch(resolved_commit):
         raise ValueError("resolvedCommit must be a full 40-character lowercase git SHA")
 

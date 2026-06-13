@@ -55,6 +55,15 @@ def test_lock_rejects_short_resolved_commit():
         parse_external_skills_lock(payload)
 
 
+def test_lock_rejects_uppercase_resolved_commit():
+    from lc_server.integrations.skills.lock import parse_external_skills_lock
+
+    payload = {**VALID_LOCK, "resolvedCommit": "FDF1BE62D61EF74B51D91AE81ED718350DCE20D5"}
+
+    with pytest.raises(ValueError, match="resolvedCommit"):
+        parse_external_skills_lock(payload)
+
+
 def test_load_external_skills_lock_from_root(tmp_path):
     from lc_server.integrations.skills.lock import load_external_skills_lock
 
