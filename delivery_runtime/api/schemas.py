@@ -340,6 +340,18 @@ class GitLabReposResponse(BaseModel):
     default_repo: str | None = Field(default=None, alias="defaultRepo")
 
 
+class VcsRepoPayload(BaseModel):
+    path: str
+    gitlabId: int | None = None
+    githubId: int | None = None
+
+
+class VcsReposResponse(BaseModel):
+    items: list[VcsRepoPayload]
+    defaultRepo: str | None = None
+    provider: str = "gitlab"
+
+
 class JiraProjectPayload(BaseModel):
     key: str
     name: str

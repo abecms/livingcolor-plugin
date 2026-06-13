@@ -353,3 +353,62 @@ class TestDeliveryApi:
         assert selected["capacityDays"] == 2
         assert len(selected["tickets"]) == 1
         assert selected["tickets"][0]["jiraKey"] == "BN-1"
+
+
+class TestVcsReposApi:
+    def test_list_project_vcs_repos_uses_github_discovery(self, monkeypatch):
+        from delivery_runtime.api.routes import list_project_vcs_repos
+
+        discovery = type(
+            "Discovery",
+            (),
+            {
+                "repos": [{"path": "github.com/org/app", "githubId": 1}],
+                "default_repo": "github.com/org/app",
+                "warnings": [],
+            },
+        )()
+
+        monkeypatch.setattr(
+            "delivery_runtime.readiness.project_settings.load_project_vcs_provider",
+            lambda _key: "github",
+        )
+        monkeypatch.setattr(
+            "delivery_runtime.readiness.project_settings.resolve_project_mcp_server",
+            lambda _key, _provider: {"env": {"GITHUB_TOKEN": "ghp_test"}},
+        )
+        monkeypatch.setattr(
+            "delivery_runtime.readiness.project_settings.load_project_default_repo",
+            lambda _key: None,
+        )
+        monkeypatch.setattr(
+            "lc_server.integrations.vcs.github.discover_github_repos_for_project",
+            lambda _key, _cfg: discovery,
+        )
+
+        response = list_project_vcs_repos("APP")
+
+        assert response.provider == "github"
+        assert response.items[0].githubId == 1
+        assert response.items[0].path == "github.com/org/app"
+        assert response.defaultRepo == "github.com/org/app"
+
+    def test_list_project_vcs_repos_github_mcp_not_configured(self, monkeypatch):
+        from fastapi import HTTPException
+
+        from delivery_runtime.api.routes import list_project_vcs_repos
+
+        monkeypatch.setattr(
+            "delivery_runtime.readiness.project_settings.load_project_vcs_provider",
+            lambda _key: "github",
+        )
+        monkeypatch.setattr(
+            "delivery_runtime.readiness.project_settings.resolve_project_mcp_server",
+            lambda _key, _provider: None,
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            list_project_vcs_repos("APP")
+
+        assert exc_info.value.status_code == 400
+        assert exc_info.value.detail == {"error": "github_mcp_not_configured"}

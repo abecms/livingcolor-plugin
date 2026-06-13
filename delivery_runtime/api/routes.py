@@ -39,6 +39,8 @@ from delivery_runtime.api.schemas import (
     SprintSelectionUpdateRequest,
     TicketEstimationUpdateRequest,
     TicketEstimationUpdateResponse,
+    VcsRepoPayload,
+    VcsReposResponse,
     ReadinessListResponse,
     ReadinessRecordResponse,
     ReadinessScanRequest,
@@ -428,6 +430,48 @@ def list_project_gitlab_repos(project_key: str) -> GitLabReposResponse:
     return GitLabReposResponse(
         items=[GitLabRepoPayload.model_validate(item) for item in repos],
         defaultRepo=default_repo,
+    )
+
+
+@router.get("/projects/{project_key}/vcs-repos", response_model=VcsReposResponse)
+def list_project_vcs_repos(project_key: str) -> VcsReposResponse:
+    from delivery_runtime.readiness.project_settings import (
+        load_project_default_repo,
+        load_project_gitlab_repos,
+        load_project_vcs_provider,
+        resolve_project_mcp_server,
+    )
+    from lc_server.integrations.vcs.github import discover_github_repos_for_project
+    from lc_server.provisioning.gitlab_discovery import discover_gitlab_repos_for_project
+
+    key = project_key.strip().upper()
+    provider = load_project_vcs_provider(key)
+    mcp_config = resolve_project_mcp_server(key, provider)
+    if not mcp_config:
+        raise HTTPException(status_code=400, detail={"error": f"{provider}_mcp_not_configured"})
+
+    try:
+        if provider == "github":
+            discovery = discover_github_repos_for_project(key, mcp_config)
+            repos = discovery.repos
+        else:
+            discovery = discover_gitlab_repos_for_project(key, mcp_config)
+            repos = discovery.repos or load_project_gitlab_repos(key)
+    except Exception as exc:
+        if provider == "gitlab":
+            cached = load_project_gitlab_repos(key)
+            if cached:
+                return VcsReposResponse(
+                    items=[VcsRepoPayload.model_validate(item) for item in cached],
+                    defaultRepo=load_project_default_repo(key),
+                    provider=provider,
+                )
+        raise HTTPException(status_code=502, detail=f"{provider.title()} repository listing failed: {exc}") from exc
+
+    return VcsReposResponse(
+        items=[VcsRepoPayload.model_validate(item) for item in repos],
+        defaultRepo=load_project_default_repo(key) or discovery.default_repo,
+        provider=provider,
     )
 
 
