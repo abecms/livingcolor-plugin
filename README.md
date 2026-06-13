@@ -66,6 +66,28 @@ Before delivery workflows can run, configure:
 LivingColor reads MCP connection status and per-project credentials only after
 you explicitly save them in **Project → Integrations** in the dashboard.
 
+### External LivingColor Skills
+
+LivingColor can enrich delivery prompts with external guidance from the
+`Tamsi/livingcolor-skills` repository. The integration is pinned by
+`livingcolor.skills.lock.json`, which records both the requested `ref` and the
+exact `resolvedCommit`. GitHub archive downloads use `resolvedCommit`, not a
+moving branch or tag, so each warmed cache points at one immutable source
+revision.
+
+The cache materializer expands those skills under
+`~/.hermes/livingcolor/skills-cache/livingcolor-skills/<resolvedCommit>/`.
+Runtime prompt enrichment is cache-only: if the lock file, cache, or registry is
+missing or invalid, LivingColor continues delivery for that run with external
+guidance disabled. Prompt enrichment does not block on a GitHub download at
+runtime.
+
+External skills are rendered as read-only model guidance. They do not grant new
+tool permissions, change delivery tool response contracts, or alter the
+human-gated workflow. To roll back, restore `livingcolor.skills.lock.json` to a
+previous known-good `resolvedCommit`, then re-materialize or warm that cache
+before running delivery again.
+
 ## First-time setup
 
 ### 1. Open the dashboard
