@@ -329,6 +329,8 @@ export interface TicketScopePayload {
   matchMode: 'all' | 'any'
 }
 
+export type VcsProvider = 'gitlab' | 'github'
+
 export interface ProjectConfigPayload {
   projectKey: string
   projectName: string
@@ -337,6 +339,7 @@ export interface ProjectConfigPayload {
   communicationLanguage: 'en' | 'fr'
   ticketScope: TicketScopePayload
   configPath: string
+  vcs?: VcsProvider
   defaultRepo?: string | null
   jiraProjectKey?: string | null
   integrationBranch?: string | null
@@ -360,6 +363,18 @@ export interface GitLabRepoOption {
 export interface GitLabReposPayload {
   items: GitLabRepoOption[]
   defaultRepo?: string | null
+}
+
+export interface VcsRepoOption {
+  path: string
+  gitlabId?: number | null
+  githubId?: number | null
+}
+
+export interface VcsReposPayload {
+  items: VcsRepoOption[]
+  defaultRepo?: string | null
+  provider: VcsProvider
 }
 
 export const DEFAULT_TICKET_SCOPE: TicketScopePayload = {
@@ -436,6 +451,7 @@ export function saveProjectConfig(body: {
   sprintCapacityDays: number
   communicationLanguage: 'en' | 'fr'
   ticketScope?: TicketScopePayload
+  vcs?: VcsProvider
   defaultRepo?: string | null
   jiraProjectKey?: string | null
   integrationBranch?: string | null
@@ -457,6 +473,14 @@ export function fetchProjectGitlabRepos(projectKey: string): Promise<GitLabRepos
   })
 }
 
+export function fetchProjectVcsRepos(projectKey: string): Promise<VcsReposPayload> {
+  return callDesktopApi<VcsReposPayload>({
+    ...profileScoped(),
+    path: `/api/delivery/projects/${encodeURIComponent(projectKey)}/vcs-repos`,
+    timeoutMs: 120_000
+  })
+}
+
 export async function saveProjectDefaultRepo(defaultRepo: string | null): Promise<ProjectConfigPayload> {
   const config = await fetchProjectConfig()
   return saveProjectConfig({
@@ -464,6 +488,7 @@ export async function saveProjectDefaultRepo(defaultRepo: string | null): Promis
     sprintCapacityDays: config.sprintCapacityDays,
     communicationLanguage: config.communicationLanguage === 'en' ? 'en' : 'fr',
     ticketScope: config.ticketScope,
+    vcs: config.vcs,
     defaultRepo
   })
 }
@@ -477,6 +502,7 @@ export async function saveProjectIntegrationBranch(
     sprintCapacityDays: config.sprintCapacityDays,
     communicationLanguage: config.communicationLanguage === 'en' ? 'en' : 'fr',
     ticketScope: config.ticketScope,
+    vcs: config.vcs,
     integrationBranch
   })
 }
@@ -496,6 +522,7 @@ export async function saveProjectJiraProjectKey(jiraProjectKey: string | null): 
     sprintCapacityDays: config.sprintCapacityDays,
     communicationLanguage: config.communicationLanguage === 'en' ? 'en' : 'fr',
     ticketScope: config.ticketScope,
+    vcs: config.vcs,
     jiraProjectKey
   })
 }

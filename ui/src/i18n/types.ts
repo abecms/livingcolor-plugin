@@ -1403,34 +1403,45 @@ export interface Translations {
     projectIntegrations: {
       connectJira: string
       connectGitLab: string
+      connectGitHub: string
       jiraConnected: string
       gitlabConnected: string
+      githubConnected: string
       updateJiraCredentials: string
       updateGitLabCredentials: string
+      updateGitHubCredentials: string
+      vcsProviderSectionTitle: string
+      vcsProviderSectionDescription: string
+      vcsProviderLabel: string
+      vcsProviderGitLab: string
+      vcsProviderGitHub: string
+      vcsProviderSaving: string
       setupAutomation: string
       setupAutomationBusy: string
       setupAutomationSuccess: (projectKey: string) => string
       setupAutomationDisabledTooltip: (missing: string) => string
       missingPrerequisiteJira: string
       missingPrerequisiteGitLab: string
+      missingPrerequisiteGitHub: string
       automationSectionTitle: string
       automationSectionDescription: string
-      targetRepoSectionTitle: string
+      targetRepoSectionTitle: (forge: string) => string
       targetRepoSectionDescription: string
       targetRepoLabel: string
       targetRepoPlaceholder: string
-      targetRepoLoading: string
+      targetRepoLoading: (forge: string) => string
       targetRepoSaving: string
       targetRepoSaved: string
-      targetRepoEmpty: string
+      targetRepoEmpty: (forge: string) => string
       targetRepoSavedHint: string
       mergeTargetSectionTitle: string
-      mergeTargetSectionDescription: string
+      mergeTargetSectionDescription: (forge: string, reviewRequest: string) => string
       mergeTargetLabel: string
       mergeTargetPlaceholder: string
       mergeTargetSaving: string
       mergeTargetSaved: string
-      mergeTargetSavedHint: string
+      mergeTargetSavedHint: (reviewRequest: string) => string
+      forgeSectionDescription: (forge: string, reviewRequest: string) => string
       jiraSectionDescription: (projectKey: string) => string
       targetJiraSectionTitle: string
       targetJiraSectionDescription: string

@@ -3,6 +3,7 @@
  * Delivery UI only needs Jira/GitLab MCP helpers and config reads.
  */
 import { callDesktopApi } from '@/lib/desktop-api'
+import type { GitHubConnectResponse, GitHubConnectionStatus } from '@/lib/github-dashboard'
 import type { GitLabConnectResponse, GitLabConnectionStatus } from '@/lib/gitlab-dashboard'
 import type { JiraConnectResponse, JiraDashboardPayload } from '@/lib/jira-dashboard'
 import type { LivingColorConfigRecord } from '@/types/livingcolor'
@@ -51,6 +52,21 @@ export function connectGitlabMcp(): Promise<GitLabConnectResponse> {
 export function fetchGitlabStatus(): Promise<GitLabConnectionStatus> {
   return callDesktopApi<GitLabConnectionStatus>({
     path: `/api/mcp/servers/${encodeURIComponent('gitlab')}/status`,
+    timeoutMs: JIRA_DASHBOARD_TIMEOUT_MS
+  })
+}
+
+export function connectGithubMcp(): Promise<GitHubConnectResponse> {
+  return callDesktopApi<GitHubConnectResponse>({
+    path: `/api/mcp/servers/${encodeURIComponent('github')}/connect`,
+    method: 'POST',
+    timeoutMs: JIRA_CONNECT_TIMEOUT_MS
+  })
+}
+
+export function fetchGithubStatus(): Promise<GitHubConnectionStatus> {
+  return callDesktopApi<GitHubConnectionStatus>({
+    path: `/api/mcp/servers/${encodeURIComponent('github')}/status`,
     timeoutMs: JIRA_DASHBOARD_TIMEOUT_MS
   })
 }

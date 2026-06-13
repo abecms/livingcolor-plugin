@@ -3,10 +3,16 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { I18nProvider } from '@/i18n'
-import { fetchGitlabStatus, fetchJiraDashboard, connectGitlabMcp, connectJiraMcp } from '@/hermes'
+import {
+  fetchGithubStatus,
+  fetchGitlabStatus,
+  fetchJiraDashboard
+} from '@/hermes'
 import { getLivingColorConfigRecord } from '@/livingcolor'
+import { connectGithubViaCredentials, getGitHubSavedCredentials } from '@/lib/github-dashboard-transport'
 import { connectGitlabViaCredentials, getGitLabSavedCredentials } from '@/lib/gitlab-dashboard-transport'
 import { connectJiraViaCredentials, getJiraSavedCredentials } from '@/lib/jira-dashboard-transport'
+import { fetchProjectConfig, saveProjectConfig } from '@/lib/delivery'
 
 import { ProjectIntegrationsSection } from './project-integrations'
 
@@ -16,17 +22,57 @@ vi.mock('@/hooks/use-project-workspace', () => ({
   })
 }))
 
+const baseProjectConfig = {
+  projectKey: 'BN',
+  projectName: 'Brand New',
+  sprintDurationDays: 14,
+  sprintCapacityDays: 10,
+  communicationLanguage: 'en' as const,
+  ticketScope: { statusGroups: ['todo'], assignees: [], includeUnassigned: true, matchMode: 'all' as const },
+  configPath: '/tmp/config.yaml',
+  integrationBranch: 'develop'
+}
+
 vi.mock('@/lib/delivery', () => ({
   setupProjectAutomation: vi.fn().mockResolvedValue({ projectKey: 'BN', warnings: [] }),
+  fetchProjectConfig: vi.fn().mockResolvedValue({
+    projectKey: 'BN',
+    projectName: 'Brand New',
+    sprintDurationDays: 14,
+    sprintCapacityDays: 10,
+    communicationLanguage: 'en',
+    ticketScope: { statusGroups: ['todo'], assignees: [], includeUnassigned: true, matchMode: 'all' },
+    configPath: '/tmp/config.yaml',
+    integrationBranch: 'develop'
+  }),
   fetchProjectGitlabRepos: vi.fn().mockResolvedValue({ items: [], defaultRepo: null }),
+  fetchProjectVcsRepos: vi.fn().mockResolvedValue({ items: [], defaultRepo: null, provider: 'github' }),
   fetchProjectJiraProjects: vi.fn().mockResolvedValue({ items: [], linkedProjectKey: 'BN' }),
+  saveProjectConfig: vi.fn().mockResolvedValue({
+    projectKey: 'BN',
+    projectName: 'Brand New',
+    sprintDurationDays: 14,
+    sprintCapacityDays: 10,
+    communicationLanguage: 'en',
+    ticketScope: { statusGroups: ['todo'], assignees: [], includeUnassigned: true, matchMode: 'all' },
+    configPath: '/tmp/config.yaml',
+    integrationBranch: 'develop'
+  }),
   saveProjectDefaultRepo: vi.fn().mockResolvedValue({ defaultRepo: null }),
+  saveProjectIntegrationBranch: vi.fn().mockResolvedValue({ integrationBranch: 'develop' }),
   saveProjectJiraProjectKey: vi.fn().mockResolvedValue({ jiraProjectKey: 'BN' })
 }))
 
 vi.mock('@/hermes', () => ({
+  connectGithubMcp: vi.fn().mockResolvedValue({ ok: false, status: 'disconnected' }),
   connectGitlabMcp: vi.fn().mockResolvedValue({ ok: false, status: 'disconnected' }),
   connectJiraMcp: vi.fn().mockResolvedValue({ ok: false, status: 'disconnected' }),
+  fetchGithubStatus: vi.fn().mockResolvedValue({
+    authenticated: false,
+    message: 'GitHub MCP is not configured yet.',
+    status: 'disconnected',
+    toolCount: 0
+  }),
   fetchGitlabStatus: vi.fn().mockResolvedValue({
     authenticated: false,
     message: 'GitLab MCP is not configured yet.',
@@ -41,6 +87,11 @@ vi.mock('@/hermes', () => ({
 
 vi.mock('@/livingcolor', () => ({
   getLivingColorConfigRecord: vi.fn().mockResolvedValue({ mcp_servers: {} })
+}))
+
+vi.mock('@/lib/github-dashboard-transport', () => ({
+  connectGithubViaCredentials: vi.fn().mockResolvedValue({ ok: true, message: 'Connected to GitHub.' }),
+  getGitHubSavedCredentials: vi.fn().mockResolvedValue({ apiToken: null, usesEnvAuth: false })
 }))
 
 vi.mock('@/lib/gitlab-dashboard-transport', () => ({
@@ -58,7 +109,35 @@ vi.mock('@/store/notifications', () => ({
   notifyError: vi.fn()
 }))
 
+vi.mock('@/store/project-config', () => ({
+  bumpProjectConfigRevision: vi.fn()
+}))
+
 beforeEach(() => {
+  Element.prototype.scrollIntoView = vi.fn()
+  vi.mocked(fetchProjectConfig).mockResolvedValue(baseProjectConfig)
+  vi.mocked(saveProjectConfig).mockResolvedValue(baseProjectConfig)
+  vi.mocked(getLivingColorConfigRecord).mockResolvedValue({ mcp_servers: {} })
+  vi.mocked(getJiraSavedCredentials).mockResolvedValue({ jiraUrl: null, username: null, usesEnvAuth: false })
+  vi.mocked(getGitLabSavedCredentials).mockResolvedValue({ gitlabUrl: null, usesEnvAuth: false })
+  vi.mocked(getGitHubSavedCredentials).mockResolvedValue({ apiToken: null, usesEnvAuth: false })
+  vi.mocked(fetchJiraDashboard).mockResolvedValue({
+    connection: { status: 'disconnected' },
+    sampleData: true
+  })
+  vi.mocked(fetchGitlabStatus).mockResolvedValue({
+    authenticated: false,
+    message: 'GitLab MCP is not configured yet.',
+    status: 'disconnected',
+    toolCount: 0
+  })
+  vi.mocked(fetchGithubStatus).mockResolvedValue({
+    authenticated: false,
+    message: 'GitHub MCP is not configured yet.',
+    status: 'disconnected',
+    toolCount: 0
+  })
+
   Object.defineProperty(window, 'livingColorDesktop', {
     configurable: true,
     value: {
@@ -69,6 +148,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  vi.clearAllMocks()
 })
 
 function renderSection() {
@@ -91,6 +171,27 @@ describe('ProjectIntegrationsSection', () => {
     expect(screen.getByRole('link', { name: 'Open MCP settings' }).getAttribute('href')).toBe('/settings?tab=mcp')
   })
 
+  it('shows GitHub controls when project provider is github', async () => {
+    vi.mocked(fetchProjectConfig).mockResolvedValue({
+      ...baseProjectConfig,
+      vcs: 'github'
+    })
+
+    renderSection()
+
+    expect(await screen.findByRole('button', { name: 'Connect GitHub' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Connect GitLab' })).toBeNull()
+  })
+
+  it('keeps GitLab controls when project provider is omitted', async () => {
+    vi.mocked(fetchProjectConfig).mockResolvedValue(baseProjectConfig)
+
+    renderSection()
+
+    expect(await screen.findByRole('button', { name: 'Connect GitLab' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Connect GitHub' })).toBeNull()
+  })
+
   it('opens the Jira credentials dialog', async () => {
     renderSection()
     await screen.findByRole('button', { name: 'Connect Jira' })
@@ -109,6 +210,21 @@ describe('ProjectIntegrationsSection', () => {
 
     expect(await screen.findByRole('dialog')).toBeTruthy()
     expect(screen.getByPlaceholderText('https://gitlab.com')).toBeTruthy()
+  })
+
+  it('opens the GitHub credentials dialog', async () => {
+    vi.mocked(fetchProjectConfig).mockResolvedValue({
+      ...baseProjectConfig,
+      vcs: 'github'
+    })
+
+    renderSection()
+    await screen.findByRole('button', { name: 'Connect GitHub' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Connect GitHub' }))
+
+    expect(await screen.findByRole('dialog')).toBeTruthy()
+    expect(screen.getByLabelText('GitHub token')).toBeTruthy()
   })
 
   it('submits Jira credentials', async () => {
@@ -155,6 +271,29 @@ describe('ProjectIntegrationsSection', () => {
       expect(connectGitlabViaCredentials).toHaveBeenCalledWith({
         gitlabUrl: 'https://gitlab.example.com',
         apiToken: 'secret-token'
+      })
+    })
+  })
+
+  it('submits GitHub credentials', async () => {
+    vi.mocked(fetchProjectConfig).mockResolvedValue({
+      ...baseProjectConfig,
+      vcs: 'github'
+    })
+
+    renderSection()
+    await screen.findByRole('button', { name: 'Connect GitHub' })
+    fireEvent.click(screen.getByRole('button', { name: 'Connect GitHub' }))
+    await screen.findByRole('dialog')
+
+    fireEvent.change(screen.getByLabelText('GitHub token'), {
+      target: { value: 'ghp_secret-token' }
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
+
+    await waitFor(() => {
+      expect(connectGithubViaCredentials).toHaveBeenCalledWith({
+        apiToken: 'ghp_secret-token'
       })
     })
   })
