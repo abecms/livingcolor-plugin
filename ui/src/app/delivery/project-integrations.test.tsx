@@ -12,9 +12,10 @@ import { getLivingColorConfigRecord } from '@/livingcolor'
 import { connectGithubViaCredentials, getGitHubSavedCredentials } from '@/lib/github-dashboard-transport'
 import { connectGitlabViaCredentials, getGitLabSavedCredentials } from '@/lib/gitlab-dashboard-transport'
 import { connectJiraViaCredentials, getJiraSavedCredentials } from '@/lib/jira-dashboard-transport'
-import { fetchProjectConfig, saveProjectConfig } from '@/lib/delivery'
+import { fetchProjectConfig, saveProjectConfig, type ProjectConfigPayload } from '@/lib/delivery'
+import type { JiraDashboardPayload } from '@/lib/jira-dashboard'
 
-import { ProjectIntegrationsSection } from './project-integrations'
+import { buildVcsProviderProjectConfig, ProjectIntegrationsSection } from './project-integrations'
 
 vi.mock('@/hooks/use-project-workspace', () => ({
   useProjectWorkspace: () => ({
@@ -22,15 +23,32 @@ vi.mock('@/hooks/use-project-workspace', () => ({
   })
 }))
 
-const baseProjectConfig = {
+const baseProjectConfig: ProjectConfigPayload = {
   projectKey: 'BN',
   projectName: 'Brand New',
   sprintDurationDays: 14,
   sprintCapacityDays: 10,
   communicationLanguage: 'en' as const,
-  ticketScope: { statusGroups: ['todo'], assignees: [], includeUnassigned: true, matchMode: 'all' as const },
+  ticketScope: { statusGroups: ['todo'], assignees: [], includeUnassigned: true, matchMode: 'all' },
   configPath: '/tmp/config.yaml',
   integrationBranch: 'develop'
+}
+
+const disconnectedJiraDashboard: JiraDashboardPayload = {
+  actions: [],
+  blockers: [],
+  connection: {
+    authenticated: false,
+    message: 'Jira MCP is not configured yet.',
+    status: 'disconnected',
+    toolCount: 0
+  },
+  metrics: [],
+  priorities: [],
+  projects: [],
+  risks: [],
+  sampleData: true,
+  selectedProjectKey: null
 }
 
 vi.mock('@/lib/delivery', () => ({
@@ -68,19 +86,28 @@ vi.mock('@/hermes', () => ({
   connectGitlabMcp: vi.fn().mockResolvedValue({ ok: false, status: 'disconnected' }),
   connectJiraMcp: vi.fn().mockResolvedValue({ ok: false, status: 'disconnected' }),
   fetchGithubStatus: vi.fn().mockResolvedValue({
+    ok: false,
     authenticated: false,
     message: 'GitHub MCP is not configured yet.',
     status: 'disconnected',
     toolCount: 0
   }),
   fetchGitlabStatus: vi.fn().mockResolvedValue({
+    ok: false,
     authenticated: false,
     message: 'GitLab MCP is not configured yet.',
     status: 'disconnected',
     toolCount: 0
   }),
   fetchJiraDashboard: vi.fn().mockResolvedValue({
-    connection: { status: 'disconnected' },
+    connection: { authenticated: false, message: 'Jira MCP is not configured yet.', status: 'disconnected', toolCount: 0 },
+    metrics: [],
+    priorities: [],
+    blockers: [],
+    risks: [],
+    actions: [],
+    projects: [],
+    selectedProjectKey: null,
     sampleData: true
   })
 }))
@@ -96,12 +123,12 @@ vi.mock('@/lib/github-dashboard-transport', () => ({
 
 vi.mock('@/lib/gitlab-dashboard-transport', () => ({
   connectGitlabViaCredentials: vi.fn().mockResolvedValue({ ok: true, message: 'Connected to GitLab.' }),
-  getGitLabSavedCredentials: vi.fn().mockResolvedValue({ gitlabUrl: null, usesEnvAuth: false })
+  getGitLabSavedCredentials: vi.fn().mockResolvedValue({ apiToken: null, gitlabUrl: null, usesEnvAuth: false })
 }))
 
 vi.mock('@/lib/jira-dashboard-transport', () => ({
   connectJiraViaCredentials: vi.fn().mockResolvedValue({ ok: true, message: 'Connected to Jira.' }),
-  getJiraSavedCredentials: vi.fn().mockResolvedValue({ jiraUrl: null, username: null, usesEnvAuth: false })
+  getJiraSavedCredentials: vi.fn().mockResolvedValue({ apiToken: null, jiraUrl: null, username: null, usesEnvAuth: false })
 }))
 
 vi.mock('@/store/notifications', () => ({
@@ -115,23 +142,25 @@ vi.mock('@/store/project-config', () => ({
 
 beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn()
+  Element.prototype.hasPointerCapture = vi.fn(() => false)
+  Element.prototype.releasePointerCapture = vi.fn()
+  Element.prototype.setPointerCapture = vi.fn()
   vi.mocked(fetchProjectConfig).mockResolvedValue(baseProjectConfig)
   vi.mocked(saveProjectConfig).mockResolvedValue(baseProjectConfig)
   vi.mocked(getLivingColorConfigRecord).mockResolvedValue({ mcp_servers: {} })
-  vi.mocked(getJiraSavedCredentials).mockResolvedValue({ jiraUrl: null, username: null, usesEnvAuth: false })
-  vi.mocked(getGitLabSavedCredentials).mockResolvedValue({ gitlabUrl: null, usesEnvAuth: false })
+  vi.mocked(getJiraSavedCredentials).mockResolvedValue({ apiToken: null, jiraUrl: null, username: null, usesEnvAuth: false })
+  vi.mocked(getGitLabSavedCredentials).mockResolvedValue({ apiToken: null, gitlabUrl: null, usesEnvAuth: false })
   vi.mocked(getGitHubSavedCredentials).mockResolvedValue({ apiToken: null, usesEnvAuth: false })
-  vi.mocked(fetchJiraDashboard).mockResolvedValue({
-    connection: { status: 'disconnected' },
-    sampleData: true
-  })
+  vi.mocked(fetchJiraDashboard).mockResolvedValue(disconnectedJiraDashboard)
   vi.mocked(fetchGitlabStatus).mockResolvedValue({
+    ok: false,
     authenticated: false,
     message: 'GitLab MCP is not configured yet.',
     status: 'disconnected',
     toolCount: 0
   })
   vi.mocked(fetchGithubStatus).mockResolvedValue({
+    ok: false,
     authenticated: false,
     message: 'GitHub MCP is not configured yet.',
     status: 'disconnected',
@@ -343,6 +372,7 @@ describe('ProjectIntegrationsSection', () => {
       sampleData: false
     } as never)
     vi.mocked(fetchGitlabStatus).mockResolvedValueOnce({
+      ok: true,
       authenticated: true,
       message: 'Connected to GitLab via MCP.',
       status: 'connected',
@@ -373,5 +403,20 @@ describe('ProjectIntegrationsSection', () => {
     expect(screen.getAllByRole('button', { name: 'Connected' })).toHaveLength(2)
     expect(screen.getByRole('button', { name: 'Update Jira credentials' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Update GitLab credentials' })).toBeTruthy()
+  })
+
+  it('builds provider switch saves that clear the default repository', () => {
+    const body = buildVcsProviderProjectConfig({
+      ...baseProjectConfig,
+      vcs: 'gitlab',
+      defaultRepo: 'gitlab.com/org/app'
+    }, 'github')
+
+    expect(body).toEqual(
+      expect.objectContaining({
+        vcs: 'github',
+        defaultRepo: null
+      })
+    )
   })
 })

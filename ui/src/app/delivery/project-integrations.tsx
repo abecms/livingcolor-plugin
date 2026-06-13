@@ -30,6 +30,7 @@ import {
   saveProjectJiraProjectKey,
   type GitLabRepoOption,
   type JiraProjectOption,
+  type ProjectConfigPayload,
   type VcsProvider,
   type VcsRepoOption
 } from '@/lib/delivery'
@@ -55,6 +56,22 @@ type IntegrationStatus = 'loading' | 'missing' | 'configured' | 'connected'
 
 function normalizeVcsProvider(value: unknown): VcsProvider {
   return String(value ?? '').trim().toLowerCase() === 'github' ? 'github' : 'gitlab'
+}
+
+export function buildVcsProviderProjectConfig(
+  config: ProjectConfigPayload,
+  nextProvider: VcsProvider
+): Parameters<typeof saveProjectConfig>[0] {
+  return {
+    sprintDurationDays: config.sprintDurationDays,
+    sprintCapacityDays: config.sprintCapacityDays,
+    communicationLanguage: config.communicationLanguage === 'en' ? 'en' : 'fr',
+    ticketScope: config.ticketScope,
+    vcs: nextProvider,
+    defaultRepo: null,
+    integrationBranch: config.integrationBranch,
+    jiraProjectKey: config.jiraProjectKey
+  }
 }
 
 function buildStatusLabel(input: {
@@ -348,16 +365,7 @@ export function ProjectIntegrationsSection() {
       setVcsProvider(nextProvider)
       try {
         const config = await fetchProjectConfig()
-        await saveProjectConfig({
-          sprintDurationDays: config.sprintDurationDays,
-          sprintCapacityDays: config.sprintCapacityDays,
-          communicationLanguage: config.communicationLanguage === 'en' ? 'en' : 'fr',
-          ticketScope: config.ticketScope,
-          vcs: nextProvider,
-          defaultRepo: config.defaultRepo,
-          integrationBranch: config.integrationBranch,
-          jiraProjectKey: config.jiraProjectKey
-        })
+        await saveProjectConfig(buildVcsProviderProjectConfig(config, nextProvider))
         bumpProjectConfigRevision()
         setVcsRepos([])
         setDefaultRepo('')
