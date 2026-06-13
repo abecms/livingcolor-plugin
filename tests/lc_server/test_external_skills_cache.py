@@ -31,6 +31,14 @@ def _skills_archive() -> bytes:
     return buffer.getvalue()
 
 
+def _incomplete_registry_archive() -> bytes:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as zf:
+        prefix = "livingcolor-skills-0123456/"
+        zf.writestr(prefix + "registry/.keep", "")
+    return buffer.getvalue()
+
+
 def _lock():
     from lc_server.integrations.skills.lock import ExternalSkillsLock
 
@@ -91,6 +99,20 @@ def test_warm_external_skills_cache_materializes_locked_registry_without_network
     )
     assert (result.registry_path / "ticket-analyst" / "prompt.md").is_file()
     assert source.calls == [("Tamsi/livingcolor-skills", "v0.1.0", _lock().resolved_commit)]
+
+
+def test_warm_external_skills_cache_rejects_invalid_locked_bundle(monkeypatch):
+    from lc_server.integrations.skills.resolver import warm_external_skills_cache
+
+    source = InMemoryArchiveSource(_incomplete_registry_archive())
+    monkeypatch.setattr("lc_server.integrations.skills.resolver.load_external_skills_lock", _lock)
+
+    result = warm_external_skills_cache(source=source)
+
+    assert result is not None
+    assert result.available is False
+    assert result.error.startswith("invalid external skills bundle: ")
+    assert "bundle not found: code-review-pipeline" in result.error
 
 
 def test_warm_external_skills_cache_returns_none_when_lock_invalid(monkeypatch, caplog):

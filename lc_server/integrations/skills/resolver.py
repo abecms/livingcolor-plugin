@@ -35,10 +35,29 @@ def warm_external_skills_cache(
         return None
 
     result = materialize_external_skills(lock, source=source)
-    if result.available:
-        logger.info("External skills cache available at %s", result.registry_path)
-    else:
+    if not result.available:
         logger.info("External skills cache unavailable: %s", result.error)
+        return result
+
+    bundle = resolve_external_bundle(
+        registry_path=result.registry_path,
+        bundle_name=lock.bundle,
+        required_skills=lock.skills,
+        resolved_commit=lock.resolved_commit,
+    )
+    if not bundle.available:
+        error = f"invalid external skills bundle: {bundle.error}"
+        logger.info("External skills cache unavailable: %s", error)
+        return ExternalSkillsCacheResult(
+            available=False,
+            registry_path=result.registry_path,
+            cache_path=result.cache_path,
+            source_ref=result.source_ref,
+            resolved_commit=result.resolved_commit,
+            error=error,
+        )
+
+    logger.info("External skills cache available at %s", result.registry_path)
     return result
 
 
