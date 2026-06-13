@@ -4,9 +4,13 @@ from lc_server.integrations.skills.cache import ExternalSkillsCacheResult, mater
 from lc_server.integrations.skills.guidance import render_external_guidance
 from lc_server.integrations.skills.lock import ExternalSkillsLock, load_external_skills_lock
 from lc_server.integrations.skills.registry import ExternalSkill, ExternalSkillsBundle, resolve_external_bundle
-from lc_server.integrations.skills.resolver import external_guidance_for_skills
+from lc_server.integrations.skills.resolver import (
+    EXTERNAL_GUIDANCE_RESPONSE_CONTRACT_REMINDER,
+    external_guidance_for_skills,
+)
 
 __all__ = [
+    "EXTERNAL_GUIDANCE_RESPONSE_CONTRACT_REMINDER",
     "ExternalSkill",
     "ExternalSkillsBundle",
     "ExternalSkillsCacheResult",

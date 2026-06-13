@@ -43,7 +43,10 @@ from delivery_runtime.development.phases import (
 )
 from lc_server.agent_bridge.manifest_prompt import render_manifest_system_prompt
 from lc_server.integrations.jira_attachment_extract import merge_attachment_context_into_pack
-from lc_server.integrations.skills import external_guidance_for_skills
+from lc_server.integrations.skills import (
+    EXTERNAL_GUIDANCE_RESPONSE_CONTRACT_REMINDER,
+    external_guidance_for_skills,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -391,7 +394,7 @@ def _append_external_code_review_guidance(prompt: str, *, developer_phase: str) 
     )
     if not guidance:
         return prompt
-    return f"{prompt}\n\n{guidance}"
+    return f"{prompt}\n\n{guidance}\n\n{EXTERNAL_GUIDANCE_RESPONSE_CONTRACT_REMINDER}"
 
 
 def _resolve_developer_project_key(
