@@ -46,6 +46,24 @@ def test_lock_rejects_moving_main_ref():
         parse_external_skills_lock(payload)
 
 
+def test_lock_rejects_heads_main_ref():
+    from lc_server.integrations.skills.lock import parse_external_skills_lock
+
+    payload = {**VALID_LOCK, "ref": "refs/heads/main"}
+
+    with pytest.raises(ValueError, match="must not be a moving branch"):
+        parse_external_skills_lock(payload)
+
+
+def test_lock_rejects_branch_like_ref():
+    from lc_server.integrations.skills.lock import parse_external_skills_lock
+
+    payload = {**VALID_LOCK, "ref": "feature/foo"}
+
+    with pytest.raises(ValueError, match="must not be a moving branch"):
+        parse_external_skills_lock(payload)
+
+
 def test_lock_rejects_short_resolved_commit():
     from lc_server.integrations.skills.lock import parse_external_skills_lock
 
@@ -61,6 +79,15 @@ def test_lock_rejects_uppercase_resolved_commit():
     payload = {**VALID_LOCK, "resolvedCommit": "FDF1BE62D61EF74B51D91AE81ED718350DCE20D5"}
 
     with pytest.raises(ValueError, match="resolvedCommit"):
+        parse_external_skills_lock(payload)
+
+
+def test_lock_rejects_non_string_skill_item():
+    from lc_server.integrations.skills.lock import parse_external_skills_lock
+
+    payload = {**VALID_LOCK, "skills": ["ticket-analyst", 123]}
+
+    with pytest.raises(ValueError, match="skills"):
         parse_external_skills_lock(payload)
 
 

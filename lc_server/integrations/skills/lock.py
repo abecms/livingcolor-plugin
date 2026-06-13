@@ -40,7 +40,7 @@ def parse_external_skills_lock(payload: dict[str, Any]) -> ExternalSkillsLock:
         raise ValueError(f"Unsupported skills repo: {repo}")
 
     ref = _require_str(payload, "ref")
-    if ref.lower() in FORBIDDEN_MOVING_REFS:
+    if _is_forbidden_ref(ref):
         raise ValueError("External skills ref must not be a moving branch")
 
     resolved_commit = _require_str(payload, "resolvedCommit")
@@ -51,18 +51,32 @@ def parse_external_skills_lock(payload: dict[str, Any]) -> ExternalSkillsLock:
     raw_skills = payload.get("skills")
     if not isinstance(raw_skills, list) or not raw_skills:
         raise ValueError("skills must be a non-empty list")
-    skills = tuple(str(item).strip() for item in raw_skills if str(item).strip())
-    if len(skills) != len(raw_skills):
-        raise ValueError("skills must contain only non-empty strings")
+    skills: list[str] = []
+    for item in raw_skills:
+        if not isinstance(item, str) or not item.strip():
+            raise ValueError("skills must contain only non-empty strings")
+        skills.append(item.strip())
+    skill_names = tuple(skills)
 
     return ExternalSkillsLock(
         repo=repo,
         ref=ref,
         resolved_commit=resolved_commit,
         bundle=bundle,
-        skills=skills,
+        skills=skill_names,
         updated_by=str(payload.get("updatedBy") or "").strip(),
     )
+
+
+def _is_forbidden_ref(ref: str) -> bool:
+    normalized_ref = ref.strip().lower()
+    if normalized_ref in FORBIDDEN_MOVING_REFS:
+        return True
+    if normalized_ref.startswith("refs/heads/"):
+        return True
+    if "/" in normalized_ref and not normalized_ref.startswith("refs/tags/"):
+        return True
+    return False
 
 
 def _require_str(payload: dict[str, Any], key: str) -> str:
