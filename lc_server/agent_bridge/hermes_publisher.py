@@ -1,4 +1,4 @@
-"""Hermes-backed publisher agent (push branch + create GitLab MR)."""
+"""Hermes-backed publisher agent (push branch + create review request)."""
 
 from __future__ import annotations
 
@@ -90,16 +90,14 @@ def parse_publisher_completion(text: str) -> dict[str, Any]:
 
 
 def build_publisher_prompt(context: dict[str, Any]) -> str:
-    """Assemble the publication instructions for one mr_creation run."""
+    """Assemble the publication instructions for one review-request publication run."""
     workspace_path = str(context.get("workspacePath") or "")
     delivery_branch = str(context.get("deliveryBranch") or "")
     integration_branch = str(context.get("integrationBranch") or "")
     mr_title = str(context.get("mrTitle") or "")
     mr_description = str(context.get("mrDescription") or "")
 
-    provider = normalize_vcs_provider(
-        context.get("vcs") or context.get("reviewRequestProvider")
-    )
+    provider = _resolve_publisher_prompt_provider(context)
     is_github = provider == "github"
     provider_label = "GitHub" if is_github else "GitLab"
     request_label = "Pull Request" if is_github else "Merge request"
@@ -146,8 +144,22 @@ def build_publisher_prompt(context: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _resolve_publisher_prompt_provider(context: dict[str, Any]) -> str:
+    explicit_provider = context.get("vcs") or context.get("reviewRequestProvider")
+    if explicit_provider:
+        return normalize_vcs_provider(explicit_provider)
+
+    project_key = str(context.get("projectKey") or "").strip()
+    if project_key:
+        from delivery_runtime.readiness.project_settings import load_project_vcs_provider
+
+        return normalize_vcs_provider(load_project_vcs_provider(project_key))
+
+    return normalize_vcs_provider(None)
+
+
 class HermesPublisherAgent:
-    """Runs the Hermes AIAgent loop to push the branch and create the GitLab MR."""
+    """Runs the Hermes AIAgent loop to push the branch and create the review request."""
 
     def __init__(
         self,
