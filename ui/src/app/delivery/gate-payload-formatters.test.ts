@@ -86,6 +86,32 @@ describe('buildGatePayloadSections', () => {
     expect(serialized).toContain('https://github.com/org/app/pull/42')
     expect(sections.some(section => section.kind === 'link' && section.label === 'Pull Request')).toBe(true)
   })
+
+  it('infers GitHub PR labels from legacy mrUrl payloads', () => {
+    const sections = buildGatePayloadSections('jira_update', {
+      mrUrl: 'https://github.com/org/app/pull/42',
+      mrIid: 42,
+      jiraKey: 'GH-1'
+    })
+
+    expect(sections.some(section => section.kind === 'link' && section.label === 'Pull Request')).toBe(true)
+    expect(JSON.stringify(sections)).toContain('View PR #42 on GitHub')
+  })
+
+  it('uses provider fallback for legacy review request payloads', () => {
+    const sections = buildGatePayloadSections(
+      'jira_update',
+      {
+        mrUrl: 'https://example.com/org/app/reviews/42',
+        mrIid: 42,
+        jiraKey: 'GH-1'
+      },
+      'github'
+    )
+
+    expect(sections.some(section => section.kind === 'link' && section.label === 'Pull Request')).toBe(true)
+    expect(JSON.stringify(sections)).toContain('View PR #42 on GitHub')
+  })
 })
 
 describe('sectionsFromJiraContextUsed', () => {

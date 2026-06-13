@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { fetchPmInbox, fetchWorkOrder, type PmInboxPayload } from '@/lib/delivery'
+import { fetchPmInbox, fetchProjectConfig, fetchWorkOrder, type PmInboxPayload } from '@/lib/delivery'
 
 import { ProjectDeliveryDashboardView } from './project-dashboard'
 
@@ -216,6 +216,24 @@ describe('ProjectDeliveryDashboardView', () => {
     expect(screen.getByText('Code/MR · 0')).toBeTruthy()
     expect(screen.getByText('Jira · 0')).toBeTruthy()
     expect(screen.getByText('Done · 0')).toBeTruthy()
+  })
+
+  it('uses project provider in dashboard review request labels', async () => {
+    vi.mocked(fetchPmInbox).mockResolvedValue(emptyInboxPayload)
+    vi.mocked(fetchProjectConfig).mockResolvedValueOnce({
+      projectKey: 'BN',
+      projectName: 'Bibliothèque Numérique',
+      sprintDurationDays: 14,
+      sprintCapacityDays: 15,
+      communicationLanguage: 'en',
+      ticketScope: { statusGroups: ['todo'], assignees: [], includeUnassigned: true, matchMode: 'all' },
+      configPath: '/tmp/project.yaml',
+      vcs: 'github'
+    })
+    renderDashboard()
+
+    expect(await screen.findByText('Code/PR · 0')).toBeTruthy()
+    expect(screen.getByText(/PR drafts/)).toBeTruthy()
   })
 
   it('renders sprint strip, gate cards, and clarification actions', async () => {

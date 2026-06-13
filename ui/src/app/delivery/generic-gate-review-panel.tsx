@@ -10,6 +10,7 @@ import { notify, notifyError } from '@/store/notifications'
 
 import { buildGatePayloadSections } from './gate-payload-formatters'
 import { GatePayloadSections } from './gate-payload-sections'
+import type { ReviewRequestProvider } from './review-request-labels'
 import type { DeliveryGate, WorkOrder } from './types'
 import { WorkOrderLockNotice } from './work-order-lock-notice'
 
@@ -19,6 +20,7 @@ export function GenericGateReviewPanel({
   onOpenChange,
   open,
   title,
+  vcsProvider,
   workOrder
 }: {
   gate: DeliveryGate | null
@@ -26,6 +28,7 @@ export function GenericGateReviewPanel({
   onOpenChange: (open: boolean) => void
   open: boolean
   title: string
+  vcsProvider?: ReviewRequestProvider
   workOrder: WorkOrder | null
 }) {
   const [feedback, setFeedback] = useState('')
@@ -123,7 +126,7 @@ export function GenericGateReviewPanel({
 
         <div className={DASHBOARD_SHEET_BODY_CLASS} data-testid="generic-gate-review-panel">
           <WorkOrderLockNotice message={lockMessage} />
-          <GatePayloadSections sections={buildGatePayloadSections(gate.gateType, gate.payload ?? {})} />
+          <GatePayloadSections sections={buildGatePayloadSections(gate.gateType, gate.payload ?? {}, vcsProvider)} />
 
           <div className="space-y-2">
             <label

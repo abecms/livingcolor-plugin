@@ -35,6 +35,7 @@ import { buildKanbanColumns } from './kanban-routing'
 import { MrDraftReviewPanel } from './mr-draft-review-panel'
 import { PatchReviewPanel } from './patch-review-panel'
 import { parseProjectKeyFromPath, isProjectWorkspacePath } from './project-navigation'
+import { reviewRequestShortLabel } from './review-request-labels'
 import { SprintHeaderStrip } from './sprint-header-strip'
 import { useDailyAnalysis } from './use-daily-analysis'
 import { WorkOrderProgressPanel } from './work-order-progress-panel'
@@ -283,6 +284,7 @@ export function ProjectDeliveryDashboardView() {
 
   const displayKey = activeProjectKey ?? 'Project'
   const displayName = activeProject?.projectName ?? 'Dashboard'
+  const reviewRequestLabel = reviewRequestShortLabel(vcsProvider)
 
   return (
     <DashboardPageShell>
@@ -293,7 +295,7 @@ export function ProjectDeliveryDashboardView() {
             Refresh
           </DashboardGhostButton>
         }
-        description="Review sprint tickets, estimations, and approve development plans, patches, MR drafts, and Jira comments."
+        description={`Review sprint tickets, estimations, and approve development plans, patches, ${reviewRequestLabel} drafts, and Jira comments.`}
         eyebrow={`${displayKey} · ${displayName}`}
         title="Project Dashboard"
       />
@@ -344,6 +346,7 @@ export function ProjectDeliveryDashboardView() {
         onDecision={handleDecision}
         onOpenChange={setReviewOpen}
         open={reviewOpen && isMrGate}
+        vcsProvider={vcsProvider}
         workOrder={isMrGate ? workOrder : null}
       />
       <GenericGateReviewPanel
@@ -352,12 +355,14 @@ export function ProjectDeliveryDashboardView() {
         onOpenChange={setReviewOpen}
         open={reviewOpen && isGenericGate}
         title={genericGateReviewTitle(gate?.gateType)}
+        vcsProvider={vcsProvider}
         workOrder={isGenericGate ? workOrder : null}
       />
       <WorkOrderProgressPanel
         onOpenChange={setProgressOpen}
         onResume={handleResumeWorkOrder}
         open={progressOpen}
+        vcsProvider={vcsProvider}
         workOrder={workOrder}
       />
     </DashboardPageShell>

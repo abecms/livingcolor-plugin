@@ -16,6 +16,7 @@ import {
   resolveReviewRequestNumber,
   resolveReviewRequestProvider,
   resolveReviewRequestUrl,
+  type ReviewRequestProvider,
   reviewRequestShortLabel
 } from './review-request-labels'
 import type { DecisionTraceFileDecision, DecisionTracePayload } from './types'
@@ -50,12 +51,14 @@ export function MrDraftReviewPanel({
   onDecision,
   onOpenChange,
   open,
+  vcsProvider,
   workOrder
 }: {
   gate: DeliveryGate | null
   onDecision: () => void | Promise<void>
   onOpenChange: (open: boolean) => void
   open: boolean
+  vcsProvider?: ReviewRequestProvider
   workOrder: WorkOrder | null
 }) {
   const [feedback, setFeedback] = useState('')
@@ -69,7 +72,7 @@ export function MrDraftReviewPanel({
   const payload = asMrDraftPayload(gate.payload)
   const draftId = payload.draftId ?? ''
   const decisionTrace = payload.decisionTrace
-  const provider = resolveReviewRequestProvider(payload)
+  const provider = resolveReviewRequestProvider(payload, vcsProvider)
   const requestLabel = reviewRequestShortLabel(provider)
   const requestUrl = resolveReviewRequestUrl(payload)
   const requestNumber = resolveReviewRequestNumber(payload)

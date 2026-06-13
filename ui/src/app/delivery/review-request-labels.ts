@@ -13,8 +13,34 @@ export function normalizeReviewRequestProvider(value: unknown): ReviewRequestPro
   return raw === 'github' ? 'github' : 'gitlab'
 }
 
-export function resolveReviewRequestProvider(payload: ReviewRequestFields): ReviewRequestProvider {
-  return normalizeReviewRequestProvider(payload.reviewRequestProvider)
+function inferReviewRequestProviderFromUrl(url: string | undefined): ReviewRequestProvider | undefined {
+  if (!url) {
+    return undefined
+  }
+  try {
+    const parsed = new URL(url)
+    if (parsed.hostname.toLowerCase() === 'github.com' && /\/pull\/\d+(?:\/|$)/.test(parsed.pathname)) {
+      return 'github'
+    }
+  } catch {
+    if (/^https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+(?:[/?#]|$)/i.test(url)) {
+      return 'github'
+    }
+  }
+  return undefined
+}
+
+export function resolveReviewRequestProvider(
+  payload: ReviewRequestFields,
+  fallbackProvider?: ReviewRequestProvider
+): ReviewRequestProvider {
+  if (payload.reviewRequestProvider) {
+    return normalizeReviewRequestProvider(payload.reviewRequestProvider)
+  }
+  if (fallbackProvider) {
+    return normalizeReviewRequestProvider(fallbackProvider)
+  }
+  return inferReviewRequestProviderFromUrl(resolveReviewRequestUrl(payload)) ?? 'gitlab'
 }
 
 export function resolveReviewRequestUrl(payload: ReviewRequestFields): string | undefined {

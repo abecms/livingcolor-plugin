@@ -111,6 +111,34 @@ describe('MrDraftReviewPanel', () => {
     expect(screen.getByTestId('mr-draft-review-link').textContent).toContain('Voir la MR !12 sur GitLab')
   })
 
+  it('falls back to the project provider when the payload omits provider', () => {
+    const gate: DeliveryGate = {
+      id: 'G-4',
+      workOrderId: 'WO-1',
+      gateType: 'merge_request_review',
+      status: 'pending',
+      createdAt: '2026-06-09T10:05:00+00:00',
+      payload: {
+        draftId: 'DR-4',
+        title: 'Fix player bug'
+      }
+    }
+
+    render(
+      <MrDraftReviewPanel
+        gate={gate}
+        onDecision={vi.fn().mockResolvedValue(undefined)}
+        onOpenChange={() => undefined}
+        open
+        vcsProvider="github"
+        workOrder={workOrder}
+      />
+    )
+
+    expect(screen.getByText('PR Draft Review')).toBeTruthy()
+    expect(screen.getByText(/Is this PR ready to exist\?/)).toBeTruthy()
+  })
+
   it('approves draft with provider-aware success message', async () => {
     const gate: DeliveryGate = {
       id: 'G-3',

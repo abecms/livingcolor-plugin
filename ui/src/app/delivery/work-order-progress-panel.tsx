@@ -58,11 +58,13 @@ export function WorkOrderProgressPanel({
   onOpenChange,
   onResume,
   open,
+  vcsProvider,
   workOrder: initialWorkOrder
 }: {
   onOpenChange: (open: boolean) => void
   onResume?: (workOrderId: string) => void | Promise<void>
   open: boolean
+  vcsProvider?: ReviewRequestProvider
   workOrder: WorkOrder | null
 }) {
   const [resuming, setResuming] = useState(false)
@@ -138,13 +140,13 @@ export function WorkOrderProgressPanel({
   const showResume = workOrderNeedsResume(workOrder) && Boolean(onResume)
   const agentRunning = developmentNode?.status === 'running'
   const reviewRequestSource: ReviewRequestFields = {
-    reviewRequestUrl: mrDraft?.reviewRequestUrl,
-    reviewRequestNumber: mrDraft?.reviewRequestNumber,
-    reviewRequestProvider: mrDraft?.reviewRequestProvider,
+    reviewRequestUrl: mrDraft?.reviewRequestUrl ?? mrCreationPayload.reviewRequestUrl,
+    reviewRequestNumber: mrDraft?.reviewRequestNumber ?? mrCreationPayload.reviewRequestNumber,
+    reviewRequestProvider: mrDraft?.reviewRequestProvider ?? mrCreationPayload.reviewRequestProvider,
     mrUrl: mrDraft?.mrUrl ?? mrCreationPayload.mrUrl,
     mrIid: mrDraft?.mrIid ?? mrCreationPayload.mrIid
   }
-  const provider = resolveReviewRequestProvider(reviewRequestSource)
+  const provider = resolveReviewRequestProvider(reviewRequestSource, vcsProvider)
   const publishedReviewUrl = resolveReviewRequestUrl(reviewRequestSource)
   const publishedReviewNumber = resolveReviewRequestNumber(reviewRequestSource)
 

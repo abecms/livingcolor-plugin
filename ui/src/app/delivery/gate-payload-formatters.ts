@@ -3,6 +3,7 @@ import {
   resolveReviewRequestNumber,
   resolveReviewRequestProvider,
   resolveReviewRequestUrl,
+  type ReviewRequestProvider,
   reviewRequestFullLabel
 } from './review-request-labels'
 
@@ -219,7 +220,10 @@ export function sectionsFromQaChecklist(checklist: Record<string, unknown>): Gat
   return entries.length ? [{ kind: 'keyValue', label: 'Validation checklist', entries }] : []
 }
 
-function sectionsFromJiraUpdatePayload(payload: Record<string, unknown>): GatePayloadSection[] {
+function sectionsFromJiraUpdatePayload(
+  payload: Record<string, unknown>,
+  fallbackProvider?: ReviewRequestProvider
+): GatePayloadSection[] {
   const sections: GatePayloadSection[] = []
 
   const proposedComment = asNonEmptyString(payload.proposedComment)
@@ -233,7 +237,7 @@ function sectionsFromJiraUpdatePayload(payload: Record<string, unknown>): GatePa
   }
 
   const reviewRequestUrl = resolveReviewRequestUrl(payload)
-  const reviewRequestProvider = resolveReviewRequestProvider(payload)
+  const reviewRequestProvider = resolveReviewRequestProvider(payload, fallbackProvider)
   const reviewRequestNumber = resolveReviewRequestNumber(payload)
   if (reviewRequestUrl) {
     const linkText = formatReviewRequestLinkLabel(reviewRequestProvider, reviewRequestNumber ?? undefined)
@@ -322,12 +326,16 @@ function sectionsFromUnknownPayload(payload: Record<string, unknown>): GatePaylo
   return sections
 }
 
-export function buildGatePayloadSections(gateType: string, payload: Record<string, unknown>): GatePayloadSection[] {
+export function buildGatePayloadSections(
+  gateType: string,
+  payload: Record<string, unknown>,
+  fallbackProvider?: ReviewRequestProvider
+): GatePayloadSection[] {
   switch (gateType) {
     case 'repo_clarification':
       return sectionsFromClarificationPayload(payload)
     case 'jira_update':
-      return sectionsFromJiraUpdatePayload(payload)
+      return sectionsFromJiraUpdatePayload(payload, fallbackProvider)
     default:
       return sectionsFromUnknownPayload(payload)
   }

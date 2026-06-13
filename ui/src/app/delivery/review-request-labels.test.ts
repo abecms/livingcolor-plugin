@@ -35,6 +35,8 @@ describe('review-request-labels', () => {
 
     expect(resolveReviewRequestNumber({ mrIid: 12 })).toBe(12)
     expect(resolveReviewRequestProvider({ reviewRequestProvider: 'github' })).toBe('github')
+    expect(resolveReviewRequestProvider({}, 'github')).toBe('github')
+    expect(resolveReviewRequestProvider({ mrUrl: 'https://github.com/org/app/pull/42' })).toBe('github')
     expect(resolveReviewRequestProvider({})).toBe('gitlab')
   })
 
