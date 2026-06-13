@@ -105,12 +105,17 @@ def ensure_managed_checkout(
 
     clone_url = _build_clone_url(repo_id, project_cfg, project_key=project_key)
     if not clone_url:
+        from lc_server.integrations.vcs.provider import normalize_vcs_provider
+
+        provider = normalize_vcs_provider(project_cfg.get("vcs"))
         logger.warning(
-            "Cannot clone %s for project %s into %s: GitLab credentials missing "
-            "(project_mapping.yaml integrations or global Hermes MCP gitlab config)",
+            "Cannot clone %s for project %s into %s: %s credentials missing "
+            "(project_mapping.yaml integrations or global Hermes MCP %s config)",
             repo_id,
             project_key,
             target,
+            provider.title(),
+            provider,
         )
         return None
 

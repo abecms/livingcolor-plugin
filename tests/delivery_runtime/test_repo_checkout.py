@@ -138,6 +138,34 @@ def test_ensure_managed_checkout_clones_github_when_project_uses_github(_isolate
     assert "x-access-token:ghp_test@github.com/org/demo-repo.git" in clone_mock.call_args.args[0]
 
 
+def test_ensure_managed_checkout_uses_global_github_mcp_fallback(_isolate_hermes_home):
+    target = managed_checkout_path("GH", "github.com/org/demo-repo")
+
+    def fake_clone(url: str, destination: Path) -> bool:
+        destination.mkdir(parents=True, exist_ok=True)
+        (destination / ".git").mkdir()
+        return True
+
+    global_github = {"env": {"GITHUB_TOKEN": "global-token"}}
+
+    with patch("delivery_runtime.context.repo_checkout.managed_checkout_path", return_value=target), patch(
+        "delivery_runtime.readiness.project_settings.resolve_project_mcp_server",
+        return_value=global_github,
+    ) as fallback_mock, patch(
+        "delivery_runtime.context.repo_checkout._clone_repository", side_effect=fake_clone
+    ) as clone_mock:
+        result = ensure_managed_checkout(
+            project_key="GH",
+            repo_id="github.com/org/demo-repo",
+            project_cfg={"vcs": "github", "integrations": {}},
+        )
+
+    assert result == str(target)
+    fallback_mock.assert_called_once_with("GH", "github")
+    clone_mock.assert_called_once()
+    assert "x-access-token:global-token@github.com/org/demo-repo.git" in clone_mock.call_args.args[0]
+
+
 def test_ensure_managed_checkout_without_github_token_returns_none(_isolate_hermes_home):
     result = ensure_managed_checkout(
         project_key="GH",

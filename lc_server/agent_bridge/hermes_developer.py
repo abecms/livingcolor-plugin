@@ -443,7 +443,9 @@ def _resolve_repo_checkout_path(
         return cloned
 
     if not has_clone_credentials(project_cfg, project_key=project_key):
-        provider = str(project_cfg.get("vcs") or "gitlab")
+        from lc_server.integrations.vcs.provider import normalize_vcs_provider
+
+        provider = normalize_vcs_provider(project_cfg.get("vcs"))
         raise ValueError(
             "Developer Agent requires a local repository checkout at "
             f"{expected_path}. {provider.title()} credentials are missing for project {project_key} "
