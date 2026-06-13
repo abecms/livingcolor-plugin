@@ -104,6 +104,17 @@ def build_planner_user_prompt(pack: ContextPack) -> str:
     if architecture_brief:
         sections.extend(["", "### Repository architecture", architecture_brief])
 
+    if pack.skills_context_markdown:
+        sections.extend(
+            [
+                "",
+                "## External skills context",
+                "Use this context when applying generic LivingColor role skills.",
+                "",
+                pack.skills_context_markdown,
+            ]
+        )
+
     if pack.project_conventions:
         sections.extend(["", "## Project conventions"])
         sections.extend(f"- {item}" for item in pack.project_conventions[:8])

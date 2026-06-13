@@ -24,6 +24,8 @@ class ContextPack:
     project_conventions: list[str] = field(default_factory=list)
     git_history: list[dict[str, Any]] = field(default_factory=list)
     repo_architecture: dict[str, Any] = field(default_factory=dict)
+    vcs_provider: str = "gitlab"
+    skills_context_markdown: str = ""
     rejection_feedback: str = ""
     resolved_repo_override: str | None = None
     build_notes: list[str] = field(default_factory=list)

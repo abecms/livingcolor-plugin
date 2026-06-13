@@ -10,7 +10,9 @@ from delivery_runtime.context.models import ContextPack
 from delivery_runtime.context.repo_architecture import architecture_profile_is_current
 from delivery_runtime.context.repo_resolver import resolve_repository
 from delivery_runtime.context.repo_scanner import scan_repository
+from delivery_runtime.context.skills_context import render_skills_context_markdown
 from delivery_runtime.pm_inbox.project_memory import load_existing_memory
+from delivery_runtime.readiness.project_settings import load_project_vcs_provider
 
 
 class ContextPackBuilder:
@@ -28,6 +30,7 @@ class ContextPackBuilder:
         project_key = str(snapshot.get("projectKey") or jira_key.split("-")[0])
         summary = str(work_order.get("title") or snapshot.get("summary") or jira_key)
         description = str(work_order.get("description") or snapshot.get("description") or "")
+        vcs_provider = load_project_vcs_provider(project_key)
 
         if description == "Ready for Phase 2.5 validation":
             description = str(snapshot.get("description") or "")
@@ -115,10 +118,12 @@ class ContextPackBuilder:
             project_conventions=conventions,
             git_history=git_history,
             repo_architecture=repo_architecture,
+            vcs_provider=vcs_provider,
             rejection_feedback=feedback,
             resolved_repo_override=override_repo,
             build_notes=build_notes,
         )
+        pack.skills_context_markdown = render_skills_context_markdown(pack)
         return pack
 
 
