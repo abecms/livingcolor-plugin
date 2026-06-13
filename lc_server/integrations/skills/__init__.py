@@ -7,6 +7,7 @@ from lc_server.integrations.skills.registry import ExternalSkill, ExternalSkills
 from lc_server.integrations.skills.resolver import (
     EXTERNAL_GUIDANCE_RESPONSE_CONTRACT_REMINDER,
     external_guidance_for_skills,
+    warm_external_skills_cache,
 )
 
 __all__ = [
@@ -20,4 +21,5 @@ __all__ = [
     "materialize_external_skills",
     "render_external_guidance",
     "resolve_external_bundle",
+    "warm_external_skills_cache",
 ]

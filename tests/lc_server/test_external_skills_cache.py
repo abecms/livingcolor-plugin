@@ -69,6 +69,45 @@ def test_materialize_reuses_existing_cache(livingcolor_home):
     assert len(source.calls) == 1
 
 
+def test_warm_external_skills_cache_materializes_locked_registry_without_network(
+    livingcolor_home, monkeypatch
+):
+    from lc_server.integrations.skills.resolver import warm_external_skills_cache
+
+    source = InMemoryArchiveSource(_skills_archive())
+    monkeypatch.setattr("lc_server.integrations.skills.resolver.load_external_skills_lock", _lock)
+
+    def fail_urlopen(*args, **kwargs):
+        raise AssertionError("warmup should use the injected archive source")
+
+    monkeypatch.setattr(urllib.request, "urlopen", fail_urlopen)
+
+    result = warm_external_skills_cache(source=source)
+
+    assert result is not None
+    assert result.available is True
+    assert result.registry_path == (
+        livingcolor_home / "skills-cache" / "livingcolor-skills" / _lock().resolved_commit / "registry"
+    )
+    assert (result.registry_path / "ticket-analyst" / "prompt.md").is_file()
+    assert source.calls == [("Tamsi/livingcolor-skills", "v0.1.0", _lock().resolved_commit)]
+
+
+def test_warm_external_skills_cache_returns_none_when_lock_invalid(monkeypatch, caplog):
+    from lc_server.integrations.skills.resolver import warm_external_skills_cache
+
+    monkeypatch.setattr(
+        "lc_server.integrations.skills.resolver.load_external_skills_lock",
+        lambda: (_ for _ in ()).throw(ValueError("invalid lock")),
+    )
+
+    with caplog.at_level("INFO", logger="lc_server.integrations.skills.resolver"):
+        result = warm_external_skills_cache(source=InMemoryArchiveSource(_skills_archive()))
+
+    assert result is None
+    assert "External skills cache warmup skipped: invalid lock" in caplog.text
+
+
 def test_materialize_reports_fetch_error(livingcolor_home):
     from lc_server.integrations.skills.cache import materialize_external_skills
 

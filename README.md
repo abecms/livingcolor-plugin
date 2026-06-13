@@ -82,6 +82,17 @@ missing or invalid, LivingColor continues delivery for that run with external
 guidance disabled. Prompt enrichment does not block on a GitHub download at
 runtime.
 
+After changing `livingcolor.skills.lock.json`, materialize the pinned cache
+explicitly before running delivery:
+
+```bash
+python -m lc_server warm-skills-cache
+```
+
+The command exits non-zero when the cache cannot be materialized, so release and
+automation scripts can fail fast while runtime prompt enrichment remains
+cache-only.
+
 External skills are rendered as read-only model guidance. They do not grant new
 tool permissions, change delivery tool response contracts, or alter the
 human-gated workflow. To roll back, restore `livingcolor.skills.lock.json` to a

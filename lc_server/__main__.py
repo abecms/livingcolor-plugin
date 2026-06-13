@@ -42,6 +42,29 @@ def _cmd_dashboard(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_warm_skills_cache(args: argparse.Namespace) -> int:
+    del args
+
+    from lc_server.integrations.skills import resolver
+
+    result = resolver.warm_external_skills_cache()
+    if result is None:
+        print("External skills cache unavailable: lock file missing or invalid.")
+        return 1
+
+    if not result.available:
+        print(f"External skills cache unavailable: {result.error or 'unknown error'}")
+        print(f"Cache path: {result.cache_path}")
+        print(f"Registry path: {result.registry_path}")
+        return 1
+
+    print("External skills cache available.")
+    print(f"Resolved commit: {result.resolved_commit}")
+    print(f"Cache path: {result.cache_path}")
+    print(f"Registry path: {result.registry_path}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="livingcolor-server", description="LivingColor Server")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -52,6 +75,12 @@ def main(argv: list[str] | None = None) -> int:
     dash.add_argument("--no-open", action="store_true", dest="no_open")
     dash.add_argument("--insecure", action="store_true", help="Allow public bind without auth gate")
     dash.set_defaults(func=_cmd_dashboard)
+
+    warm = sub.add_parser(
+        "warm-skills-cache",
+        help="Materialize the pinned external LivingColor skills cache",
+    )
+    warm.set_defaults(func=_cmd_warm_skills_cache)
 
     args = parser.parse_args(argv)
     return int(args.func(args))
