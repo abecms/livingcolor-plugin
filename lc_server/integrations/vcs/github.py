@@ -7,6 +7,7 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import quote
 
 _GITHUB_API_URL = "https://api.github.com"
 _FETCH_TIMEOUT_SECONDS = 30
@@ -24,6 +25,15 @@ def _read_mcp_env(mcp_config: dict) -> dict[str, str]:
     if not isinstance(env, dict):
         return {}
     return {str(k): str(v).strip() for k, v in env.items() if v is not None and str(v).strip()}
+
+
+def github_token_from_config(mcp_config: dict) -> str | None:
+    return _read_mcp_env(mcp_config).get("GITHUB_TOKEN")
+
+
+def build_github_clone_url(repo_id: str, token: str) -> str:
+    repo_path = repo_id.strip().removeprefix("github.com/").strip("/")
+    return f"https://x-access-token:{quote(token, safe='')}@github.com/{repo_path}.git"
 
 
 def _project_matches_key(repo: dict[str, Any], project_key: str) -> bool:

@@ -13,7 +13,7 @@ from delivery_runtime.development.patch_store import save_patch_artifact
 from delivery_runtime.development.prompt_context import build_developer_user_prompt, parse_developer_completion
 from delivery_runtime.context.repo_checkout import (
     ensure_managed_checkout,
-    has_gitlab_clone_credentials,
+    has_clone_credentials,
     is_managed_repo_checkout,
     managed_checkout_path,
     managed_project_environment_root,
@@ -442,11 +442,12 @@ def _resolve_repo_checkout_path(
         context_pack["repo_checkout_path"] = cloned
         return cloned
 
-    if not has_gitlab_clone_credentials(project_cfg, project_key=project_key):
+    if not has_clone_credentials(project_cfg, project_key=project_key):
+        provider = str(project_cfg.get("vcs") or "gitlab")
         raise ValueError(
             "Developer Agent requires a local repository checkout at "
-            f"{expected_path}. GitLab credentials are missing for project {project_key} "
-            "(configure integrations.mcp_servers.gitlab in project_mapping.yaml or global Hermes MCP)."
+            f"{expected_path}. {provider.title()} credentials are missing for project {project_key} "
+            f"(configure integrations.mcp_servers.{provider} in project_mapping.yaml or global Hermes MCP)."
         )
     raise ValueError(
         "Developer Agent requires a local repository checkout at "
