@@ -43,6 +43,7 @@ from delivery_runtime.development.phases import (
 )
 from lc_server.agent_bridge.manifest_prompt import render_manifest_system_prompt
 from lc_server.integrations.jira_attachment_extract import merge_attachment_context_into_pack
+from lc_server.integrations.skills import external_guidance_for_skills
 
 logger = logging.getLogger(__name__)
 
@@ -190,6 +191,7 @@ class HermesDeveloperAgent:
             developer_phase=developer_phase,
             merge_conflict=merge_conflict if developer_phase == DEVELOPER_PHASE_MERGE_CONFLICT_RESOLUTION else None,
         )
+        prompt = _append_external_code_review_guidance(prompt, developer_phase=developer_phase)
 
         task_id = f"delivery-dev-{work_order_id}"
         scope_guard = None
@@ -379,6 +381,17 @@ class HermesDeveloperAgent:
         from tools.terminal_tool import clear_task_env_overrides
 
         clear_task_env_overrides(task_id)
+
+
+def _append_external_code_review_guidance(prompt: str, *, developer_phase: str) -> str:
+    if developer_phase != DEVELOPER_PHASE_CODE_QUALITY_REVIEW:
+        return prompt
+    guidance = external_guidance_for_skills(
+        ("code-architect", "qa-reviewer", "security-auditor")
+    )
+    if not guidance:
+        return prompt
+    return f"{prompt}\n\n{guidance}"
 
 
 def _resolve_developer_project_key(

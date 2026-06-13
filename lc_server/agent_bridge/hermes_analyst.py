@@ -14,6 +14,7 @@ from delivery_runtime.readiness.analyst_prompt import (
     parse_analyst_completion,
 )
 from lc_server.agent_bridge.manifest_prompt import render_manifest_system_prompt
+from lc_server.integrations.skills import external_guidance_for_skills
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +53,9 @@ class HermesAnalystAgent:
         jira_key = str(snapshot.get("key") or "").strip()
         task_id = f"delivery-analyst-{jira_key or key}"
         prompt = build_analyst_user_prompt(snapshot)
+        guidance = external_guidance_for_skills(("ticket-analyst",))
+        if guidance:
+            prompt = f"{prompt}\n\n{guidance}"
 
         agent = self._agent_factory(
             task_id=task_id,
