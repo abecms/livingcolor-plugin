@@ -275,6 +275,11 @@ class SelectedSprintTicketResponse(BaseModel):
     priorityRank: int = 0
     urgencyScore: float = 0
     warnings: list[str] = Field(default_factory=list)
+    readinessStatus: str | None = None
+    workOrderId: str | None = None
+    inDevelopment: bool = False
+    currentStage: str | None = None
+    status: str | None = None
 
 
 class SelectedSprintResponse(BaseModel):
@@ -285,6 +290,7 @@ class SelectedSprintResponse(BaseModel):
     overflowRisk: bool = False
     warnings: list[str] = Field(default_factory=list)
     tickets: list[SelectedSprintTicketResponse] = Field(default_factory=list)
+    activeDevelopmentCount: int = 0
 
 
 class SprintReportResponse(BaseModel):
@@ -295,6 +301,26 @@ class SprintReportResponse(BaseModel):
     publishedAt: str | None = None
     messagePreview: str | None = None
     error: str | None = None
+
+
+class AnalysisDispatchItemResponse(BaseModel):
+    jiraKey: str
+    status: str
+    backend: str | None = None
+    durationMs: int | None = None
+    error: str | None = None
+
+
+class AnalysisDispatchResponse(BaseModel):
+    backend: str = ""
+    concurrency: int = 3
+    success: int = 0
+    cached: int = 0
+    failed: int = 0
+    skipped: int = 0
+    forced: bool = False
+    durationMs: int = 0
+    items: list[AnalysisDispatchItemResponse] = Field(default_factory=list)
 
 
 class PmInboxResponse(BaseModel):
@@ -312,6 +338,7 @@ class PmInboxResponse(BaseModel):
     activeDevelopments: list[ActiveDevelopmentItemResponse] = Field(default_factory=list)
     projectMemoryHighlights: list[ProjectMemoryHighlightResponse] = Field(default_factory=list)
     projectMemory: dict[str, Any] = Field(default_factory=dict)
+    analysisDispatch: AnalysisDispatchResponse | None = None
 
 
 class DailyAnalysisRunRequest(BaseModel):
@@ -407,6 +434,7 @@ class LocalProjectCreateRequest(BaseModel):
 class ProjectConfigUpdateRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
+    project_key: str | None = Field(default=None, alias="projectKey")
     sprintDurationDays: int = Field(ge=1, le=90)
     sprintCapacityDays: float = Field(ge=0.5, le=120)
     sprintStartWeekday: int | None = Field(default=None, ge=1, le=7)
@@ -443,6 +471,12 @@ class TicketEstimationUpdateResponse(BaseModel):
 class SprintSwapRequest(BaseModel):
     a: str
     b: str
+
+
+class SprintResetRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    project_key: str | None = Field(default=None, alias="projectKey")
 
 
 class SprintSelectionUpdateRequest(BaseModel):

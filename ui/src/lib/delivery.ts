@@ -208,6 +208,26 @@ export function rejectMrDraft(draftId: string, feedback: string): Promise<MrDraf
   })
 }
 
+export interface AnalysisDispatchItem {
+  jiraKey: string
+  status: 'success' | 'cached' | 'failed' | 'skipped' | string
+  backend?: string | null
+  durationMs?: number | null
+  error?: string | null
+}
+
+export interface AnalysisDispatchPayload {
+  backend: string
+  concurrency: number
+  success: number
+  cached: number
+  failed: number
+  skipped: number
+  forced: boolean
+  durationMs: number
+  items: AnalysisDispatchItem[]
+}
+
 export interface PmInboxPayload {
   projectKey: string
   projectName: string
@@ -225,6 +245,7 @@ export interface PmInboxPayload {
     estimated?: number
     errorMessage?: string | null
   } | null
+  analysisDispatch?: AnalysisDispatchPayload | null
   recommendedNext: ExecutionQueueItem | null
   currentActiveDelivery: {
     workOrderId: string
@@ -261,6 +282,7 @@ export interface PmInboxPayload {
       priorityRank: number
       urgencyScore: number
       warnings: string[]
+      readinessStatus?: string
       workOrderId?: string
       inDevelopment?: boolean
       currentStage?: string
@@ -448,6 +470,7 @@ export function fetchProjectConfig(): Promise<ProjectConfigPayload> {
 }
 
 export function saveProjectConfig(body: {
+  projectKey?: string
   sprintDurationDays: number
   sprintCapacityDays: number
   sprintStartWeekday?: number
@@ -532,11 +555,12 @@ export async function saveProjectJiraProjectKey(jiraProjectKey: string | null): 
   })
 }
 
-export function resetProjectSprint(): Promise<PmInboxPayload['selectedSprint']> {
+export function resetProjectSprint(projectKey?: string): Promise<PmInboxPayload['selectedSprint']> {
   return callDesktopApi({
     ...profileScoped(),
     path: '/api/delivery/sprint/reset',
     method: 'POST',
+    body: projectKey ? { projectKey } : undefined,
     timeoutMs: DELIVERY_TIMEOUT_MS
   })
 }

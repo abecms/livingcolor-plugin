@@ -27,6 +27,25 @@ def test_init_db_creates_schema(_isolate_hermes_home):
     assert "events" in tables
 
 
+def test_readiness_records_include_analysis_metadata_columns(_isolate_hermes_home):
+    init_db()
+
+    with connect() as conn:
+        columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(readiness_records)").fetchall()
+        }
+        version = conn.execute(
+            "SELECT value FROM delivery_meta WHERE key = 'schema_version'"
+        ).fetchone()["value"]
+
+    assert int(version) == SCHEMA_VERSION
+    assert "analysis_input_hash" in columns
+    assert "analysis_backend" in columns
+    assert "last_analysis_error" in columns
+    assert "last_analysis_failed_at" in columns
+
+
 def test_next_public_id_increments(_isolate_hermes_home):
     init_db()
     with connect() as conn:
@@ -95,6 +114,24 @@ def test_connect_handles_concurrent_readers(_isolate_hermes_home):
         results = list(pool.map(lambda _: read_count(), range(16)))
 
     assert all(result == 0 for result in results)
+
+
+def test_connect_handles_concurrent_writers(_isolate_hermes_home):
+    init_db()
+    store = EventStore()
+
+    def append_event(index: int) -> str:
+        created = store.append(
+            event_type="READINESS_SCAN_STARTED",
+            actor="system",
+            payload={"index": index},
+        )
+        return created["id"]
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        event_ids = list(pool.map(append_event, range(16)))
+
+    assert len(set(event_ids)) == 16
 
 
 def test_event_store_is_append_only(_isolate_hermes_home):
