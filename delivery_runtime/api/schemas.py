@@ -20,6 +20,8 @@ class ReadinessRecordResponse(BaseModel):
     confidence: float = 0
     jiraSnapshot: dict[str, Any] = Field(default_factory=dict)
     analyzedAt: str | None = None
+    lastAnalysisError: str | None = None
+    lastAnalysisFailedAt: str | None = None
     promotedWorkOrderId: str | None = None
     createdAt: str
     updatedAt: str
@@ -276,6 +278,8 @@ class SelectedSprintTicketResponse(BaseModel):
     urgencyScore: float = 0
     warnings: list[str] = Field(default_factory=list)
     readinessStatus: str | None = None
+    lastAnalysisError: str | None = None
+    lastAnalysisFailedAt: str | None = None
     workOrderId: str | None = None
     inDevelopment: bool = False
     currentStage: str | None = None

@@ -283,6 +283,8 @@ export interface PmInboxPayload {
       urgencyScore: number
       warnings: string[]
       readinessStatus?: string
+      lastAnalysisError?: string | null
+      lastAnalysisFailedAt?: string | null
       workOrderId?: string
       inDevelopment?: boolean
       currentStage?: string

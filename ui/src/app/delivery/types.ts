@@ -37,6 +37,8 @@ export interface ReadinessRecord {
   recommendedRepos: string[]
   confidence: number
   analyzedAt?: string | null
+  lastAnalysisError?: string | null
+  lastAnalysisFailedAt?: string | null
   promotedWorkOrderId?: string | null
   createdAt: string
   updatedAt: string

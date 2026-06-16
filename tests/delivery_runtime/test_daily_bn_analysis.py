@@ -338,6 +338,7 @@ class TestDailyPipeline:
         assert inbox["analysisDispatch"] == dispatch
 
     def test_failed_analysis_preserves_previous_readiness_record(self):
+        from delivery_runtime.api.schemas import PmInboxResponse
         from delivery_runtime.readiness.analyst_backend import SynchronousAnalystBackend
         from delivery_runtime.readiness.scanner import ReadinessScanner
 
@@ -376,6 +377,7 @@ class TestDailyPipeline:
         assert "subagent timeout" in row["last_analysis_error"]
 
         inbox = build_pm_inbox(project_key="AAC")
+        inbox = PmInboxResponse.model_validate(inbox).model_dump()
         sprint_ticket = next(
             ticket for ticket in inbox["selectedSprint"]["tickets"] if ticket["jiraKey"] == "AAC-801"
         )
