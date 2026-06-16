@@ -12,10 +12,14 @@ from delivery_runtime.orchestration.engine import OrchestrationEngine
 from delivery_runtime.mr_drafts.service import MrDraftService
 from delivery_runtime.pm_inbox.queue_consumer import ExecutionQueueConsumer
 from delivery_runtime.pm_inbox.service import PmInboxService
+from delivery_runtime.readiness.analyst_backend import AnalystBackend, SynchronousAnalystBackend
 from delivery_runtime.readiness.scanner import ReadinessScanner
 from delivery_runtime.readiness.service import ReadinessService
 from delivery_runtime.work_orders.service import WorkOrderService
-from lc_server.agent_bridge.hermes_analyst_subagent import HermesSubagentAnalystBackend
+from lc_server.agent_bridge.hermes_analyst_subagent import (
+    HermesSubagentAnalystBackend,
+    default_subagent_launcher_available,
+)
 from lc_server.agent_bridge.hermes_runtime import get_agent_runtime_bridge
 from lc_server.integrations.jira_estimate_invoker import McpJiraEstimateInvoker
 from lc_server.integrations.jira_readiness import (
@@ -35,6 +39,12 @@ def _analysis_runner(snapshot: dict[str, Any], project_key: str) -> dict[str, An
     )
 
 
+def _build_readiness_analysis_backend() -> AnalystBackend:
+    if default_subagent_launcher_available():
+        return HermesSubagentAnalystBackend(fallback_runner=_analysis_runner)
+    return SynchronousAnalystBackend(_analysis_runner)
+
+
 def build_delivery_services() -> DeliveryServices:
     """Construct server-owned delivery services with integrations injected."""
     events = EventStore()
@@ -52,7 +62,7 @@ def build_delivery_services() -> DeliveryServices:
     scanner = ReadinessScanner(
         events,
         issue_fetcher=fetch_issues_for_readiness,
-        analysis_backend=HermesSubagentAnalystBackend(),
+        analysis_backend=_build_readiness_analysis_backend(),
     )
     work_orders = WorkOrderService(events)
     readiness = ReadinessService(
