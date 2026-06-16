@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from typing import Any
 
 from delivery_runtime.readiness.attachment_prompt import build_attachment_prompt_section
@@ -220,8 +221,13 @@ def parse_analyst_completion(
         raise AnalystParseError("confidence must be numeric")
 
     estimated_days = payload.get("estimatedDays")
-    if not isinstance(estimated_days, (int, float)) or isinstance(estimated_days, bool) or estimated_days <= 0:
-        raise AnalystParseError("estimatedDays must be a positive number")
+    if (
+        not isinstance(estimated_days, (int, float))
+        or isinstance(estimated_days, bool)
+        or not math.isfinite(float(estimated_days))
+        or estimated_days <= 0
+    ):
+        raise AnalystParseError("estimatedDays must be a positive finite number")
 
     return {
         "readinessScore": int(readiness_score),

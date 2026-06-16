@@ -150,6 +150,39 @@ async def test_run_readiness_analysis_delegates_to_analyst_when_automation_ready
 
 
 @pytest.mark.asyncio
+async def test_run_readiness_analysis_returns_analysis_failed_on_parse_error():
+    from lc_server.agent_bridge.hermes_runtime import HermesRuntimeBridge
+
+    snapshot = {
+        "key": "BN-10",
+        "summary": "OAuth callback",
+        "description": "Given a user completes OAuth, when the callback returns, then tokens are stored.",
+        "projectKey": "BN",
+    }
+
+    class _FakeRegistry:
+        def is_automation_ready(self, project_key: str) -> bool:
+            return project_key == "BN"
+
+    class _FailingAnalyst:
+        def analyze(self, received_snapshot: dict, project_key: str) -> dict:
+            assert received_snapshot == snapshot
+            assert project_key == "BN"
+            raise AnalystParseError("bad JSON")
+
+    bridge = HermesRuntimeBridge(registry=_FakeRegistry(), analyst=_FailingAnalyst())
+    result = await bridge.run_readiness_analysis("BN-10", {"projectKey": "BN", "snapshot": snapshot})
+
+    assert result["readinessStatus"] == "analysis_failed"
+    assert result["readinessScore"] == 0
+    assert result["estimatedDays"] == 0
+    assert result["recommendedRepos"] == []
+    assert "could not be parsed" in result["analysisSummary"]
+    assert result["blockers"] == ["bad JSON"]
+    assert result["jiraSnapshot"] == snapshot
+
+
+@pytest.mark.asyncio
 async def test_run_readiness_analysis_falls_back_to_heuristic_when_not_provisioned():
     from delivery_runtime.readiness.analyzer import analyze_ticket_snapshot
     from lc_server.agent_bridge.hermes_runtime import HermesRuntimeBridge

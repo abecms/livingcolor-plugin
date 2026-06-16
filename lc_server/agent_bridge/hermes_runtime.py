@@ -50,10 +50,20 @@ class HermesRuntimeBridge:
                 return self.analyst.analyze(snapshot, project_key)
             except AnalystParseError as exc:
                 logger.warning(
-                    "Analyst run failed for %s (%s); falling back to heuristic analysis",
+                    "Analyst run failed for %s (%s); returning analysis_failed",
                     jira_key,
                     exc,
                 )
+                return {
+                    "readinessScore": 0,
+                    "readinessStatus": "analysis_failed",
+                    "analysisSummary": f"LLM readiness analysis output could not be parsed: {exc}",
+                    "blockers": [str(exc)],
+                    "recommendedRepos": [],
+                    "confidence": 0.0,
+                    "estimatedDays": 0,
+                    "jiraSnapshot": snapshot,
+                }
         return analyze_ticket_snapshot(snapshot)
 
     async def run_node(

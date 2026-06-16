@@ -94,7 +94,13 @@ def test_parse_analyst_completion_rejects_missing_estimated_days():
 
 @pytest.mark.parametrize("value", ["soon", True, 0, -2, None])
 def test_parse_analyst_completion_rejects_invalid_estimated_days(value):
-    with pytest.raises(AnalystParseError, match="estimatedDays must be a positive number"):
+    with pytest.raises(AnalystParseError, match="estimatedDays must be a positive finite number"):
+        parse_analyst_completion(_fenced(_payload(estimatedDays=value)), {"key": "TVP-6"})
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_parse_analyst_completion_rejects_non_finite_estimated_days(value):
+    with pytest.raises(AnalystParseError, match="estimatedDays must be a positive finite number"):
         parse_analyst_completion(_fenced(_payload(estimatedDays=value)), {"key": "TVP-6"})
 
 
