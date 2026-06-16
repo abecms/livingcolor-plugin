@@ -99,7 +99,7 @@ def build_selected_sprint_payload(*, project_key: str, sprint_number: int | None
     backlog_extras = [
         item
         for item in candidates
-        if item.get("readinessStatus") != "ready" or item["jiraKey"] not in selected_ready_keys
+        if item.get("readinessStatus") != "ready"
     ]
     backlog_extras.sort(
         key=lambda item: (

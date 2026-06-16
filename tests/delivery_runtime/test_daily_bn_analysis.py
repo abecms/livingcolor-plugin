@@ -359,6 +359,59 @@ class TestDailyPipeline:
         assert row["readiness_status"] == "analysis_failed"
         assert "subagent timeout" in row["last_analysis_error"]
 
+    def test_automatic_analysis_failed_record_is_not_reused_as_cache(self):
+        from delivery_runtime.readiness.analysis_dispatcher import build_analysis_input_hash
+        from delivery_runtime.readiness.analyst_backend import SynchronousAnalystBackend
+        from delivery_runtime.readiness.scanner import ReadinessScanner
+
+        snapshot = _ready_snapshot("AAC-803")
+        input_hash = build_analysis_input_hash(snapshot, project_key="AAC")
+        with connect() as conn:
+            now = utc_now_iso()
+            conn.execute(
+                """
+                INSERT INTO readiness_records (
+                    id, jira_key, project_key, title, readiness_score, readiness_status,
+                    analysis_summary, blockers_json, recommended_repos_json, confidence,
+                    estimated_days, analysis_input_hash, analysis_backend,
+                    last_analysis_error, last_analysis_failed_at,
+                    jira_snapshot_json, analyzed_at, created_at, updated_at
+                ) VALUES ('RD-803', 'AAC-803', 'AAC', 'Failed analysis', 0, 'analysis_failed',
+                          'LLM analysis failed before producing a valid readiness result.',
+                          '[]', '[]', 0, NULL, ?, 'hermes_subagent',
+                          'previous timeout', ?, ?, NULL, ?, ?)
+                """,
+                (input_hash, now, json_dumps(snapshot), now, now),
+            )
+
+        calls: list[str] = []
+
+        def failing_runner(snapshot: dict, project_key: str) -> dict:
+            calls.append(snapshot["key"])
+            raise RuntimeError("new timeout")
+
+        scanner = ReadinessScanner(
+            issue_fetcher=lambda _project: [snapshot],
+            analysis_backend=SynchronousAnalystBackend(failing_runner),
+        )
+        pipeline = DailyAnalysisPipeline(scanner=scanner)
+        result = pipeline.run("AAC", force=False)
+
+        assert calls == ["AAC-803"]
+        assert result["analysisDispatch"]["cached"] == 0
+        assert result["analysisDispatch"]["failed"] == 1
+        with connect() as conn:
+            row = conn.execute(
+                """
+                SELECT readiness_status, last_analysis_error, analysis_input_hash, analysis_backend
+                FROM readiness_records WHERE jira_key = 'AAC-803'
+                """
+            ).fetchone()
+        assert row["readiness_status"] == "analysis_failed"
+        assert "new timeout" in row["last_analysis_error"]
+        assert row["analysis_input_hash"] == input_hash
+        assert row["analysis_backend"] == "hermes_conversation"
+
 
 class TestPmInboxService:
     @pytest.fixture(autouse=True)

@@ -235,7 +235,9 @@ class ReadinessScanner:
                 """
                 SELECT *
                 FROM readiness_records
-                WHERE jira_key = ? AND readiness_status NOT IN ('promoted', 'dismissed')
+                WHERE jira_key = ?
+                  AND readiness_status NOT IN ('promoted', 'dismissed', 'analysis_failed')
+                  AND COALESCE(last_analysis_error, '') = ''
                 """,
                 (jira_key,),
             ).fetchone()
