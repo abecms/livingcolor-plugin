@@ -292,10 +292,10 @@ def _download_attachment_via_jira_api(url: str) -> bytes | None:
     import urllib.error
     import urllib.request
 
-    from hermes_cli.jira_dashboard import JIRA_MCP_NAME
+    from lc_server.integrations.mcp_server_resolver import active_jira_mcp_name
     from hermes_cli.mcp_config import _get_mcp_servers
 
-    cfg = _get_mcp_servers().get(JIRA_MCP_NAME) or {}
+    cfg = _get_mcp_servers().get(active_jira_mcp_name()) or {}
     env = cfg.get("env") if isinstance(cfg.get("env"), dict) else {}
     username = str(env.get("JIRA_USERNAME") or "").strip()
     token = str(env.get("JIRA_API_TOKEN") or "").strip()

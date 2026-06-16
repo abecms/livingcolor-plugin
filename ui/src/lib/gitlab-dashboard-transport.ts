@@ -14,6 +14,7 @@ import {
   readGitLabSavedCredentials,
   type GitLabEnvCredentials
 } from '@/lib/gitlab-mcp'
+import { readMcpServers, resolveGitlabMcpServer } from '@/lib/mcp-server-resolver'
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
@@ -23,12 +24,20 @@ function isMethodNotAllowed(error: unknown): boolean {
   return errorMessage(error).toLowerCase().includes('405')
 }
 
-async function persistGitLabMcpConfig(serverConfig: Record<string, unknown>): Promise<void> {
-  const response = await saveMcpServerConfig(GITLAB_MCP_PRESET_NAME, serverConfig)
+async function resolveGitlabMcpServerName(): Promise<string> {
+  const config = await getLivingColorConfigRecord()
+  return resolveGitlabMcpServer(readMcpServers(config))?.name ?? GITLAB_MCP_PRESET_NAME
+}
+
+async function persistGitLabMcpConfig(serverConfig: Record<string, unknown>): Promise<string> {
+  const serverName = await resolveGitlabMcpServerName()
+  const response = await saveMcpServerConfig(serverName, serverConfig)
 
   if (!response?.ok) {
     throw new Error('Could not save GitLab MCP credentials to config.yaml')
   }
+
+  return response.name ?? serverName
 }
 
 function finalizeConnectResponse(result: GitLabConnectResponse, saved = false): GitLabConnectResponse {
@@ -50,8 +59,8 @@ function finalizeConnectResponse(result: GitLabConnectResponse, saved = false): 
   }
 }
 
-async function connectGitlabViaMcpTestFallback(gitlabUrl: string): Promise<GitLabConnectResponse> {
-  const result = await testMcpServer(GITLAB_MCP_PRESET_NAME)
+async function connectGitlabViaMcpTestFallback(gitlabUrl: string, serverName: string): Promise<GitLabConnectResponse> {
+  const result = await testMcpServer(serverName)
   const connected = Boolean(result.ok)
   return {
     authenticated: connected,
@@ -68,16 +77,16 @@ async function connectGitlabViaMcpTestFallback(gitlabUrl: string): Promise<GitLa
 export async function connectGitlabViaCredentials(credentials: GitLabEnvCredentials): Promise<GitLabConnectResponse> {
   const serverConfig = buildGitLabMcpConfig(credentials)
 
-  await persistGitLabMcpConfig(serverConfig)
+  const serverName = await persistGitLabMcpConfig(serverConfig)
 
   try {
-    const result = await connectGitlabMcp()
+    const result = await connectGitlabMcp(serverName)
     return finalizeConnectResponse(result, true)
   } catch (error) {
     if (!isMethodNotAllowed(error)) {
       throw error
     }
-    const fallback = await connectGitlabViaMcpTestFallback(normalizeGitLabApiUrl(credentials.gitlabUrl))
+    const fallback = await connectGitlabViaMcpTestFallback(normalizeGitLabApiUrl(credentials.gitlabUrl), serverName)
     return finalizeConnectResponse(fallback, true)
   }
 }
@@ -88,12 +97,10 @@ export async function getGitLabSavedCredentials(): Promise<{
   usesEnvAuth: boolean
 }> {
   const config = await getLivingColorConfigRecord()
-  const currentServers =
-    config.mcp_servers && typeof config.mcp_servers === 'object' && !Array.isArray(config.mcp_servers)
-      ? (config.mcp_servers as Record<string, Record<string, unknown>>)
-      : {}
+  const servers = readMcpServers(config)
+  const resolved = resolveGitlabMcpServer(servers)
 
-  return readGitLabSavedCredentials(currentServers[GITLAB_MCP_PRESET_NAME])
+  return readGitLabSavedCredentials(resolved?.config ?? servers[GITLAB_MCP_PRESET_NAME])
 }
 
 export { fetchGitlabStatus }

@@ -82,6 +82,35 @@ def test_resolve_project_mcp_server_falls_back_to_global_config(tmp_path, monkey
     assert resolved["env"]["GITLAB_API_URL"] == "https://gitlab.tv5monde.com/api/v4"
 
 
+def test_resolve_project_mcp_server_falls_back_to_custom_global_gitlab_name(tmp_path, monkeypatch):
+    import lc_constants
+    from delivery_runtime.automation import config as automation_config
+
+    home = tmp_path / "livingcolor"
+    monkeypatch.setattr(lc_constants, "get_livingcolor_home", lambda: home)
+    monkeypatch.setattr(automation_config, "get_livingcolor_home", lambda: home)
+
+    mapping_path = home / "project_mapping.yaml"
+    mapping_path.parent.mkdir(parents=True, exist_ok=True)
+    mapping_path.write_text("TVP:\n  name: TV5+\n", encoding="utf-8")
+
+    global_gitlab = {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-gitlab"],
+        "env": {
+            "GITLAB_API_URL": "https://gitlab.tv5monde.com/api/v4",
+            "GITLAB_PERSONAL_ACCESS_TOKEN": "secret-token",
+        },
+    }
+    monkeypatch.setattr(
+        "hermes_cli.mcp_config._get_mcp_servers",
+        lambda: {"gitlab-tv5": global_gitlab},
+    )
+
+    resolved = resolve_project_mcp_server("TVP", "gitlab")
+    assert resolved["env"]["GITLAB_API_URL"] == "https://gitlab.tv5monde.com/api/v4"
+
+
 def test_persist_project_default_repo_updates_all_agent_manifests_and_automation_state(tmp_path, monkeypatch):
     import yaml
     import lc_constants

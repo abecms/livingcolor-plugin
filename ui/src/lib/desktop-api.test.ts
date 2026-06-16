@@ -21,4 +21,17 @@ describe('callDesktopApi', () => {
     expect(init.method).toBe('POST')
     expect((init.headers as Headers).get('Authorization')).toBe('Bearer test-token')
   })
+
+  it('rewrites MCP server management paths to the LivingColor plugin', async () => {
+    await callDesktopApi({
+      path: '/api/mcp/servers/Atlassian',
+      method: 'PUT',
+      body: { command: 'uvx', args: ['mcp-atlassian'] }
+    })
+
+    const sdk = (window as any).__HERMES_PLUGIN_SDK__
+    const [path, init] = sdk.fetchJSON.mock.calls[0]
+    expect(path).toBe('/api/plugins/livingcolor/mcp/servers/Atlassian')
+    expect(init.method).toBe('PUT')
+  })
 })

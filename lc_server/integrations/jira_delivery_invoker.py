@@ -100,8 +100,8 @@ class McpJiraDeliveryInvoker:
 
     @staticmethod
     def _connect() -> tuple[list[str], Callable[[str, dict], dict], str | None]:
+        from lc_server.integrations.mcp_server_resolver import active_jira_mcp_name
         from hermes_cli.jira_dashboard import (
-            JIRA_MCP_NAME,
             JiraDashboardError,
             _ensure_cloud_id,
             ensure_jira_mcp_connected,
@@ -114,11 +114,12 @@ class McpJiraDeliveryInvoker:
         except JiraDashboardError as exc:
             raise RuntimeError(str(exc)) from exc
 
-        cfg = _get_mcp_servers().get(JIRA_MCP_NAME) or {}
-        tool_names = list_connected_mcp_raw_tool_names(JIRA_MCP_NAME)
+        jira_name = active_jira_mcp_name()
+        cfg = _get_mcp_servers().get(jira_name) or {}
+        tool_names = list_connected_mcp_raw_tool_names(jira_name)
 
         def invoke(tool_name: str, arguments: dict) -> dict:
-            return invoke_mcp_tool(JIRA_MCP_NAME, tool_name, arguments)
+            return invoke_mcp_tool(jira_name, tool_name, arguments)
 
         try:
             cloud_id = _ensure_cloud_id(cfg, tool_names, invoke)

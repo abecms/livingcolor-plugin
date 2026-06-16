@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -35,16 +34,19 @@ import {
   type VcsRepoOption
 } from '@/lib/delivery'
 import { bumpProjectConfigRevision } from '@/store/project-config'
-import { GITHUB_MCP_PRESET_NAME } from '@/lib/github-mcp'
-import { GITLAB_MCP_PRESET_NAME } from '@/lib/gitlab-mcp'
-import { JIRA_MCP_PRESET_NAME } from '@/lib/jira-mcp'
+import {
+  readMcpServers,
+  resolveGithubMcpServer,
+  resolveGitlabMcpServer,
+  resolveJiraMcpServer
+} from '@/lib/mcp-server-resolver'
 import { Link2 } from '@/lib/icons'
+import { buildHermesAppPath, HERMES_MCP_SETTINGS_PATH } from '@/lib/hermes-app-path'
 import { notifyError, notify } from '@/store/notifications'
 
 import { useProjectWorkspace } from '@/hooks/use-project-workspace'
 
 import { ManagerSection } from '../manager-page-layout'
-import { SETTINGS_ROUTE } from '../routes'
 
 import { dashboardOutlineButtonProps, dashboardPrimaryButtonProps } from './dashboard-ui'
 
@@ -166,30 +168,32 @@ export function ProjectIntegrationsSection() {
     setGitlabStatus('loading')
     setGithubStatus('loading')
     try {
-      let [config, jiraSaved, gitlabSaved, githubSaved, jiraDashboard, gitlabConnection, githubConnection] =
-        await Promise.all([
-          getLivingColorConfigRecord(),
-          getJiraSavedCredentials(),
-          getGitLabSavedCredentials(),
-          getGitHubSavedCredentials(),
-          fetchJiraDashboard({ reconnect: false }).catch(() => null),
-          fetchGitlabStatus().catch(() => null),
-          fetchGithubStatus().catch(() => null)
-        ])
-      const servers =
-        config?.mcp_servers && typeof config.mcp_servers === 'object' && !Array.isArray(config.mcp_servers)
-          ? (config.mcp_servers as Record<string, Record<string, unknown>>)
-          : {}
+      const [config, jiraSaved, gitlabSaved, githubSaved] = await Promise.all([
+        getLivingColorConfigRecord(),
+        getJiraSavedCredentials(),
+        getGitLabSavedCredentials(),
+        getGitHubSavedCredentials()
+      ])
+      const servers = readMcpServers(config)
+      const jiraServer = resolveJiraMcpServer(servers)
+      const gitlabServer = resolveGitlabMcpServer(servers)
+      const githubServer = resolveGithubMcpServer(servers)
 
-      const hasJiraServer = Boolean(servers[JIRA_MCP_PRESET_NAME])
+      let [jiraDashboard, gitlabConnection, githubConnection] = await Promise.all([
+        fetchJiraDashboard({ reconnect: false }).catch(() => null),
+        fetchGitlabStatus('gitlab').catch(() => null),
+        fetchGithubStatus('github').catch(() => null)
+      ])
+
+      const hasJiraServer = Boolean(jiraServer)
       const hasJiraCredentials = Boolean(jiraSaved.jiraUrl && jiraSaved.username) || jiraSaved.usesEnvAuth
       let jiraLiveConnected = jiraDashboard?.connection?.status === 'connected' && jiraDashboard.sampleData !== true
 
-      const hasGitLabServer = Boolean(servers[GITLAB_MCP_PRESET_NAME])
+      const hasGitLabServer = Boolean(gitlabServer)
       const hasGitLabCredentials = Boolean(gitlabSaved.gitlabUrl) || gitlabSaved.usesEnvAuth
       let gitlabLiveConnected = gitlabConnection?.status === 'connected' && gitlabConnection.authenticated
 
-      const hasGitHubServer = Boolean(servers[GITHUB_MCP_PRESET_NAME])
+      const hasGitHubServer = Boolean(githubServer)
       const hasGitHubCredentials = Boolean(githubSaved.apiToken) || githubSaved.usesEnvAuth
       let githubLiveConnected = githubConnection?.status === 'connected' && githubConnection.authenticated
 
@@ -197,10 +201,10 @@ export function ProjectIntegrationsSection() {
         await connectJiraMcp().catch(() => undefined)
       }
       if ((hasGitLabServer || hasGitLabCredentials) && !gitlabLiveConnected) {
-        await connectGitlabMcp().catch(() => undefined)
+        await connectGitlabMcp('gitlab').catch(() => undefined)
       }
       if ((hasGitHubServer || hasGitHubCredentials) && !githubLiveConnected) {
-        await connectGithubMcp().catch(() => undefined)
+        await connectGithubMcp('github').catch(() => undefined)
       }
 
       if (
@@ -210,8 +214,8 @@ export function ProjectIntegrationsSection() {
       ) {
         ;[jiraDashboard, gitlabConnection, githubConnection] = await Promise.all([
           fetchJiraDashboard({ reconnect: false }).catch(() => null),
-          fetchGitlabStatus().catch(() => null),
-          fetchGithubStatus().catch(() => null)
+          fetchGitlabStatus('gitlab').catch(() => null),
+          fetchGithubStatus('github').catch(() => null)
         ])
         jiraLiveConnected = jiraDashboard?.connection?.status === 'connected' && jiraDashboard.sampleData !== true
         gitlabLiveConnected = gitlabConnection?.status === 'connected' && gitlabConnection.authenticated
@@ -341,16 +345,19 @@ export function ProjectIntegrationsSection() {
     async (target: 'jira' | 'gitlab' | 'github') => {
       try {
         await window.livingColorDesktop?.touchBackend?.()
-        await refreshStatus()
-        if (target === 'jira') {
-          setJiraDialogOpen(true)
-        } else if (target === 'github') {
-          setGithubDialogOpen(true)
-        } else {
-          setGitlabDialogOpen(true)
-        }
       } catch (error) {
         notifyError(error, 'LivingColor backend is not ready yet')
+        return
+      }
+
+      void refreshStatus().catch(() => undefined)
+
+      if (target === 'jira') {
+        setJiraDialogOpen(true)
+      } else if (target === 'github') {
+        setGithubDialogOpen(true)
+      } else {
+        setGitlabDialogOpen(true)
       }
     },
     [refreshStatus]
@@ -875,7 +882,7 @@ export function ProjectIntegrationsSection() {
             </p>
             <div className="mt-4">
               <Button asChild size="sm" {...dashboardOutlineButtonProps()}>
-                <Link to={`${SETTINGS_ROUTE}?tab=mcp`}>Open MCP settings</Link>
+                <a href={buildHermesAppPath(HERMES_MCP_SETTINGS_PATH)}>Open MCP settings</a>
               </Button>
             </div>
           </div>

@@ -6,20 +6,23 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-_WARMUP_SERVERS = ("jira", "gitlab")
-
 
 def warm_configured_mcp_connections() -> None:
-    """Reconnect jira/gitlab MCP servers that are already configured on disk."""
+    """Reconnect Jira/GitLab MCP servers that are already configured on disk."""
     try:
         from hermes_cli.mcp_config import _get_mcp_servers
         from hermes_cli.mcp_runtime import connect_mcp_server
+        from lc_server.integrations.mcp_server_resolver import (
+            resolve_gitlab_mcp_server_name,
+            resolve_jira_mcp_server_name,
+        )
     except ImportError:
         return
 
     servers = _get_mcp_servers()
-    for name in _WARMUP_SERVERS:
-        if name not in servers:
+    for resolve in (resolve_jira_mcp_server_name, resolve_gitlab_mcp_server_name):
+        name = resolve(servers)
+        if not name:
             continue
         try:
             result = connect_mcp_server(name)

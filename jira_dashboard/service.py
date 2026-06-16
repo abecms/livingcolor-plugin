@@ -29,6 +29,12 @@ JIRA_MCP_CONFIG: Dict[str, Any] = {
 }
 
 
+def _active_jira_mcp_name() -> str:
+    from lc_server.integrations.mcp_server_resolver import resolve_jira_mcp_server_name
+
+    return resolve_jira_mcp_server_name() or JIRA_MCP_NAME
+
+
 class JiraDashboardError(Exception):
     """Raised when Jira dashboard data cannot be fetched."""
 
@@ -51,23 +57,32 @@ def ensure_jira_mcp_config() -> dict:
 def _jira_server_connected() -> bool:
     from tools.mcp_tool import get_mcp_status
 
+    active_name = _active_jira_mcp_name()
     for entry in get_mcp_status():
-        if entry.get("name") == JIRA_MCP_NAME and entry.get("connected"):
+        if entry.get("name") == active_name and entry.get("connected"):
             return True
     return False
 
 
 def connect_jira_mcp() -> dict:
-    """Save the Jira MCP preset and connect via the MCP runtime."""
-    cfg = ensure_jira_mcp_config()
+    """Connect the configured Jira MCP server via the MCP runtime."""
+    from lc_server.integrations.mcp_server_resolver import resolve_jira_mcp_server_name
     from tools.mcp_tool import list_connected_mcp_tool_names, reconnect_mcp_server
 
-    reconnect_mcp_server(JIRA_MCP_NAME, cfg)
+    resolved = resolve_jira_mcp_server_name()
+    if resolved:
+        cfg = dict(_get_mcp_servers().get(resolved) or {})
+        name = resolved
+    else:
+        cfg = ensure_jira_mcp_config()
+        name = JIRA_MCP_NAME
+
+    reconnect_mcp_server(name, cfg)
     connected = _jira_server_connected()
-    oauth_ready = _oauth_tokens_present(JIRA_MCP_NAME) if cfg.get("auth") == "oauth" else True
+    oauth_ready = _oauth_tokens_present(name) if cfg.get("auth") == "oauth" else True
     tool_count = 0
     if connected:
-        tool_count = len(list_connected_mcp_tool_names(JIRA_MCP_NAME))
+        tool_count = len(list_connected_mcp_tool_names(name))
 
     status = "connected" if connected and oauth_ready else "disconnected"
     message = "Connected to Jira via MCP."
@@ -95,13 +110,14 @@ def ensure_jira_mcp_connected() -> None:
     Saved credentials or MCP config alone are not enough: the LivingColor backend
     must hold an active MCP session before tools such as daily analysis can run.
     """
-    cfg = _get_mcp_servers().get(JIRA_MCP_NAME)
+    cfg = _get_mcp_servers().get(_active_jira_mcp_name())
     if not cfg:
         raise JiraDashboardError("Jira MCP is not configured. Connect Jira before scanning.")
 
     from tools.mcp_tool import list_connected_mcp_raw_tool_names
 
-    if _jira_server_connected() and list_connected_mcp_raw_tool_names(JIRA_MCP_NAME):
+    active_name = _active_jira_mcp_name()
+    if _jira_server_connected() and list_connected_mcp_raw_tool_names(active_name):
         return
 
     result = connect_jira_mcp()
@@ -109,7 +125,7 @@ def ensure_jira_mcp_connected() -> None:
         message = str(result.get("message") or "Jira is not connected. Connect Jira before scanning.")
         raise JiraDashboardError(message)
 
-    if not list_connected_mcp_raw_tool_names(JIRA_MCP_NAME):
+    if not list_connected_mcp_raw_tool_names(active_name):
         raise JiraDashboardError("Jira MCP is connected but no tools are available.")
 
 
@@ -1141,7 +1157,7 @@ def fetch_jira_attachment_preview(
     if not safe_key:
         raise JiraDashboardError("Issue key is required.")
 
-    cfg = _get_mcp_servers().get(JIRA_MCP_NAME)
+    cfg = _get_mcp_servers().get(_active_jira_mcp_name())
     if not cfg:
         raise JiraDashboardError("Jira is not configured.")
 
@@ -1150,17 +1166,17 @@ def fetch_jira_attachment_preview(
     if not _jira_server_connected():
         raise JiraDashboardError("Jira is not connected.")
 
-    tool_names = list_connected_mcp_raw_tool_names(JIRA_MCP_NAME)
+    tool_names = list_connected_mcp_raw_tool_names(_active_jira_mcp_name())
     download_tool = _find_tool(tool_names, "jira_download_attachments", "download_attachments")
     if not download_tool:
         raise JiraDashboardError("Connected Jira MCP server does not expose attachment download.")
 
-    payload = _parse_tool_payload(invoke_mcp_tool(JIRA_MCP_NAME, download_tool, {"issue_key": safe_key}))
+    payload = _parse_tool_payload(invoke_mcp_tool(_active_jira_mcp_name(), download_tool, {"issue_key": safe_key}))
     match = _find_attachment_blob(payload, attachment_id=attachment_id, name=name)
     if not match:
         image_tool = _find_tool(tool_names, "jira_get_issue_images", "get_issue_images")
         if image_tool:
-            image_payload = _parse_tool_payload(invoke_mcp_tool(JIRA_MCP_NAME, image_tool, {"issue_key": safe_key}))
+            image_payload = _parse_tool_payload(invoke_mcp_tool(_active_jira_mcp_name(), image_tool, {"issue_key": safe_key}))
             match = _find_attachment_media_file(image_payload, attachment_id=attachment_id, name=name)
     if not match:
         raise JiraDashboardError(
@@ -1265,7 +1281,7 @@ def fetch_jira_issue_attachments(issue_key: str) -> List[dict]:
     if not safe_key:
         raise JiraDashboardError("Issue key is required.")
 
-    cfg = _get_mcp_servers().get(JIRA_MCP_NAME)
+    cfg = _get_mcp_servers().get(_active_jira_mcp_name())
     if not cfg:
         raise JiraDashboardError("Jira is not configured.")
 
@@ -1274,12 +1290,12 @@ def fetch_jira_issue_attachments(issue_key: str) -> List[dict]:
     if not _jira_server_connected():
         raise JiraDashboardError("Jira is not connected.")
 
-    tool_names = list_connected_mcp_raw_tool_names(JIRA_MCP_NAME)
+    tool_names = list_connected_mcp_raw_tool_names(_active_jira_mcp_name())
     if not tool_names:
         raise JiraDashboardError("Connected to Jira MCP, but no tools were exposed.")
 
     def invoke(tool_name: str, arguments: dict) -> dict:
-        return invoke_mcp_tool(JIRA_MCP_NAME, tool_name, arguments)
+        return invoke_mcp_tool(_active_jira_mcp_name(), tool_name, arguments)
 
     return _fetch_issue_attachments_from_tools(tool_names, invoke, safe_key)
 
@@ -1303,14 +1319,14 @@ def fetch_jira_dashboard(
     if force_sample:
         return _sample_dashboard()
 
-    cfg = _get_mcp_servers().get(JIRA_MCP_NAME)
+    cfg = _get_mcp_servers().get(_active_jira_mcp_name())
     if not cfg:
         return _sample_dashboard()
 
     if reconnect:
         from tools.mcp_tool import reconnect_mcp_server
 
-        reconnect_mcp_server(JIRA_MCP_NAME, cfg)
+        reconnect_mcp_server(_active_jira_mcp_name(), cfg)
 
     from tools.mcp_tool import invoke_mcp_tool, list_connected_mcp_raw_tool_names
 
@@ -1330,7 +1346,7 @@ def fetch_jira_dashboard(
             )
         return sample
 
-    tool_names = list_connected_mcp_raw_tool_names(JIRA_MCP_NAME)
+    tool_names = list_connected_mcp_raw_tool_names(_active_jira_mcp_name())
     if not tool_names:
         sample = _sample_dashboard()
         sample["connection"]["status"] = "error"
@@ -1338,7 +1354,7 @@ def fetch_jira_dashboard(
         return sample
 
     def invoke(tool_name: str, arguments: dict) -> dict:
-        return invoke_mcp_tool(JIRA_MCP_NAME, tool_name, arguments)
+        return invoke_mcp_tool(_active_jira_mcp_name(), tool_name, arguments)
 
     try:
         projects = _fetch_projects(tool_names, invoke)

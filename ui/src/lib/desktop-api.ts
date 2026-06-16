@@ -21,6 +21,8 @@ function rewrite(path: string): string {
     .replace(/^\/api\/delivery\//, '/api/plugins/livingcolor/delivery/')
     .replace(/^\/api\/jira\//, '/api/plugins/livingcolor/jira/')
     .replace(/^\/api\/firebase\//, '/api/plugins/livingcolor/firebase/')
+    .replace(/^\/api\/mcp\/servers\//, '/api/plugins/livingcolor/mcp/servers/')
+    .replace(/^\/api\/mcp\/integrations\//, '/api/plugins/livingcolor/mcp/integrations/')
 }
 
 function buildHeaders(init: RequestInit): Headers {

@@ -7,6 +7,7 @@ import {
   readJiraSavedCredentials,
   type JiraEnvCredentials
 } from '@/lib/jira-mcp'
+import { readMcpServers, resolveJiraMcpServer } from '@/lib/mcp-server-resolver'
 
 export type GatewayRequester = <T>(method: string, params?: Record<string, unknown>) => Promise<T>
 
@@ -76,12 +77,20 @@ function isUnavailableRoute(error: unknown): boolean {
   )
 }
 
-async function persistJiraMcpConfig(serverConfig: Record<string, unknown>): Promise<void> {
-  const response = await saveMcpServerConfig(JIRA_MCP_PRESET_NAME, serverConfig)
+async function resolveJiraMcpServerName(): Promise<string> {
+  const config = await getLivingColorConfigRecord()
+  return resolveJiraMcpServer(readMcpServers(config))?.name ?? JIRA_MCP_PRESET_NAME
+}
+
+async function persistJiraMcpConfig(serverConfig: Record<string, unknown>): Promise<string> {
+  const serverName = await resolveJiraMcpServerName()
+  const response = await saveMcpServerConfig(serverName, serverConfig)
 
   if (!response?.ok) {
     throw new Error('Could not save Jira MCP credentials to config.yaml')
   }
+
+  return response.name ?? serverName
 }
 
 function finalizeConnectResponse(result: JiraConnectResponse, saved = false): JiraConnectResponse {
@@ -220,12 +229,10 @@ export async function getJiraSavedCredentials(): Promise<{
   usesEnvAuth: boolean
 }> {
   const config = await getLivingColorConfigRecord()
-  const currentServers =
-    config.mcp_servers && typeof config.mcp_servers === 'object' && !Array.isArray(config.mcp_servers)
-      ? (config.mcp_servers as Record<string, Record<string, unknown>>)
-      : {}
+  const servers = readMcpServers(config)
+  const resolved = resolveJiraMcpServer(servers)
 
-  return readJiraSavedCredentials(currentServers[JIRA_MCP_PRESET_NAME])
+  return readJiraSavedCredentials(resolved?.config ?? servers[JIRA_MCP_PRESET_NAME])
 }
 
 export async function resolveJiraBaseUrl(): Promise<string | null> {
@@ -235,7 +242,8 @@ export async function resolveJiraBaseUrl(): Promise<string | null> {
   }
 
   try {
-    const status = await fetchJiraMcpStatus()
+    const serverName = await resolveJiraMcpServerName()
+    const status = await fetchJiraMcpStatus(serverName)
     if (status.jiraUrl) {
       return status.jiraUrl
     }

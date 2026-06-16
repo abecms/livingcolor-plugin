@@ -198,7 +198,7 @@ describe('ProjectIntegrationsSection', () => {
     expect(await screen.findByText('Integrations')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Connect Jira' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Connect GitLab' })).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Open MCP settings' }).getAttribute('href')).toBe('/settings?tab=mcp')
+    expect(screen.getByRole('link', { name: 'Open MCP settings' }).getAttribute('href')).toMatch(/\/mcp$/)
   })
 
   it('shows GitHub controls when project provider is github', async () => {
@@ -328,17 +328,25 @@ describe('ProjectIntegrationsSection', () => {
     })
   })
 
-  it('detects an existing Jira MCP entry', async () => {
+  it('detects an existing Jira MCP entry under a custom Hermes name', async () => {
     vi.mocked(getLivingColorConfigRecord).mockResolvedValueOnce({
       mcp_servers: {
-        jira: { command: 'uvx', args: ['mcp-atlassian'] }
+        Atlassian: {
+          command: 'uvx',
+          args: ['mcp-atlassian'],
+          env: {
+            JIRA_URL: 'https://afp-jira.atlassian.net/',
+            JIRA_USERNAME: 'you@company.com',
+            JIRA_API_TOKEN: 'secret'
+          }
+        }
       }
     } as never)
     vi.mocked(getJiraSavedCredentials).mockResolvedValueOnce({
-      apiToken: null,
+      apiToken: 'secret',
       jiraUrl: 'https://afp-jira.atlassian.net/',
       username: 'you@company.com',
-      usesEnvAuth: false
+      usesEnvAuth: true
     })
 
     renderSection()
@@ -349,14 +357,21 @@ describe('ProjectIntegrationsSection', () => {
     expect(screen.getByRole('button', { name: 'Update Jira credentials' })).toBeTruthy()
   })
 
-  it('detects an existing GitLab MCP entry', async () => {
+  it('detects an existing GitLab MCP entry under a custom Hermes name', async () => {
     vi.mocked(getLivingColorConfigRecord).mockResolvedValueOnce({
       mcp_servers: {
-        gitlab: { command: 'npx', args: ['@modelcontextprotocol/server-gitlab'] }
+        'gitlab-tv5': {
+          command: 'npx',
+          args: ['-y', '@modelcontextprotocol/server-gitlab'],
+          env: {
+            GITLAB_API_URL: 'https://gitlab.example.com/api/v4/',
+            GITLAB_PERSONAL_ACCESS_TOKEN: 'secret'
+          }
+        }
       }
     } as never)
     vi.mocked(getGitLabSavedCredentials).mockResolvedValueOnce({
-      apiToken: null,
+      apiToken: 'secret',
       gitlabUrl: 'https://gitlab.example.com',
       usesEnvAuth: true
     })

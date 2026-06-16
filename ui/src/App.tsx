@@ -8,6 +8,7 @@ import {
   ProjectWorkspaceLayout
 } from './app/delivery'
 import { ProjectDeliveryDashboardView } from './app/delivery/project-dashboard'
+import { LegacySettingsRedirect } from './app/delivery/legacy-settings-redirect'
 import { DASHBOARD_ROUTE, DELIVERY_ROUTE } from './app/routes'
 import { FirebaseAuthGate } from '@/components/firebase-auth-gate'
 import { OfflineBanner } from '@/components/offline-banner'
@@ -31,6 +32,7 @@ function DeliveryApp() {
             <Route element={<ProjectSettingsView />} path="settings" />
             <Route element={<ProjectIntegrationsView />} path="integrations" />
           </Route>
+          <Route element={<LegacySettingsRedirect />} path="settings" />
           <Route element={<Navigate replace to="/" />} path="*" />
         </Routes>
         </BrowserRouter>

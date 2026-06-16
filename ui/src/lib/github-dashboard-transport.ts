@@ -12,6 +12,7 @@ import {
   readGitHubSavedCredentials,
   type GitHubEnvCredentials
 } from '@/lib/github-mcp'
+import { readMcpServers, resolveGithubMcpServer } from '@/lib/mcp-server-resolver'
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
@@ -21,12 +22,20 @@ function isMethodNotAllowed(error: unknown): boolean {
   return errorMessage(error).toLowerCase().includes('405')
 }
 
-async function persistGitHubMcpConfig(serverConfig: Record<string, unknown>): Promise<void> {
-  const response = await saveMcpServerConfig(GITHUB_MCP_PRESET_NAME, serverConfig)
+async function resolveGithubMcpServerName(): Promise<string> {
+  const config = await getLivingColorConfigRecord()
+  return resolveGithubMcpServer(readMcpServers(config))?.name ?? GITHUB_MCP_PRESET_NAME
+}
+
+async function persistGitHubMcpConfig(serverConfig: Record<string, unknown>): Promise<string> {
+  const serverName = await resolveGithubMcpServerName()
+  const response = await saveMcpServerConfig(serverName, serverConfig)
 
   if (!response?.ok) {
     throw new Error('Could not save GitHub MCP credentials to config.yaml')
   }
+
+  return response.name ?? serverName
 }
 
 function finalizeConnectResponse(result: GitHubConnectResponse, saved = false): GitHubConnectResponse {
@@ -47,8 +56,8 @@ function finalizeConnectResponse(result: GitHubConnectResponse, saved = false): 
   }
 }
 
-async function connectGithubViaMcpTestFallback(): Promise<GitHubConnectResponse> {
-  const result = await testMcpServer(GITHUB_MCP_PRESET_NAME)
+async function connectGithubViaMcpTestFallback(serverName: string): Promise<GitHubConnectResponse> {
+  const result = await testMcpServer(serverName)
   const connected = Boolean(result.ok)
   return {
     authenticated: connected,
@@ -64,16 +73,16 @@ async function connectGithubViaMcpTestFallback(): Promise<GitHubConnectResponse>
 export async function connectGithubViaCredentials(credentials: GitHubEnvCredentials): Promise<GitHubConnectResponse> {
   const serverConfig = buildGitHubMcpConfig(credentials)
 
-  await persistGitHubMcpConfig(serverConfig)
+  const serverName = await persistGitHubMcpConfig(serverConfig)
 
   try {
-    const result = await connectGithubMcp()
+    const result = await connectGithubMcp(serverName)
     return finalizeConnectResponse(result, true)
   } catch (error) {
     if (!isMethodNotAllowed(error)) {
       throw error
     }
-    const fallback = await connectGithubViaMcpTestFallback()
+    const fallback = await connectGithubViaMcpTestFallback(serverName)
     return finalizeConnectResponse(fallback, true)
   }
 }
@@ -83,12 +92,10 @@ export async function getGitHubSavedCredentials(): Promise<{
   usesEnvAuth: boolean
 }> {
   const config = await getLivingColorConfigRecord()
-  const currentServers =
-    config.mcp_servers && typeof config.mcp_servers === 'object' && !Array.isArray(config.mcp_servers)
-      ? (config.mcp_servers as Record<string, Record<string, unknown>>)
-      : {}
+  const servers = readMcpServers(config)
+  const resolved = resolveGithubMcpServer(servers)
 
-  return readGitHubSavedCredentials(currentServers[GITHUB_MCP_PRESET_NAME])
+  return readGitHubSavedCredentials(resolved?.config ?? servers[GITHUB_MCP_PRESET_NAME])
 }
 
 export { fetchGithubStatus }

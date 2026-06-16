@@ -348,6 +348,26 @@ def load_project_mcp_servers(project_key: str) -> dict[str, dict[str, Any]]:
     return out
 
 
+def _resolve_global_mcp_server_name(server_name: str, servers: dict[str, Any]) -> str:
+    canonical = str(server_name or "").strip().lower()
+    try:
+        from lc_server.integrations.mcp_server_resolver import (
+            active_github_mcp_name,
+            active_gitlab_mcp_name,
+            active_jira_mcp_name,
+        )
+    except ImportError:
+        return str(server_name or "").strip()
+
+    if canonical == "jira":
+        return active_jira_mcp_name(servers)
+    if canonical == "gitlab":
+        return active_gitlab_mcp_name(servers)
+    if canonical == "github":
+        return active_github_mcp_name(servers)
+    return str(server_name or "").strip()
+
+
 def resolve_project_mcp_server(project_key: str, server_name: str) -> dict[str, Any]:
     """Return MCP config saved on the project, falling back to global Hermes config."""
     stored = load_project_mcp_servers(project_key).get(server_name)
@@ -357,7 +377,9 @@ def resolve_project_mcp_server(project_key: str, server_name: str) -> dict[str, 
     try:
         from hermes_cli.mcp_config import _get_mcp_servers
 
-        global_cfg = _get_mcp_servers().get(server_name)
+        servers = _get_mcp_servers()
+        resolved_name = _resolve_global_mcp_server_name(server_name, servers)
+        global_cfg = servers.get(resolved_name)
         if isinstance(global_cfg, dict) and global_cfg:
             return dict(global_cfg)
     except ImportError:
@@ -370,6 +392,16 @@ def resolve_jira_browse_base_url(project_key: str) -> str | None:
     """Return the Jira site URL saved for a project, if any."""
     servers = load_project_mcp_servers(project_key)
     jira_cfg = servers.get("jira")
+    if not isinstance(jira_cfg, dict):
+        try:
+            from hermes_cli.mcp_config import _get_mcp_servers
+            from lc_server.integrations.mcp_server_resolver import active_jira_mcp_name
+
+            global_servers = _get_mcp_servers()
+            jira_cfg = global_servers.get(active_jira_mcp_name(global_servers))
+        except ImportError:
+            jira_cfg = None
+
     if not isinstance(jira_cfg, dict):
         return None
 

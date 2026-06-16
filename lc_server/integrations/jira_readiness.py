@@ -14,8 +14,8 @@ _READINESS_COMMENT_LIMIT = 50
 
 def list_jira_projects_for_readiness(project_key: str) -> list[dict[str, str]]:
     """List Jira projects visible to the configured MCP server."""
+    from lc_server.integrations.mcp_server_resolver import active_jira_mcp_name
     from hermes_cli.jira_dashboard import (
-        JIRA_MCP_NAME,
         JiraDashboardError,
         _fetch_projects,
         ensure_jira_mcp_connected,
@@ -23,16 +23,17 @@ def list_jira_projects_for_readiness(project_key: str) -> list[dict[str, str]]:
     from hermes_cli.mcp_config import _get_mcp_servers
     from tools.mcp_tool import invoke_mcp_tool, list_connected_mcp_raw_tool_names
 
-    _get_mcp_servers().get(JIRA_MCP_NAME)
+    jira_name = active_jira_mcp_name()
+    _get_mcp_servers().get(jira_name)
     try:
         ensure_jira_mcp_connected()
     except JiraDashboardError as exc:
         raise ReadinessIntegrationError(str(exc)) from exc
 
-    tool_names = list_connected_mcp_raw_tool_names(JIRA_MCP_NAME)
+    tool_names = list_connected_mcp_raw_tool_names(jira_name)
 
     def invoke(tool_name: str, arguments: dict) -> dict:
-        return invoke_mcp_tool(JIRA_MCP_NAME, tool_name, arguments)
+        return invoke_mcp_tool(jira_name, tool_name, arguments)
 
     try:
         projects = _fetch_projects(tool_names, invoke)
@@ -58,8 +59,8 @@ def fetch_issues_for_readiness(project_key: str, *, max_results: int = 100) -> l
     livingcolor_project_key = str(project_key or "").strip().upper()
     jira_project_key = resolve_jira_project_key(livingcolor_project_key)
     ticket_scope = load_ticket_scope_for_project(livingcolor_project_key)
+    from lc_server.integrations.mcp_server_resolver import active_jira_mcp_name
     from hermes_cli.jira_dashboard import (
-        JIRA_MCP_NAME,
         JiraDashboardError,
         _ensure_cloud_id,
         _fetch_projects,
@@ -78,11 +79,12 @@ def fetch_issues_for_readiness(project_key: str, *, max_results: int = 100) -> l
     except JiraDashboardError as exc:
         raise ReadinessIntegrationError(str(exc)) from exc
 
-    cfg = _get_mcp_servers().get(JIRA_MCP_NAME)
-    tool_names = list_connected_mcp_raw_tool_names(JIRA_MCP_NAME)
+    jira_name = active_jira_mcp_name()
+    cfg = _get_mcp_servers().get(jira_name)
+    tool_names = list_connected_mcp_raw_tool_names(jira_name)
 
     def invoke(tool_name: str, arguments: dict) -> dict:
-        return invoke_mcp_tool(JIRA_MCP_NAME, tool_name, arguments)
+        return invoke_mcp_tool(jira_name, tool_name, arguments)
 
     try:
         projects = _fetch_projects(tool_names, invoke)
@@ -115,8 +117,8 @@ def fetch_issues_for_readiness(project_key: str, *, max_results: int = 100) -> l
 
 def fetch_issue_snapshot_for_readiness(jira_key: str) -> dict[str, Any]:
     """Fetch a single Jira issue with comments for readiness re-analysis."""
+    from lc_server.integrations.mcp_server_resolver import active_jira_mcp_name
     from hermes_cli.jira_dashboard import (
-        JIRA_MCP_NAME,
         JiraDashboardError,
         _extract_single_issue,
         _find_issue_detail_tool,
@@ -137,11 +139,12 @@ def fetch_issue_snapshot_for_readiness(jira_key: str) -> dict[str, Any]:
     except JiraDashboardError as exc:
         raise ReadinessIntegrationError(str(exc)) from exc
 
-    _get_mcp_servers().get(JIRA_MCP_NAME)
-    tool_names = list_connected_mcp_raw_tool_names(JIRA_MCP_NAME)
+    jira_name = active_jira_mcp_name()
+    _get_mcp_servers().get(jira_name)
+    tool_names = list_connected_mcp_raw_tool_names(jira_name)
 
     def invoke(tool_name: str, arguments: dict) -> dict:
-        return invoke_mcp_tool(JIRA_MCP_NAME, tool_name, arguments)
+        return invoke_mcp_tool(jira_name, tool_name, arguments)
 
     detail_tool = _find_issue_detail_tool(tool_names)
     if not detail_tool:

@@ -41,32 +41,43 @@ export function connectJiraMcp(): Promise<JiraConnectResponse> {
   })
 }
 
-export function connectGitlabMcp(): Promise<GitLabConnectResponse> {
+export function connectGitlabMcp(serverName = 'gitlab'): Promise<GitLabConnectResponse> {
   return callDesktopApi<GitLabConnectResponse>({
-    path: `/api/mcp/servers/${encodeURIComponent('gitlab')}/connect`,
+    path: `/api/mcp/servers/${encodeURIComponent(serverName)}/connect`,
     method: 'POST',
     timeoutMs: JIRA_CONNECT_TIMEOUT_MS
   })
 }
 
-export function fetchGitlabStatus(): Promise<GitLabConnectionStatus> {
+export function fetchGitlabStatus(serverName = 'gitlab'): Promise<GitLabConnectionStatus> {
   return callDesktopApi<GitLabConnectionStatus>({
-    path: `/api/mcp/servers/${encodeURIComponent('gitlab')}/status`,
+    path: `/api/mcp/servers/${encodeURIComponent(serverName)}/status`,
     timeoutMs: JIRA_DASHBOARD_TIMEOUT_MS
   })
 }
 
-export function connectGithubMcp(): Promise<GitHubConnectResponse> {
+export function connectGithubMcp(serverName = 'github'): Promise<GitHubConnectResponse> {
   return callDesktopApi<GitHubConnectResponse>({
-    path: `/api/mcp/servers/${encodeURIComponent('github')}/connect`,
+    path: `/api/mcp/servers/${encodeURIComponent(serverName)}/connect`,
     method: 'POST',
     timeoutMs: JIRA_CONNECT_TIMEOUT_MS
   })
 }
 
-export function fetchGithubStatus(): Promise<GitHubConnectionStatus> {
+export function fetchGithubStatus(serverName = 'github'): Promise<GitHubConnectionStatus> {
   return callDesktopApi<GitHubConnectionStatus>({
-    path: `/api/mcp/servers/${encodeURIComponent('github')}/status`,
+    path: `/api/mcp/servers/${encodeURIComponent(serverName)}/status`,
+    timeoutMs: JIRA_DASHBOARD_TIMEOUT_MS
+  })
+}
+
+export function fetchIntegrationsMcpStatus(): Promise<{
+  jira: import('@/lib/jira-dashboard').JiraConnectionStatus & { configured?: boolean; serverName?: string | null }
+  gitlab: GitLabConnectionStatus & { configured?: boolean; serverName?: string | null }
+  github: GitHubConnectionStatus & { configured?: boolean; serverName?: string | null }
+}> {
+  return callDesktopApi({
+    path: '/api/mcp/integrations/status',
     timeoutMs: JIRA_DASHBOARD_TIMEOUT_MS
   })
 }
@@ -103,9 +114,9 @@ export function testMcpServer(name: string): Promise<{ ok: boolean; error?: stri
   })
 }
 
-export function fetchJiraMcpStatus(): Promise<import('@/lib/jira-dashboard').JiraConnectionStatus> {
+export function fetchJiraMcpStatus(serverName = 'jira'): Promise<import('@/lib/jira-dashboard').JiraConnectionStatus> {
   return callDesktopApi({
-    path: `/api/mcp/servers/${encodeURIComponent('jira')}/status`,
+    path: `/api/mcp/servers/${encodeURIComponent(serverName)}/status`,
     timeoutMs: JIRA_DASHBOARD_TIMEOUT_MS
   })
 }

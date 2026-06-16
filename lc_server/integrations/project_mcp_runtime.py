@@ -9,6 +9,7 @@ from delivery_runtime.readiness.project_settings import (
     load_project_mcp_servers,
     persist_project_mcp_server,
 )
+from lc_server.integrations.mcp_connect import preferred_integration_server_name
 
 logger = logging.getLogger(__name__)
 
@@ -16,27 +17,27 @@ _PROJECT_SCOPED_SERVERS = frozenset({"jira", "gitlab"})
 
 
 def apply_project_mcp_runtime(project_key: str | None) -> None:
-    """Swap active jira/gitlab MCP entries to the requested project's saved config."""
+    """Merge per-project jira/gitlab MCP overrides into the active global servers."""
     key = (project_key or "").strip().upper()
     if not key:
         return
 
     try:
-        from hermes_cli.mcp_config import _get_mcp_servers, _remove_mcp_server, _save_mcp_server
+        from hermes_cli.mcp_config import _get_mcp_servers, _save_mcp_server
     except ImportError:
         return
 
     stored = load_project_mcp_servers(key)
     current = _get_mcp_servers()
 
-    for server_name in _PROJECT_SCOPED_SERVERS:
-        project_cfg = stored.get(server_name)
-        if isinstance(project_cfg, dict) and project_cfg:
-            merged = {**(current.get(server_name) or {}), **project_cfg}
-            _save_mcp_server(server_name, merged)
+    for canonical in _PROJECT_SCOPED_SERVERS:
+        project_cfg = stored.get(canonical)
+        if not isinstance(project_cfg, dict) or not project_cfg:
             continue
-        if server_name in current:
-            _remove_mcp_server(server_name)
+
+        target_name = preferred_integration_server_name(canonical, current)
+        merged = {**(current.get(target_name) or {}), **project_cfg}
+        _save_mcp_server(target_name, merged)
 
 
 def persist_project_mcp_runtime(project_key: str | None, server_name: str, server_config: dict[str, Any]) -> None:
@@ -64,11 +65,21 @@ def install_project_mcp_hooks() -> None:
 
     def _save_with_project_scope(name: str, server_config: dict[str, Any]) -> None:
         from lc_server.context import get_project_context
+        from lc_server.integrations.mcp_server_resolver import is_gitlab_mcp_server, is_jira_mcp_server
 
         ctx = get_project_context()
         project_key = ctx.normalized_project_key() if ctx is not None else ""
-        if project_key and name in _PROJECT_SCOPED_SERVERS:
-            persist_project_mcp_server(project_key, name, server_config)
+        if project_key:
+            cfg = server_config if isinstance(server_config, dict) else {}
+            canonical: str | None = None
+            if name in _PROJECT_SCOPED_SERVERS:
+                canonical = name
+            elif is_jira_mcp_server(name, cfg):
+                canonical = "jira"
+            elif is_gitlab_mcp_server(name, cfg):
+                canonical = "gitlab"
+            if canonical:
+                persist_project_mcp_server(project_key, canonical, server_config)
         original_save(name, server_config)
 
     mcp_config._save_mcp_server = _save_with_project_scope
