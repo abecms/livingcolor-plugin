@@ -73,6 +73,21 @@ class SlowBackend:
         return _analysis(snapshot)
 
 
+class SnapshotlessBackend:
+    name = "snapshotless"
+
+    async def analyze_ticket(self, snapshot: dict[str, Any], *, project_key: str, run_id: str) -> dict[str, Any]:
+        return {
+            "readinessScore": 82,
+            "readinessStatus": "ready",
+            "analysisSummary": f"{snapshot['key']} is ready.",
+            "blockers": [],
+            "recommendedRepos": ["tv5monde/tv5mondeplus-front"],
+            "confidence": 0.82,
+            "estimatedDays": 1.0,
+        }
+
+
 @pytest.mark.asyncio
 async def test_dispatcher_limits_concurrency_to_three():
     backend = RecordingBackend()
@@ -194,6 +209,7 @@ async def test_dispatcher_skips_snapshot_without_jira_key():
     assert result.summary.skipped == 1
     assert result.summary.success == 0
     assert result.outcomes[0].status == "skipped"
+    assert result.outcomes[0].analysis_input_hash == build_analysis_input_hash(snapshot, project_key="TVP")
     assert backend.calls == []
 
 
@@ -243,3 +259,49 @@ def test_analysis_input_hash_normalizes_project_key_and_uses_fallback_fields():
     assert normalized == upper
     assert changed_title != normalized
     assert changed_issue_type != normalized
+
+
+def test_analysis_input_hash_treats_none_list_fields_as_empty_lists():
+    missing_lists = {
+        "key": "TVP-1",
+        "summary": "Ticket TVP-1",
+        "description": "Acceptance criteria: render the page.",
+        "issueType": "Task",
+        "status": "To Do",
+        "statusCategory": "To Do",
+    }
+    none_lists = {
+        **missing_lists,
+        "labels": None,
+        "comments": None,
+        "attachments": None,
+        "attachmentExtracts": None,
+    }
+    empty_lists = {
+        **missing_lists,
+        "labels": [],
+        "comments": [],
+        "attachments": [],
+        "attachmentExtracts": [],
+    }
+
+    assert build_analysis_input_hash(none_lists, project_key="TVP") == build_analysis_input_hash(
+        missing_lists,
+        project_key="TVP",
+    )
+    assert build_analysis_input_hash(empty_lists, project_key="TVP") == build_analysis_input_hash(
+        missing_lists,
+        project_key="TVP",
+    )
+
+
+@pytest.mark.asyncio
+async def test_dispatcher_adds_missing_jira_snapshot_to_successful_analysis():
+    snapshot = _snapshot("TVP-1")
+    dispatcher = ReadinessAnalysisDispatcher(backend=SnapshotlessBackend(), concurrency=3)
+
+    result = await dispatcher.analyze_many([snapshot], project_key="TVP", run_id="DA-1", force=True)
+
+    assert result.summary.success == 1
+    assert result.outcomes[0].analysis is not None
+    assert result.outcomes[0].analysis["jiraSnapshot"] == snapshot

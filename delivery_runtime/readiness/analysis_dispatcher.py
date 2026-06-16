@@ -90,12 +90,12 @@ def build_analysis_input_hash(snapshot: dict[str, Any], *, project_key: str) -> 
         "issueType": snapshot.get("issueType") or snapshot.get("issue_type"),
         "status": snapshot.get("status"),
         "statusCategory": snapshot.get("statusCategory"),
-        "labels": snapshot.get("labels", []),
+        "labels": snapshot.get("labels") or [],
         "assignee": snapshot.get("assignee") or snapshot.get("assigneeDisplayName"),
         "assigneeEmail": snapshot.get("assigneeEmail"),
-        "comments": snapshot.get("comments", []),
-        "attachments": snapshot.get("attachments", []),
-        "attachmentExtracts": snapshot.get("attachmentExtracts", []),
+        "comments": snapshot.get("comments") or [],
+        "attachments": snapshot.get("attachments") or [],
+        "attachmentExtracts": snapshot.get("attachmentExtracts") or [],
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
@@ -159,17 +159,16 @@ class ReadinessAnalysisDispatcher:
     ) -> AnalysisOutcome:
         started_at = time.perf_counter()
         jira_key = str(snapshot.get("key") or "").strip()
+        analysis_input_hash = build_analysis_input_hash(snapshot, project_key=project_key)
         if not jira_key:
             return AnalysisOutcome(
                 jira_key="",
                 status="skipped",
-                analysis_input_hash="",
+                analysis_input_hash=analysis_input_hash,
                 duration_ms=_elapsed_ms(started_at),
                 error="Missing Jira key",
                 backend=self._backend.name,
             )
-
-        analysis_input_hash = build_analysis_input_hash(snapshot, project_key=project_key)
 
         if not force:
             cache_entry = await self._lookup_cache(jira_key)
@@ -204,6 +203,7 @@ class ReadinessAnalysisDispatcher:
                 backend=self._backend.name,
             )
 
+        analysis.setdefault("jiraSnapshot", snapshot)
         return AnalysisOutcome(
             jira_key=jira_key,
             status="success",
