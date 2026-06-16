@@ -15,6 +15,7 @@ from delivery_runtime.pm_inbox.service import PmInboxService
 from delivery_runtime.readiness.scanner import ReadinessScanner
 from delivery_runtime.readiness.service import ReadinessService
 from delivery_runtime.work_orders.service import WorkOrderService
+from lc_server.agent_bridge.hermes_analyst_subagent import HermesSubagentAnalystBackend
 from lc_server.agent_bridge.hermes_runtime import get_agent_runtime_bridge
 from lc_server.integrations.jira_estimate_invoker import McpJiraEstimateInvoker
 from lc_server.integrations.jira_readiness import (
@@ -51,7 +52,7 @@ def build_delivery_services() -> DeliveryServices:
     scanner = ReadinessScanner(
         events,
         issue_fetcher=fetch_issues_for_readiness,
-        analysis_runner=_analysis_runner,
+        analysis_backend=HermesSubagentAnalystBackend(),
     )
     work_orders = WorkOrderService(events)
     readiness = ReadinessService(
