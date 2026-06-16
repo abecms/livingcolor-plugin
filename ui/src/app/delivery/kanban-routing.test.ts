@@ -244,4 +244,75 @@ describe('buildKanbanColumns', () => {
     expect(columns.find(column => column.id === 'sprint')!.cards).toHaveLength(0)
     expect(columns.find(column => column.id === 'dev')!.cards).toHaveLength(1)
   })
+
+  it('places sprint tickets marked in development into the dev column when inbox activeDevelopments is empty', () => {
+    const inbox = makeInbox()
+    inbox.selectedSprint.tickets = [
+      {
+        readinessId: 'R-3',
+        jiraKey: 'TVP-2138',
+        title: 'Device rail assets',
+        estimatedDays: 1.1,
+        priorityRank: 0,
+        urgencyScore: 6,
+        warnings: [],
+        workOrderId: 'WO-9',
+        inDevelopment: true,
+        currentStage: 'development'
+      }
+    ]
+
+    const columns = buildKanbanColumns(inbox, [])
+    expect(columns.find(column => column.id === 'sprint')!.cards).toHaveLength(0)
+    expect(columns.find(column => column.id === 'dev')!.cards[0]).toMatchObject({
+      jiraKey: 'TVP-2138',
+      workOrderId: 'WO-9'
+    })
+  })
+
+  it('shows needs_clarification sprint tickets with a Clarify CTA', () => {
+    const inbox = makeInbox()
+    inbox.selectedSprint.tickets = [
+      {
+        readinessId: 'R-4',
+        jiraKey: 'TVP-2258',
+        title: 'Airship encoding',
+        estimatedDays: 0.5,
+        priorityRank: 2,
+        urgencyScore: 0,
+        warnings: ['Needs clarification before development'],
+        readinessStatus: 'needs_clarification'
+      }
+    ]
+
+    const columns = buildKanbanColumns(inbox, [])
+    expect(columns.find(column => column.id === 'sprint')!.cards[0]).toMatchObject({
+      jiraKey: 'TVP-2258',
+      ctaLabel: 'Clarify',
+      estimatedDays: 0.5
+    })
+  })
+
+  it('shows analysis_failed sprint tickets without an approve CTA', () => {
+    const inbox = makeInbox()
+    inbox.selectedSprint.tickets = [
+      {
+        readinessId: 'R-failed',
+        jiraKey: 'TVP-999',
+        title: 'Analysis failed',
+        estimatedDays: 0,
+        priorityRank: 2,
+        urgencyScore: 0,
+        warnings: ['Latest LLM analysis failed; review the error before promotion'],
+        readinessStatus: 'analysis_failed'
+      }
+    ]
+
+    const columns = buildKanbanColumns(inbox, [])
+    const card = columns.find(column => column.id === 'sprint')!.cards[0]
+
+    expect(card.jiraKey).toBe('TVP-999')
+    expect(card.ctaLabel).toBeUndefined()
+    expect(card.readinessStatus).toBe('analysis_failed')
+  })
 })

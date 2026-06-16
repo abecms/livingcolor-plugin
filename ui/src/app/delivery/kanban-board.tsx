@@ -25,15 +25,19 @@ export function KanbanBoard({
   className,
   columns,
   onApproveTicket,
+  onClarifyTicket,
   onOpenCard,
   onReviewGate,
+  promotingReadinessId = null,
   vcsProvider
 }: {
   className?: string
   columns: KanbanColumn[]
   onApproveTicket: (readinessId: string, jiraKey: string) => void
+  onClarifyTicket?: () => void
   onOpenCard: (workOrderId: string) => void
   onReviewGate: (input: { workOrderId: string; gateId: string; gateType: string }) => void
+  promotingReadinessId?: string | null
   vcsProvider?: ReviewRequestProvider
 }) {
   return (
@@ -67,8 +71,10 @@ export function KanbanBoard({
                   isGate={Boolean(card.gateId)}
                   key={card.id}
                   onApproveTicket={onApproveTicket}
+                  onClarifyTicket={onClarifyTicket}
                   onOpenCard={onOpenCard}
                   onReviewGate={onReviewGate}
+                  promotingReadinessId={promotingReadinessId}
                   vcsProvider={vcsProvider}
                 />
               ))
@@ -85,38 +91,55 @@ function KanbanCardView({
   isDone,
   isGate,
   onApproveTicket,
+  onClarifyTicket,
   onOpenCard,
   onReviewGate,
+  promotingReadinessId,
   vcsProvider
 }: {
   card: KanbanCard
   isDone: boolean
   isGate: boolean
   onApproveTicket: (readinessId: string, jiraKey: string) => void
+  onClarifyTicket?: () => void
   onOpenCard: (workOrderId: string) => void
   onReviewGate: (input: { workOrderId: string; gateId: string; gateType: string }) => void
+  promotingReadinessId: string | null
   vcsProvider?: ReviewRequestProvider
 }) {
-  const clickable = Boolean(card.workOrderId)
+  const openableWorkOrderId = card.workOrderId?.trim() || null
   const ctaProps = dashboardPrimaryButtonProps()
+  const isPromoting = Boolean(card.readinessId && promotingReadinessId === card.readinessId)
 
-  const handleCardClick = () => {
-    if (card.workOrderId) {
-      onOpenCard(card.workOrderId)
+  const openWorkOrder = () => {
+    if (openableWorkOrderId) {
+      onOpenCard(openableWorkOrderId)
     }
+  }
+
+  const handleCardClick = (event: MouseEvent<HTMLDivElement>) => {
+    if ((event.target as HTMLElement).closest('a, button')) {
+      return
+    }
+    openWorkOrder()
   }
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
-      handleCardClick()
+      openWorkOrder()
     }
   }
 
-  const handleCta = (event: MouseEvent) => {
+  const handleCta = (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault()
     event.stopPropagation()
-    if (isGate && card.gateId && card.workOrderId) {
-      onReviewGate({ workOrderId: card.workOrderId, gateId: card.gateId, gateType: card.gateType ?? 'unknown' })
+    if (isGate && card.gateId && openableWorkOrderId) {
+      onReviewGate({ workOrderId: openableWorkOrderId, gateId: card.gateId, gateType: card.gateType ?? 'unknown' })
+      return
+    }
+    if (card.ctaLabel === 'Clarify') {
+      onClarifyTicket?.()
       return
     }
     if (card.readinessId) {
@@ -130,20 +153,16 @@ function KanbanCardView({
         'w-full rounded-xl border bg-card p-4 transition-colors',
         isGate ? 'border-ring/50' : 'border-border',
         isDone ? 'opacity-55' : null,
-        clickable ? 'cursor-pointer hover:border-ring/40' : null
+        openableWorkOrderId ? 'cursor-pointer hover:border-ring/40' : null
       )}
-      onClick={handleCardClick}
-      onKeyDown={clickable ? handleKeyDown : undefined}
-      role={clickable ? 'button' : undefined}
-      tabIndex={clickable ? 0 : undefined}
+      onClick={openableWorkOrderId ? handleCardClick : undefined}
+      onKeyDown={openableWorkOrderId ? handleKeyDown : undefined}
+      role={openableWorkOrderId ? 'button' : undefined}
+      tabIndex={openableWorkOrderId ? 0 : undefined}
     >
       <TicketKeyBadge>{card.jiraKey}</TicketKeyBadge>
       <div className="mt-2 text-sm font-medium leading-snug text-foreground">
-        {card.workOrderId ? (
-          card.title
-        ) : (
-          <JiraTicketTitleLink jiraKey={card.jiraKey}>{card.title}</JiraTicketTitleLink>
-        )}
+        <JiraTicketTitleLink jiraKey={card.jiraKey}>{card.title}</JiraTicketTitleLink>
         {isDone ? ' ✓' : ''}
       </div>
       <div className="mt-1.5 space-y-0.5 text-[10px] text-muted-foreground">
@@ -151,14 +170,21 @@ function KanbanCardView({
         {card.priorityRank != null ? <div>Prio #{card.priorityRank}</div> : null}
         {card.currentStage ? <div>⚙ {formatWorkOrderStage(card.currentStage, vcsProvider)}</div> : null}
       </div>
+      {card.warnings?.length ? (
+        <div className="mt-2 rounded-md border border-amber-400/40 bg-amber-400/10 px-2 py-1 text-[10px] text-amber-100">
+          {card.warnings[0]}
+        </div>
+      ) : null}
       {card.ctaLabel ? (
         <Button
           {...ctaProps}
           className={cn(ctaProps.className, 'mt-2 h-6 px-2 text-[10px]')}
+          disabled={isPromoting || (Boolean(promotingReadinessId) && Boolean(card.readinessId))}
           onClick={handleCta}
           size="sm"
+          type="button"
         >
-          {card.ctaLabel}
+          {isPromoting ? 'Approving…' : card.ctaLabel}
         </Button>
       ) : null}
     </div>

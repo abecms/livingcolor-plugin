@@ -26,6 +26,7 @@ const columns: KanbanColumn[] = [
         readinessId: 'R-1',
         estimatedDays: 0.5,
         priorityRank: 1,
+        warnings: ['Latest LLM analysis failed; review the error before promotion'],
         ctaLabel: 'Approve dev'
       }
     ]
@@ -81,6 +82,18 @@ describe('KanbanBoard', () => {
     expect(screen.getByText('Jira · 1')).toBeTruthy()
   })
 
+  it('renders the first card warning when present', () => {
+    render(
+      <KanbanBoard
+        columns={columns}
+        onApproveTicket={() => {}}
+        onOpenCard={() => {}}
+        onReviewGate={() => {}}
+      />
+    )
+    expect(screen.getByText('Latest LLM analysis failed; review the error before promotion')).toBeTruthy()
+  })
+
   it('fires onReviewGate when the gate CTA is clicked', () => {
     const onReviewGate = vi.fn()
     render(
@@ -119,11 +132,11 @@ describe('KanbanBoard', () => {
         onReviewGate={() => {}}
       />
     )
-    fireEvent.click(screen.getByText('Cache headers'))
+    fireEvent.click(screen.getByText('TVP-1510'))
     expect(onOpenCard).toHaveBeenCalledWith('WO-3')
   })
 
-  it('renders the title of sprint cards without work order as a Jira link', () => {
+  it('renders every card title as a Jira link when a browse base URL is configured', () => {
     render(
       <JiraBrowseProvider baseUrl="https://jira.example.com">
         <KanbanBoard
@@ -134,10 +147,24 @@ describe('KanbanBoard', () => {
         />
       </JiraBrowseProvider>
     )
-    const link = screen.getByText('Pagination guide TV').closest('a')
-    expect(link).toBeTruthy()
-    expect(link!.getAttribute('href')).toBe('https://jira.example.com/browse/TVP-1502')
-    expect(screen.getByText('Cache headers').closest('a')).toBeNull()
+    expect(screen.getByTitle('Open TVP-1502 in Jira')).toBeTruthy()
+    expect(screen.getByTitle('Open TVP-1510 in Jira')).toBeTruthy()
+  })
+
+  it('does not open the work order when the Jira title link is clicked', () => {
+    const onOpenCard = vi.fn()
+    render(
+      <JiraBrowseProvider baseUrl="https://jira.example.com">
+        <KanbanBoard
+          columns={columns}
+          onApproveTicket={() => {}}
+          onOpenCard={onOpenCard}
+          onReviewGate={() => {}}
+        />
+      </JiraBrowseProvider>
+    )
+    fireEvent.click(screen.getByTitle('Open TVP-1510 in Jira'))
+    expect(onOpenCard).not.toHaveBeenCalled()
   })
 
   it('opens the card with the keyboard', () => {

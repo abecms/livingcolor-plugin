@@ -19,7 +19,7 @@ export type DailyAnalysisLastRun = {
 const TIME_FMT = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' })
 const DATE_FMT = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
 const POLL_INTERVAL_MS = 2_000
-const POLL_TIMEOUT_MS = 600_000
+const POLL_TIMEOUT_MS = 5_400_000
 
 function isSameCalendarDay(left: Date, right: Date): boolean {
   return (
@@ -88,6 +88,11 @@ function sleep(ms: number): Promise<void> {
   })
 }
 
+function isAnalysisAlreadyRunningError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return /already running/i.test(message)
+}
+
 async function waitForDailyAnalysisCompletion(projectKey?: string): Promise<PmInboxPayload> {
   const deadline = Date.now() + POLL_TIMEOUT_MS
   let sawRunning = false
@@ -118,7 +123,26 @@ async function waitForDailyAnalysisCompletion(projectKey?: string): Promise<PmIn
     }
   }
 
-  throw new Error('Daily analysis timed out after 10 minutes')
+  throw new Error('Daily analysis timed out after 90 minutes')
+}
+
+async function finishDailyAnalysis(
+  projectKey: string | undefined,
+  onSuccess?: () => void | Promise<void>
+): Promise<{ status: string; projectKey?: string }> {
+  const inbox = await waitForDailyAnalysisCompletion(projectKey)
+  bumpProjectConfigRevision()
+  const lastRun = inbox.lastRun
+  const dispatch = inbox.analysisDispatch
+  const summary =
+    dispatch != null
+      ? `LLM analysis complete: ${lastRun?.jiraSynced ?? 0} in scope, ${dispatch.success} analyzed, ${dispatch.cached} cached, ${dispatch.failed} failed.`
+      : lastRun != null
+        ? `Daily analysis complete: ${lastRun.jiraSynced ?? 0} in scope, ${lastRun.analyzed ?? 0} analyzed.`
+      : 'Daily analysis complete.'
+  notify({ kind: 'success', message: summary })
+  await onSuccess?.()
+  return { status: 'completed', projectKey: inbox.projectKey }
 }
 
 export function useDailyAnalysis(onSuccess?: () => void | Promise<void>) {
@@ -128,24 +152,29 @@ export function useDailyAnalysis(onSuccess?: () => void | Promise<void>) {
     async (projectKey?: string) => {
       setRunning(true)
       try {
-        const started = await runDailyAnalysis(projectKey)
-        if (started.status !== 'started') {
-          bumpProjectConfigRevision()
-          notify({ kind: 'success', message: analysisSuccessMessage(started) })
-          await onSuccess?.()
-          return started
+        let started: Awaited<ReturnType<typeof runDailyAnalysis>>
+        try {
+          started = await runDailyAnalysis(projectKey)
+        } catch (error) {
+          if (isAnalysisAlreadyRunningError(error)) {
+            notify({
+              kind: 'info',
+              message: 'Analysis already running. Waiting for completion…'
+            })
+            return await finishDailyAnalysis(projectKey, onSuccess)
+          }
+          throw error
         }
 
-        const inbox = await waitForDailyAnalysisCompletion(projectKey)
+        if (started.status === 'started') {
+          notify({ kind: 'info', message: 'Daily analysis started…' })
+          return await finishDailyAnalysis(projectKey, onSuccess)
+        }
+
         bumpProjectConfigRevision()
-        const lastRun = inbox.lastRun
-        const summary =
-          lastRun != null
-            ? `Daily analysis complete: ${lastRun.jiraSynced ?? 0} in scope, ${lastRun.analyzed ?? 0} analyzed, ${lastRun.estimated ?? 0} estimated.`
-            : 'Daily analysis complete.'
-        notify({ kind: 'success', message: summary })
+        notify({ kind: 'success', message: analysisSuccessMessage(started) })
         await onSuccess?.()
-        return { status: 'completed', projectKey: inbox.projectKey }
+        return started
       } catch (error) {
         notifyError(error, 'Daily analysis failed')
         throw error

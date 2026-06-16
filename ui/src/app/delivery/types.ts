@@ -5,6 +5,7 @@ export type ReadinessStatus =
   | 'not_ready'
   | 'needs_clarification'
   | 'not_development'
+  | 'analysis_failed'
   | 'promoted'
   | 'dismissed'
 

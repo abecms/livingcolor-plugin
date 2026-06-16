@@ -16,6 +16,8 @@ export interface KanbanCard {
   estimatedDays?: number
   priorityRank?: number
   currentStage?: string
+  readinessStatus?: string
+  warnings?: string[]
   ctaLabel?: string
 }
 
@@ -43,6 +45,27 @@ const GATE_CTA: Record<KanbanColumnId, string> = {
   done: ''
 }
 
+function sprintCtaForTicket(ticket: {
+  readinessStatus?: string | null
+  readinessId?: string | null
+}): string | undefined {
+  const readinessId = ticket.readinessId?.trim()
+  if (!readinessId) {
+    return undefined
+  }
+  const status = (ticket.readinessStatus ?? 'ready').trim().toLowerCase()
+  if (status === 'analysis_failed') {
+    return undefined
+  }
+  if (status === 'ready') {
+    return GATE_CTA.sprint
+  }
+  if (status === 'needs_clarification' || status === 'not_ready') {
+    return 'Clarify'
+  }
+  return undefined
+}
+
 export function columnForGateType(gateType: string): KanbanColumnId {
   return GATE_COLUMN[gateType] ?? 'jira'
 }
@@ -61,6 +84,12 @@ export function buildKanbanColumns(
     done: []
   }
 
+  const sprintEstimates = new Map(
+    (inbox?.selectedSprint?.tickets ?? [])
+      .filter(ticket => ticket.estimatedDays != null)
+      .map(ticket => [ticket.jiraKey, ticket.estimatedDays] as const)
+  )
+
   const gateJiraKeys = new Set<string>()
   for (const item of inbox?.waitingForApproval ?? []) {
     if (item.kind !== 'gate' || !item.gateId || !item.workOrderId) {
@@ -78,25 +107,12 @@ export function buildKanbanColumns(
       workOrderId: item.workOrderId,
       gateId: item.gateId,
       gateType: item.gateType ?? 'unknown',
+      estimatedDays: jiraKey ? sprintEstimates.get(jiraKey) : undefined,
       ctaLabel: GATE_CTA[columnId]
     })
   }
 
   const devJiraKeys = new Set<string>()
-  for (const item of inbox?.activeDevelopments ?? []) {
-    if (gateJiraKeys.has(item.jiraKey)) {
-      continue
-    }
-    devJiraKeys.add(item.jiraKey)
-    columns.dev.push({
-      id: `dev-${item.workOrderId}`,
-      jiraKey: item.jiraKey,
-      title: item.title,
-      workOrderId: item.workOrderId,
-      currentStage: item.currentStage
-    })
-  }
-
   const sprintKeys = new Set((inbox?.selectedSprint?.tickets ?? []).map(ticket => ticket.jiraKey))
   const doneJiraKeys = new Set<string>()
   for (const workOrder of completedWorkOrders) {
@@ -113,18 +129,57 @@ export function buildKanbanColumns(
   }
 
   for (const ticket of inbox?.selectedSprint?.tickets ?? []) {
+    const jiraKey = ticket.jiraKey
+    if (!jiraKey || gateJiraKeys.has(jiraKey) || devJiraKeys.has(jiraKey) || doneJiraKeys.has(jiraKey)) {
+      continue
+    }
+    if (!(ticket.workOrderId || ticket.inDevelopment)) {
+      continue
+    }
+    devJiraKeys.add(jiraKey)
+    columns.dev.push({
+      id: `dev-${ticket.workOrderId ?? jiraKey}`,
+      jiraKey,
+      title: ticket.title,
+      workOrderId: ticket.workOrderId,
+      currentStage: ticket.currentStage,
+      estimatedDays: ticket.estimatedDays
+    })
+  }
+
+  for (const item of inbox?.activeDevelopments ?? []) {
+    if (gateJiraKeys.has(item.jiraKey)) {
+      continue
+    }
+    devJiraKeys.add(item.jiraKey)
+    columns.dev.push({
+      id: `dev-${item.workOrderId}`,
+      jiraKey: item.jiraKey,
+      title: item.title,
+      workOrderId: item.workOrderId,
+      currentStage: item.currentStage,
+      estimatedDays: sprintEstimates.get(item.jiraKey)
+    })
+  }
+
+  for (const ticket of inbox?.selectedSprint?.tickets ?? []) {
     if (gateJiraKeys.has(ticket.jiraKey) || devJiraKeys.has(ticket.jiraKey) || doneJiraKeys.has(ticket.jiraKey)) {
       continue
     }
+    if (ticket.workOrderId || ticket.inDevelopment) {
+      continue
+    }
+    const readinessId = ticket.readinessId?.trim()
     columns.sprint.push({
-      id: `sprint-${ticket.readinessId}`,
+      id: `sprint-${readinessId || ticket.jiraKey}`,
       jiraKey: ticket.jiraKey,
       title: ticket.title,
-      readinessId: ticket.readinessId,
-      workOrderId: ticket.workOrderId,
+      readinessId: readinessId || undefined,
       estimatedDays: ticket.estimatedDays,
       priorityRank: ticket.priorityRank,
-      ctaLabel: GATE_CTA.sprint
+      readinessStatus: ticket.readinessStatus,
+      warnings: ticket.warnings,
+      ctaLabel: sprintCtaForTicket(ticket)
     })
   }
 
