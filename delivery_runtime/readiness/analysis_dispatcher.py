@@ -203,6 +203,16 @@ class ReadinessAnalysisDispatcher:
                 backend=self._backend.name,
             )
 
+        if analysis.get("readinessStatus") == "analysis_failed":
+            return AnalysisOutcome(
+                jira_key=jira_key,
+                status="failed",
+                analysis_input_hash=analysis_input_hash,
+                duration_ms=_elapsed_ms(started_at),
+                error=_analysis_failure_error(analysis),
+                backend=self._backend.name,
+            )
+
         analysis.setdefault("jiraSnapshot", snapshot)
         return AnalysisOutcome(
             jira_key=jira_key,
@@ -235,3 +245,21 @@ class ReadinessAnalysisDispatcher:
 
 def _elapsed_ms(started_at: float) -> int:
     return int((time.perf_counter() - started_at) * 1000)
+
+
+def _analysis_failure_error(analysis: dict[str, Any]) -> str:
+    blockers = analysis.get("blockers")
+    if isinstance(blockers, list):
+        for blocker in blockers:
+            if isinstance(blocker, str) and blocker.strip():
+                return blocker.strip()
+            if isinstance(blocker, dict):
+                for key in ("message", "summary", "description", "error"):
+                    value = blocker.get(key)
+                    if isinstance(value, str) and value.strip():
+                        return value.strip()
+
+    summary = analysis.get("analysisSummary")
+    if isinstance(summary, str) and summary.strip():
+        return summary.strip()
+    return "LLM analysis failed before producing a valid readiness result."

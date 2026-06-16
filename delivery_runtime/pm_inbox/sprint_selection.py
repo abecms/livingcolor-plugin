@@ -11,6 +11,65 @@ from delivery_runtime.pm_inbox.sprint import PRIORITY_RANK, _priority_rank, buil
 from delivery_runtime.readiness.ticket_scope import load_ticket_scope_for_project, matches_ticket_scope
 
 _SPRINT_BACKLOG_STATUSES = ("ready", "needs_clarification", "not_ready", "analysis_failed")
+_ANALYSIS_FAILED_WARNING = "Latest LLM analysis failed; review the error before promotion"
+
+
+def _latest_analysis_error(row_or_item: Any) -> str:
+    if isinstance(row_or_item, dict):
+        value = row_or_item.get("lastAnalysisError") or row_or_item.get("last_analysis_error")
+    else:
+        value = row_or_item["last_analysis_error"]
+    return str(value or "").strip()
+
+
+def _append_latest_analysis_warning(warnings: list[str], row_or_item: Any) -> list[str]:
+    if _latest_analysis_error(row_or_item) and _ANALYSIS_FAILED_WARNING not in warnings:
+        warnings.append(_ANALYSIS_FAILED_WARNING)
+    return warnings
+
+
+def _latest_analysis_failure_metadata(project_key: str) -> dict[str, dict[str, str | None]]:
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT jira_key, last_analysis_error, last_analysis_failed_at
+            FROM readiness_records
+            WHERE project_key = ? AND readiness_status NOT IN ('promoted', 'dismissed')
+            """,
+            (project_key,),
+        ).fetchall()
+    return {
+        str(row["jira_key"]): {
+            "lastAnalysisError": row["last_analysis_error"],
+            "lastAnalysisFailedAt": row["last_analysis_failed_at"],
+        }
+        for row in rows
+    }
+
+
+def _merge_latest_analysis_failure_warnings(payload: dict[str, Any], *, project_key: str) -> dict[str, Any]:
+    failure_metadata = _latest_analysis_failure_metadata(project_key)
+    if not failure_metadata:
+        return payload
+
+    merged = dict(payload)
+    tickets: list[dict[str, Any]] = []
+    for ticket in payload.get("tickets") or []:
+        if not isinstance(ticket, dict):
+            continue
+        enriched = dict(ticket)
+        metadata = failure_metadata.get(str(enriched.get("jiraKey") or ""))
+        if metadata:
+            enriched.update(metadata)
+            warnings = list(enriched.get("warnings") or [])
+            if _latest_analysis_error(enriched):
+                _append_latest_analysis_warning(warnings, enriched)
+            elif enriched.get("readinessStatus") != "analysis_failed":
+                warnings = [warning for warning in warnings if warning != _ANALYSIS_FAILED_WARNING]
+            enriched["warnings"] = warnings
+        tickets.append(enriched)
+    merged["tickets"] = tickets
+    return merged
 
 
 def build_selected_sprint_payload(*, project_key: str, sprint_number: int | None = None) -> dict[str, Any]:
@@ -68,6 +127,8 @@ def build_selected_sprint_payload(*, project_key: str, sprint_number: int | None
                 "title": row["title"],
                 "estimatedDays": float(estimated_days),
                 "readinessStatus": str(row["readiness_status"] or ""),
+                "lastAnalysisError": row["last_analysis_error"],
+                "lastAnalysisFailedAt": row["last_analysis_failed_at"],
                 "jiraSnapshot": snapshot,
             }
         )
@@ -82,6 +143,7 @@ def build_selected_sprint_payload(*, project_key: str, sprint_number: int | None
     )
 
     selected_ready_keys = {ticket.jira_key for ticket in recommendation.tickets}
+    ready_candidates_by_id = {str(item["readinessId"]): item for item in ready_candidates}
     tickets_payload: list[dict[str, Any]] = [
         {
             "readinessId": ticket.readiness_id,
@@ -90,8 +152,13 @@ def build_selected_sprint_payload(*, project_key: str, sprint_number: int | None
             "estimatedDays": ticket.estimated_days,
             "priorityRank": ticket.priority_rank,
             "urgencyScore": ticket.urgency_score,
-            "warnings": ticket.warnings,
+            "warnings": _append_latest_analysis_warning(
+                list(ticket.warnings),
+                ready_candidates_by_id[ticket.readiness_id],
+            ),
             "readinessStatus": "ready",
+            "lastAnalysisError": ready_candidates_by_id[ticket.readiness_id].get("lastAnalysisError"),
+            "lastAnalysisFailedAt": ready_candidates_by_id[ticket.readiness_id].get("lastAnalysisFailedAt"),
         }
         for ticket in recommendation.tickets
     ]
@@ -121,7 +188,8 @@ def build_selected_sprint_payload(*, project_key: str, sprint_number: int | None
         elif status == "not_ready":
             warnings.append("Not ready for autonomous delivery")
         elif status == "analysis_failed":
-            warnings.append("Latest LLM analysis failed; review the error before promotion")
+            warnings.append(_ANALYSIS_FAILED_WARNING)
+        _append_latest_analysis_warning(warnings, item)
         tickets_payload.append(
             {
                 "readinessId": item["readinessId"],
@@ -132,6 +200,8 @@ def build_selected_sprint_payload(*, project_key: str, sprint_number: int | None
                 "urgencyScore": 0.0,
                 "warnings": warnings,
                 "readinessStatus": status,
+                "lastAnalysisError": item.get("lastAnalysisError"),
+                "lastAnalysisFailedAt": item.get("lastAnalysisFailedAt"),
             }
         )
 
@@ -275,9 +345,11 @@ def load_selected_sprint_payload(*, project_key: str) -> dict[str, Any]:
         if isinstance(recommendation, dict) and "tickets" in recommendation:
             if should_keep_empty_backlog(state):
                 return dict(recommendation)
-            return merge_active_work_orders_into_sprint(recommendation, project_key=project_key)
+            merged = merge_active_work_orders_into_sprint(recommendation, project_key=project_key)
+            return _merge_latest_analysis_failure_warnings(merged, project_key=project_key)
 
-    return merge_active_work_orders_into_sprint(
+    merged = merge_active_work_orders_into_sprint(
         build_selected_sprint_payload(project_key=project_key),
         project_key=project_key,
     )
+    return _merge_latest_analysis_failure_warnings(merged, project_key=project_key)

@@ -26,6 +26,8 @@ def _readiness_row_to_dict(row) -> dict[str, Any]:
         "confidence": row["confidence"],
         "jiraSnapshot": json_loads(row["jira_snapshot_json"], {}),
         "analyzedAt": row["analyzed_at"],
+        "lastAnalysisError": row["last_analysis_error"],
+        "lastAnalysisFailedAt": row["last_analysis_failed_at"],
         "promotedWorkOrderId": row["promoted_work_order_id"],
         "createdAt": row["created_at"],
         "updatedAt": row["updated_at"],

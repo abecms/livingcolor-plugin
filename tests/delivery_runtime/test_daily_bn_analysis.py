@@ -375,6 +375,15 @@ class TestDailyPipeline:
         assert row["readiness_status"] == "ready"
         assert "subagent timeout" in row["last_analysis_error"]
 
+        inbox = build_pm_inbox(project_key="AAC")
+        sprint_ticket = next(
+            ticket for ticket in inbox["selectedSprint"]["tickets"] if ticket["jiraKey"] == "AAC-801"
+        )
+        assert sprint_ticket["readinessStatus"] == "ready"
+        assert sprint_ticket["lastAnalysisError"] == "subagent timeout"
+        assert sprint_ticket["lastAnalysisFailedAt"]
+        assert "Latest LLM analysis failed; review the error before promotion" in sprint_ticket["warnings"]
+
     def test_failed_analysis_without_previous_record_creates_analysis_failed(self):
         from delivery_runtime.readiness.analyst_backend import SynchronousAnalystBackend
         from delivery_runtime.readiness.scanner import ReadinessScanner

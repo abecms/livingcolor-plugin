@@ -88,6 +88,22 @@ class SnapshotlessBackend:
         }
 
 
+class AnalysisFailedBackend:
+    name = "analysis-failed"
+
+    async def analyze_ticket(self, snapshot: dict[str, Any], *, project_key: str, run_id: str) -> dict[str, Any]:
+        return {
+            "readinessScore": 0,
+            "readinessStatus": "analysis_failed",
+            "analysisSummary": "Could not parse analyst response.",
+            "blockers": ["Analyst returned invalid JSON"],
+            "recommendedRepos": [],
+            "confidence": 0,
+            "estimatedDays": None,
+            "jiraSnapshot": snapshot,
+        }
+
+
 @pytest.mark.asyncio
 async def test_dispatcher_limits_concurrency_to_three():
     backend = RecordingBackend()
@@ -305,3 +321,20 @@ async def test_dispatcher_adds_missing_jira_snapshot_to_successful_analysis():
     assert result.summary.success == 1
     assert result.outcomes[0].analysis is not None
     assert result.outcomes[0].analysis["jiraSnapshot"] == snapshot
+
+
+@pytest.mark.asyncio
+async def test_dispatcher_treats_analysis_failed_payload_as_failed_outcome():
+    snapshot = _snapshot("TVP-1")
+    dispatcher = ReadinessAnalysisDispatcher(backend=AnalysisFailedBackend(), concurrency=3)
+
+    result = await dispatcher.analyze_many([snapshot], project_key="TVP", run_id="DA-1", force=True)
+
+    assert result.summary.failed == 1
+    assert result.summary.success == 0
+    outcome = result.outcomes[0]
+    assert outcome.status == "failed"
+    assert outcome.analysis is None
+    assert outcome.analysis_input_hash == build_analysis_input_hash(snapshot, project_key="TVP")
+    assert outcome.backend == "analysis-failed"
+    assert outcome.error == "Analyst returned invalid JSON"
