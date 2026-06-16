@@ -1,0 +1,186 @@
+"""Async readiness analysis dispatcher."""
+
+from __future__ import annotations
+
+import asyncio
+import hashlib
+import inspect
+import json
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any, Literal
+
+from delivery_runtime.readiness.analyst_backend import AnalystBackend
+
+ANALYSIS_PROMPT_SCHEMA_VERSION = "analyst-v2"
+
+AnalysisOutcomeStatus = Literal["success", "cached", "failed"]
+CacheLookup = Callable[[str], "AnalysisCacheEntry | None"]
+
+
+@dataclass(frozen=True)
+class AnalysisCacheEntry:
+    jira_key: str
+    analysis_input_hash: str
+    analysis: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class AnalysisOutcome:
+    jira_key: str
+    status: AnalysisOutcomeStatus
+    analysis_input_hash: str
+    analysis: dict[str, Any] | None = None
+    error: str | None = None
+    backend_name: str | None = None
+
+
+@dataclass(frozen=True)
+class AnalysisDispatchSummary:
+    total: int
+    success: int
+    failed: int
+    cached: int
+
+    def to_dict(self) -> dict[str, int]:
+        return {
+            "total": self.total,
+            "success": self.success,
+            "failed": self.failed,
+            "cached": self.cached,
+        }
+
+
+@dataclass(frozen=True)
+class AnalysisDispatchResult:
+    outcomes: list[AnalysisOutcome]
+    summary: AnalysisDispatchSummary
+
+
+def build_analysis_input_hash(snapshot: dict[str, Any], *, project_key: str) -> str:
+    """Build a stable hash for the Jira fields that affect analyst output."""
+
+    payload = {
+        "schemaVersion": ANALYSIS_PROMPT_SCHEMA_VERSION,
+        "projectKey": project_key,
+        "jira": {
+            "key": snapshot.get("key"),
+            "projectKey": snapshot.get("projectKey"),
+            "summary": snapshot.get("summary"),
+            "description": snapshot.get("description"),
+            "issueType": snapshot.get("issueType"),
+            "status": snapshot.get("status"),
+            "statusCategory": snapshot.get("statusCategory"),
+            "labels": snapshot.get("labels", []),
+            "comments": snapshot.get("comments", []),
+            "attachments": snapshot.get("attachments", []),
+            "attachmentExtracts": snapshot.get("attachmentExtracts", []),
+        },
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+class ReadinessAnalysisDispatcher:
+    def __init__(
+        self,
+        *,
+        backend: AnalystBackend,
+        concurrency: int = 3,
+        cache_lookup: CacheLookup | None = None,
+        timeout_seconds: float | None = None,
+    ) -> None:
+        self._backend = backend
+        self._concurrency = min(max(1, concurrency), 3)
+        self._cache_lookup = cache_lookup
+        self._timeout_seconds = timeout_seconds
+
+    async def analyze_many(
+        self,
+        snapshots: list[dict[str, Any]],
+        *,
+        project_key: str,
+        run_id: str,
+        force: bool = False,
+    ) -> AnalysisDispatchResult:
+        semaphore = asyncio.Semaphore(self._concurrency)
+
+        async def run_one(snapshot: dict[str, Any]) -> AnalysisOutcome:
+            async with semaphore:
+                return await self._analyze_one(
+                    snapshot,
+                    project_key=project_key,
+                    run_id=run_id,
+                    force=force,
+                )
+
+        outcomes = await asyncio.gather(*(run_one(snapshot) for snapshot in snapshots))
+        summary = AnalysisDispatchSummary(
+            total=len(outcomes),
+            success=sum(1 for outcome in outcomes if outcome.status == "success"),
+            failed=sum(1 for outcome in outcomes if outcome.status == "failed"),
+            cached=sum(1 for outcome in outcomes if outcome.status == "cached"),
+        )
+        return AnalysisDispatchResult(outcomes=outcomes, summary=summary)
+
+    async def _analyze_one(
+        self,
+        snapshot: dict[str, Any],
+        *,
+        project_key: str,
+        run_id: str,
+        force: bool,
+    ) -> AnalysisOutcome:
+        jira_key = str(snapshot.get("key") or "")
+        analysis_input_hash = build_analysis_input_hash(snapshot, project_key=project_key)
+
+        if not force:
+            cache_entry = await self._lookup_cache(jira_key)
+            if cache_entry and cache_entry.analysis_input_hash == analysis_input_hash:
+                return AnalysisOutcome(
+                    jira_key=jira_key,
+                    status="cached",
+                    analysis_input_hash=analysis_input_hash,
+                    analysis=cache_entry.analysis,
+                    backend_name=self._backend.name,
+                )
+
+        try:
+            analysis = await self._run_backend(snapshot, project_key=project_key, run_id=run_id)
+        except Exception as exc:
+            return AnalysisOutcome(
+                jira_key=jira_key,
+                status="failed",
+                analysis_input_hash=analysis_input_hash,
+                error=str(exc),
+                backend_name=self._backend.name,
+            )
+
+        return AnalysisOutcome(
+            jira_key=jira_key,
+            status="success",
+            analysis_input_hash=analysis_input_hash,
+            analysis=analysis,
+            backend_name=self._backend.name,
+        )
+
+    async def _lookup_cache(self, jira_key: str) -> AnalysisCacheEntry | None:
+        if self._cache_lookup is None:
+            return None
+
+        cache_entry = self._cache_lookup(jira_key)
+        if inspect.isawaitable(cache_entry):
+            return await cache_entry
+        return cache_entry
+
+    async def _run_backend(
+        self,
+        snapshot: dict[str, Any],
+        *,
+        project_key: str,
+        run_id: str,
+    ) -> dict[str, Any]:
+        task = self._backend.analyze_ticket(snapshot, project_key=project_key, run_id=run_id)
+        if self._timeout_seconds is None:
+            return await task
+        return await asyncio.wait_for(task, timeout=self._timeout_seconds)
