@@ -370,6 +370,7 @@ class ProjectConfigResponse(BaseModel):
     projectName: str
     sprintDurationDays: int
     sprintCapacityDays: float
+    sprintStartWeekday: int = Field(default=1, ge=1, le=7)
     communicationLanguage: str
     ticketScope: TicketScopePayload
     configPath: str
@@ -398,6 +399,7 @@ class ProjectConfigUpdateRequest(BaseModel):
 
     sprintDurationDays: int = Field(ge=1, le=90)
     sprintCapacityDays: float = Field(ge=0.5, le=120)
+    sprintStartWeekday: int | None = Field(default=None, ge=1, le=7)
     communicationLanguage: str = "fr"
     ticketScope: TicketScopePayload | None = None
     default_repo: str | None = Field(default=None, alias="defaultRepo")

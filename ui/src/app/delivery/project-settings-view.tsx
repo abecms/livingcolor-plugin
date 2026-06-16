@@ -7,11 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   DEFAULT_TICKET_SCOPE,
   fetchProjectConfig,
+  resetProjectSprint,
   saveProjectConfig,
   type TicketScopePayload
 } from '@/lib/delivery'
 import { useFirebaseAuth } from '@/hooks/use-firebase-auth'
-import { Settings, Share2, SlidersHorizontal, Trash2 } from '@/lib/icons'
+import { RefreshCw, Settings, Share2, SlidersHorizontal, Trash2 } from '@/lib/icons'
 import { bumpProjectConfigRevision } from '@/store/project-config'
 import { notifyError, notify } from '@/store/notifications'
 
@@ -20,6 +21,16 @@ import { ManagerPageHeader, ManagerPageShell, ManagerSection } from '../manager-
 import { dashboardOutlineButtonProps, dashboardPrimaryButtonProps } from './dashboard-ui'
 import { ShareProjectDialog } from './share-project-dialog'
 import { useProjectWorkspace } from '@/hooks/use-project-workspace'
+
+const SPRINT_START_WEEKDAYS = [
+  { value: '1', label: 'Monday' },
+  { value: '2', label: 'Tuesday' },
+  { value: '3', label: 'Wednesday' },
+  { value: '4', label: 'Thursday' },
+  { value: '5', label: 'Friday' },
+  { value: '6', label: 'Saturday' },
+  { value: '7', label: 'Sunday' }
+] as const
 
 export function ProjectSettingsView() {
   const { enabled, status } = useFirebaseAuth()
@@ -32,11 +43,13 @@ export function ProjectSettingsView() {
   const [projectKey, setProjectKey] = useState('')
   const [durationDays, setDurationDays] = useState('14')
   const [capacityDays, setCapacityDays] = useState('15')
+  const [sprintStartWeekday, setSprintStartWeekday] = useState('1')
   const [communicationLanguage, setCommunicationLanguage] = useState<'en' | 'fr'>('fr')
   const [ticketScope, setTicketScope] = useState<TicketScopePayload>(DEFAULT_TICKET_SCOPE)
   const [assigneeInput, setAssigneeInput] = useState('')
   const [configPath, setConfigPath] = useState('')
   const [shareOpen, setShareOpen] = useState(false)
+  const [resettingSprint, setResettingSprint] = useState(false)
 
   const displayName = activeProject?.projectName ?? projectName
   const displayKey = activeProjectKey ?? projectKey
@@ -49,6 +62,7 @@ export function ProjectSettingsView() {
       setProjectName(config.projectName)
       setDurationDays(String(config.sprintDurationDays))
       setCapacityDays(String(config.sprintCapacityDays))
+      setSprintStartWeekday(String(config.sprintStartWeekday ?? 1))
       setCommunicationLanguage(config.communicationLanguage === 'en' ? 'en' : 'fr')
       setTicketScope(config.ticketScope ?? DEFAULT_TICKET_SCOPE)
       setAssigneeInput((config.ticketScope?.assignees ?? []).join(', '))
@@ -67,12 +81,17 @@ export function ProjectSettingsView() {
   const save = useCallback(async () => {
     const parsedDuration = Number.parseInt(durationDays, 10)
     const parsedCapacity = Number.parseFloat(capacityDays)
+    const parsedStartWeekday = Number.parseInt(sprintStartWeekday, 10)
     if (!Number.isFinite(parsedDuration) || parsedDuration < 1) {
       notifyError(new Error('Invalid sprint duration'), 'Enter a sprint duration of at least 1 day')
       return
     }
     if (!Number.isFinite(parsedCapacity) || parsedCapacity < 0.5) {
       notifyError(new Error('Invalid capacity'), 'Enter a capacity of at least 0.5 person-days')
+      return
+    }
+    if (!Number.isFinite(parsedStartWeekday) || parsedStartWeekday < 1 || parsedStartWeekday > 7) {
+      notifyError(new Error('Invalid start day'), 'Choose a valid sprint start day')
       return
     }
 
@@ -90,11 +109,13 @@ export function ProjectSettingsView() {
       const config = await saveProjectConfig({
         sprintDurationDays: parsedDuration,
         sprintCapacityDays: parsedCapacity,
+        sprintStartWeekday: parsedStartWeekday,
         communicationLanguage,
         ticketScope: scopePayload
       })
       setDurationDays(String(config.sprintDurationDays))
       setCapacityDays(String(config.sprintCapacityDays))
+      setSprintStartWeekday(String(config.sprintStartWeekday ?? 1))
       setCommunicationLanguage(config.communicationLanguage === 'en' ? 'en' : 'fr')
       setTicketScope(config.ticketScope ?? DEFAULT_TICKET_SCOPE)
       setAssigneeInput((config.ticketScope?.assignees ?? []).join(', '))
@@ -109,7 +130,25 @@ export function ProjectSettingsView() {
     } finally {
       setSaving(false)
     }
-  }, [assigneeInput, capacityDays, communicationLanguage, durationDays, ticketScope])
+  }, [assigneeInput, capacityDays, communicationLanguage, durationDays, sprintStartWeekday, ticketScope])
+
+  const resetSprintNow = useCallback(async () => {
+    setResettingSprint(true)
+    try {
+      const sprint = await resetProjectSprint()
+      bumpProjectConfigRevision()
+      notify({
+        kind: 'success',
+        message: sprint?.sprintName
+          ? `Sprint reset — ${sprint.sprintName} is ready with ${sprint.tickets?.length ?? 0} ticket(s).`
+          : 'Sprint reset with a fresh ticket selection.'
+      })
+    } catch (error) {
+      notifyError(error, 'Could not reset sprint')
+    } finally {
+      setResettingSprint(false)
+    }
+  }, [])
 
   const toggleStatusGroup = useCallback((group: 'todo' | 'in_progress', checked: boolean) => {
     setTicketScope(current => {
@@ -187,6 +226,43 @@ export function ProjectSettingsView() {
                 type="number"
                 value={capacityDays}
               />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium" htmlFor="sprint-start-day">
+                Sprint start day
+              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                <Select
+                  disabled={loading || saving || resettingSprint}
+                  onValueChange={setSprintStartWeekday}
+                  value={sprintStartWeekday}
+                >
+                  <SelectTrigger className="h-9 w-full max-w-xs rounded-md" id="sprint-start-day">
+                    <SelectValue placeholder="Select a day" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SPRINT_START_WEEKDAYS.map(day => (
+                      <SelectItem key={day.value} value={day.value}>
+                        {day.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  disabled={loading || saving || resettingSprint}
+                  onClick={() => void resetSprintNow()}
+                  {...dashboardOutlineButtonProps()}
+                >
+                  <RefreshCw className="mr-2 size-4" />
+                  {resettingSprint ? 'Resetting…' : 'Reset sprint now'}
+                </Button>
+              </div>
+              <p className="text-xs text-(--ui-text-tertiary)">
+                Each sprint starts on this weekday and runs for the configured duration. LivingColor
+                opens a new sprint automatically on the next start day once the previous sprint has
+                ended. Use the button to start a new sprint immediately.
+              </p>
             </div>
 
             <div className="space-y-2">

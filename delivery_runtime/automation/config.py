@@ -34,6 +34,7 @@ class DailyAnalysisCronConfig:
 class SprintConfig:
     duration_days: int = 14
     capacity_days: float = 15.0
+    start_weekday: int = 1
 
 
 @dataclass(frozen=True)
@@ -214,7 +215,11 @@ def load_delivery_automation_config(*, project_key: str | None = None) -> Delive
             hour=max(0, min(23, cron_hour)),
             minute=max(0, min(59, cron_minute)),
         ),
-        sprint=SprintConfig(duration_days=max(1, sprint_duration), capacity_days=max(0.5, sprint_capacity)),
+        sprint=SprintConfig(
+            duration_days=max(1, sprint_duration),
+            capacity_days=max(0.5, sprint_capacity),
+            start_weekday=per_project.sprint_start_weekday,
+        ),
         ticket_scope=ticket_scope or default_ticket_scope(),
     )
 
@@ -231,6 +236,7 @@ def save_delivery_project_config(
     capacity_days: float,
     duration_days: int,
     communication_language: str | None = None,
+    start_weekday: int | None = None,
     ticket_scope: "TicketScopeConfig | None" = None,
     project_key: str | None = None,
 ) -> DeliveryAutomationConfig:
@@ -254,6 +260,7 @@ def save_delivery_project_config(
         duration_days=duration_days,
         capacity_days=capacity_days,
         communication_language=resolved_language,
+        start_weekday=start_weekday,
         ticket_scope=resolved_scope,
     )
 

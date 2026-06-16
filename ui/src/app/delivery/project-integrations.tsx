@@ -65,6 +65,7 @@ export function buildVcsProviderProjectConfig(
   return {
     sprintDurationDays: config.sprintDurationDays,
     sprintCapacityDays: config.sprintCapacityDays,
+    sprintStartWeekday: config.sprintStartWeekday,
     communicationLanguage: config.communicationLanguage === 'en' ? 'en' : 'fr',
     ticketScope: config.ticketScope,
     vcs: nextProvider,

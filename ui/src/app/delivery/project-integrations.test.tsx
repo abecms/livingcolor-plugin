@@ -28,6 +28,7 @@ const baseProjectConfig: ProjectConfigPayload = {
   projectName: 'Brand New',
   sprintDurationDays: 14,
   sprintCapacityDays: 10,
+  sprintStartWeekday: 1,
   communicationLanguage: 'en' as const,
   ticketScope: { statusGroups: ['todo'], assignees: [], includeUnassigned: true, matchMode: 'all' },
   configPath: '/tmp/config.yaml',

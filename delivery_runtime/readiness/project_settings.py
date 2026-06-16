@@ -17,6 +17,7 @@ from delivery_runtime.readiness.ticket_scope import (
 
 _DEFAULT_SPRINT_DURATION_DAYS = 14
 _DEFAULT_SPRINT_CAPACITY_DAYS = 15.0
+_DEFAULT_SPRINT_START_WEEKDAY = 1  # ISO: Monday
 _INTEGRATION_MCP_KEY = "mcp_servers"
 
 
@@ -24,7 +25,16 @@ _INTEGRATION_MCP_KEY = "mcp_servers"
 class ProjectDeliverySettings:
     sprint_duration_days: int = _DEFAULT_SPRINT_DURATION_DAYS
     sprint_capacity_days: float = _DEFAULT_SPRINT_CAPACITY_DAYS
+    sprint_start_weekday: int = _DEFAULT_SPRINT_START_WEEKDAY
     communication_language: str = DEFAULT_COMMUNICATION_LANGUAGE
+
+
+def normalize_sprint_start_weekday(value: Any) -> int:
+    try:
+        weekday = int(value)
+    except (TypeError, ValueError):
+        weekday = _DEFAULT_SPRINT_START_WEEKDAY
+    return max(1, min(7, weekday))
 
 
 def _normalize_project_key(project_key: str) -> str:
@@ -86,6 +96,12 @@ def load_project_delivery_settings(project_key: str) -> ProjectDeliverySettings:
 
     duration_raw = sprint_map.get("duration_days")
     capacity_raw = sprint_map.get("capacity_days")
+    start_weekday_raw = (
+        sprint_map.get("start_weekday")
+        or sprint_map.get("startWeekday")
+        or sprint_map.get("reset_weekday")
+        or sprint_map.get("resetWeekday")
+    )
     language_raw = entry.get("communication_language") or entry.get("communicationLanguage")
 
     duration = _DEFAULT_SPRINT_DURATION_DAYS
@@ -105,6 +121,7 @@ def load_project_delivery_settings(project_key: str) -> ProjectDeliverySettings:
     return ProjectDeliverySettings(
         sprint_duration_days=duration,
         sprint_capacity_days=capacity,
+        sprint_start_weekday=normalize_sprint_start_weekday(start_weekday_raw),
         communication_language=normalize_communication_language(language_raw),
     )
 
@@ -115,6 +132,7 @@ def persist_project_delivery_settings(
     duration_days: int,
     capacity_days: float,
     communication_language: str,
+    start_weekday: int | None = None,
     ticket_scope: TicketScopeConfig | None = None,
 ) -> ProjectDeliverySettings:
     key = _normalize_project_key(project_key)
@@ -126,10 +144,16 @@ def persist_project_delivery_settings(
     resolved_language = normalize_communication_language(communication_language)
 
     def _update(entry: dict[str, Any]) -> None:
-        entry["sprint"] = {
-            "duration_days": resolved_duration,
-            "capacity_days": resolved_capacity,
-        }
+        sprint = entry.get("sprint")
+        sprint_map = dict(sprint) if isinstance(sprint, dict) else {}
+        sprint_map["duration_days"] = resolved_duration
+        sprint_map["capacity_days"] = resolved_capacity
+        if start_weekday is not None:
+            sprint_map["start_weekday"] = normalize_sprint_start_weekday(start_weekday)
+        elif "start_weekday" not in sprint_map and "startWeekday" not in sprint_map:
+            legacy = sprint_map.get("reset_weekday") or sprint_map.get("resetWeekday")
+            sprint_map["start_weekday"] = normalize_sprint_start_weekday(legacy)
+        entry["sprint"] = sprint_map
         entry["communication_language"] = resolved_language
 
     _upsert_mapping_entry(key, _update)
@@ -137,9 +161,17 @@ def persist_project_delivery_settings(
     scope = ticket_scope if ticket_scope is not None else default_ticket_scope()
     persist_ticket_scope_for_project(key, scope)
 
+    current = load_project_delivery_settings(key)
+    resolved_start_weekday = (
+        normalize_sprint_start_weekday(start_weekday)
+        if start_weekday is not None
+        else current.sprint_start_weekday
+    )
+
     return ProjectDeliverySettings(
         sprint_duration_days=resolved_duration,
         sprint_capacity_days=resolved_capacity,
+        sprint_start_weekday=resolved_start_weekday,
         communication_language=resolved_language,
     )
 
@@ -385,6 +417,7 @@ def serialize_delivery_settings_for_share(
     return {
         "sprintDurationDays": config.sprint.duration_days,
         "sprintCapacityDays": config.sprint.capacity_days,
+        "sprintStartWeekday": config.sprint.start_weekday,
         "communicationLanguage": config.communication_language,
         "ticketScope": serialize_ticket_scope(scope),
     }
@@ -399,10 +432,11 @@ def apply_shared_delivery_settings(project_key: str, payload: dict[str, Any] | N
 
     duration = payload.get("sprintDurationDays")
     capacity = payload.get("sprintCapacityDays")
+    start_weekday = payload.get("sprintStartWeekday") or payload.get("sprintResetWeekday")
     language = payload.get("communicationLanguage")
     scope_raw = payload.get("ticketScope")
 
-    if duration is None and capacity is None and language is None and scope_raw is None:
+    if duration is None and capacity is None and start_weekday is None and language is None and scope_raw is None:
         return
 
     current = load_project_delivery_settings(key)
@@ -410,6 +444,7 @@ def apply_shared_delivery_settings(project_key: str, payload: dict[str, Any] | N
         project_key=key,
         duration_days=int(duration) if duration is not None else current.sprint_duration_days,
         capacity_days=float(capacity) if capacity is not None else current.sprint_capacity_days,
+        start_weekday=int(start_weekday) if start_weekday is not None else None,
         communication_language=str(language) if language is not None else current.communication_language,
         ticket_scope=parse_ticket_scope(scope_raw) if scope_raw is not None else None,
     )

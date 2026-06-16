@@ -336,6 +336,7 @@ export interface ProjectConfigPayload {
   projectName: string
   sprintDurationDays: number
   sprintCapacityDays: number
+  sprintStartWeekday: number
   communicationLanguage: 'en' | 'fr'
   ticketScope: TicketScopePayload
   configPath: string
@@ -449,6 +450,7 @@ export function fetchProjectConfig(): Promise<ProjectConfigPayload> {
 export function saveProjectConfig(body: {
   sprintDurationDays: number
   sprintCapacityDays: number
+  sprintStartWeekday?: number
   communicationLanguage: 'en' | 'fr'
   ticketScope?: TicketScopePayload
   vcs?: VcsProvider
@@ -486,6 +488,7 @@ export async function saveProjectDefaultRepo(defaultRepo: string | null): Promis
   return saveProjectConfig({
     sprintDurationDays: config.sprintDurationDays,
     sprintCapacityDays: config.sprintCapacityDays,
+    sprintStartWeekday: config.sprintStartWeekday,
     communicationLanguage: config.communicationLanguage === 'en' ? 'en' : 'fr',
     ticketScope: config.ticketScope,
     vcs: config.vcs,
@@ -500,6 +503,7 @@ export async function saveProjectIntegrationBranch(
   return saveProjectConfig({
     sprintDurationDays: config.sprintDurationDays,
     sprintCapacityDays: config.sprintCapacityDays,
+    sprintStartWeekday: config.sprintStartWeekday,
     communicationLanguage: config.communicationLanguage === 'en' ? 'en' : 'fr',
     ticketScope: config.ticketScope,
     vcs: config.vcs,
@@ -520,10 +524,20 @@ export async function saveProjectJiraProjectKey(jiraProjectKey: string | null): 
   return saveProjectConfig({
     sprintDurationDays: config.sprintDurationDays,
     sprintCapacityDays: config.sprintCapacityDays,
+    sprintStartWeekday: config.sprintStartWeekday,
     communicationLanguage: config.communicationLanguage === 'en' ? 'en' : 'fr',
     ticketScope: config.ticketScope,
     vcs: config.vcs,
     jiraProjectKey
+  })
+}
+
+export function resetProjectSprint(): Promise<PmInboxPayload['selectedSprint']> {
+  return callDesktopApi({
+    ...profileScoped(),
+    path: '/api/delivery/sprint/reset',
+    method: 'POST',
+    timeoutMs: DELIVERY_TIMEOUT_MS
   })
 }
 

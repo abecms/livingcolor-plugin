@@ -26,6 +26,7 @@ vi.mock('@/lib/delivery', () => ({
     projectName: 'Bibliothèque Numérique',
     sprintDurationDays: 14,
     sprintCapacityDays: 15,
+    sprintStartWeekday: 1,
     communicationLanguage: 'fr',
     ticketScope: {
       statusGroups: ['todo'],
@@ -40,6 +41,7 @@ vi.mock('@/lib/delivery', () => ({
     projectName: 'Bibliothèque Numérique',
     sprintDurationDays: 21,
     sprintCapacityDays: 18,
+    sprintStartWeekday: 1,
     communicationLanguage: 'en',
     ticketScope: {
       statusGroups: ['todo'],
@@ -90,6 +92,7 @@ describe('ProjectSettingsView', () => {
       expect(saveProjectConfig).toHaveBeenCalledWith({
         sprintDurationDays: 21,
         sprintCapacityDays: 18,
+        sprintStartWeekday: 1,
         communicationLanguage: 'fr',
         ticketScope: {
           statusGroups: ['todo'],

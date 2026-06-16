@@ -368,6 +368,7 @@ def _project_config_response(project_key: str, project_name: str, config) -> Pro
         projectName=project_name,
         sprintDurationDays=config.sprint.duration_days,
         sprintCapacityDays=config.sprint.capacity_days,
+        sprintStartWeekday=config.sprint.start_weekday,
         communicationLanguage=config.communication_language,
         ticketScope=_ticket_scope_response(project_key),
         configPath=str(delivery_config_path()),
@@ -576,6 +577,7 @@ def update_project_config(body: ProjectConfigUpdateRequest, request: Request) ->
     save_delivery_project_config(
         capacity_days=body.sprintCapacityDays,
         duration_days=body.sprintDurationDays,
+        start_weekday=body.sprintStartWeekday,
         communication_language=body.communicationLanguage,
         ticket_scope=ticket_scope,
         project_key=request_key,
@@ -647,6 +649,19 @@ def update_sprint_selection(
             swap=swap_payload,
             append=body.append,
         )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return SelectedSprintResponse.model_validate(payload)
+
+
+@router.post("/sprint/reset", response_model=SelectedSprintResponse)
+def reset_sprint_selection(request: Request) -> SelectedSprintResponse:
+    project_key = _activate_local_project_from_request(request)
+    if not project_key:
+        raise HTTPException(status_code=400, detail="Active project key is required")
+    services = get_services()
+    try:
+        payload = services.pm_inbox.reset_sprint(project_key=project_key)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return SelectedSprintResponse.model_validate(payload)

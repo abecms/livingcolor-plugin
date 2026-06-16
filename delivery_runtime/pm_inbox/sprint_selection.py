@@ -11,12 +11,23 @@ from delivery_runtime.pm_inbox.sprint import build_sprint_recommendation
 from delivery_runtime.readiness.ticket_scope import load_ticket_scope_for_project, matches_ticket_scope
 
 
-def build_selected_sprint_payload(*, project_key: str) -> dict[str, Any]:
+def build_selected_sprint_payload(*, project_key: str, sprint_number: int | None = None) -> dict[str, Any]:
     """Select LivingColor sprint tickets within configured capacity from ready, estimated work."""
     config = load_delivery_automation_config(project_key=project_key)
     project_key = project_key.strip().upper()
     ticket_scope = load_ticket_scope_for_project(project_key)
     latest_estimations = pm_store.latest_estimations_by_readiness(project_key=project_key)
+
+    if sprint_number is None:
+        state = pm_store.get_sprint_state(project_key=project_key)
+        memory = (state or {}).get("memory") or {}
+        if isinstance(memory, dict):
+            try:
+                stored_number = int(memory.get("sprintNumber") or 0)
+                if stored_number > 0:
+                    sprint_number = stored_number
+            except (TypeError, ValueError):
+                pass
 
     candidates: list[dict[str, Any]] = []
     with connect() as conn:
@@ -53,6 +64,7 @@ def build_selected_sprint_payload(*, project_key: str) -> dict[str, Any]:
         candidates=candidates,
         capacity_days=config.sprint.capacity_days,
         duration_days=config.sprint.duration_days,
+        sprint_number=sprint_number,
     )
 
     return {
@@ -169,7 +181,13 @@ def persist_selected_sprint(
 
 def load_selected_sprint_payload(*, project_key: str) -> dict[str, Any]:
     """Return persisted sprint selection when manually overridden, else rebuild."""
+    from delivery_runtime.pm_inbox.sprint_reset import maybe_auto_reset_sprint
+
     project_key = project_key.strip().upper()
+    auto_reset = maybe_auto_reset_sprint(project_key=project_key)
+    if auto_reset is not None:
+        return auto_reset
+
     state = pm_store.get_sprint_state(project_key=project_key)
     if state and isinstance(state.get("memory"), dict) and state["memory"].get("manualOverride"):
         recommendation = state.get("recommendation") or {}

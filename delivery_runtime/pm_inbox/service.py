@@ -198,3 +198,14 @@ class PmInboxService:
             },
         )
         return payload
+
+    def reset_sprint(self, *, project_key: str, actor: str = "human") -> dict[str, Any]:
+        from delivery_runtime.pm_inbox.sprint_reset import reset_sprint
+
+        payload = reset_sprint(project_key=project_key)
+        self.events.append(
+            event_type="SPRINT_RESET",
+            actor=actor,
+            payload={"projectKey": project_key.strip().upper()},
+        )
+        return payload

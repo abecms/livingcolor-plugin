@@ -275,8 +275,13 @@ class DailyAnalysisPipeline:
         return payload
 
     def _rebuild_selected_sprint(self, *, project_key: str) -> dict[str, Any]:
+        from delivery_runtime.pm_inbox.sprint_reset import maybe_auto_reset_sprint
         from delivery_runtime.pm_inbox.sprint_selection import build_selected_sprint_payload, persist_selected_sprint
         from delivery_runtime.pm_inbox import store as pm_store
+
+        auto_reset = maybe_auto_reset_sprint(project_key=project_key)
+        if auto_reset is not None:
+            return auto_reset
 
         state = pm_store.get_sprint_state(project_key=project_key)
         memory = (state or {}).get("memory") or {}
