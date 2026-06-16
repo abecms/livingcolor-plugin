@@ -94,6 +94,20 @@ describe('KanbanBoard', () => {
     expect(screen.getByText('Latest LLM analysis failed; review the error before promotion')).toBeTruthy()
   })
 
+  it('renders warnings with theme-aware contrast classes', () => {
+    render(
+      <KanbanBoard
+        columns={columns}
+        onApproveTicket={() => {}}
+        onOpenCard={() => {}}
+        onReviewGate={() => {}}
+      />
+    )
+    const warning = screen.getByText('Latest LLM analysis failed; review the error before promotion')
+    expect(warning.className).toContain('text-amber-800')
+    expect(warning.className).toContain('dark:text-amber-100')
+  })
+
   it('fires onReviewGate when the gate CTA is clicked', () => {
     const onReviewGate = vi.fn()
     render(
@@ -167,7 +181,22 @@ describe('KanbanBoard', () => {
     expect(onOpenCard).not.toHaveBeenCalled()
   })
 
-  it('opens the card with the keyboard', () => {
+  it('does not nest the Jira title link inside the keyboard-open control', () => {
+    render(
+      <JiraBrowseProvider baseUrl="https://jira.example.com">
+        <KanbanBoard
+          columns={columns}
+          onApproveTicket={() => {}}
+          onOpenCard={() => {}}
+          onReviewGate={() => {}}
+        />
+      </JiraBrowseProvider>
+    )
+
+    expect(screen.getByTitle('Open TVP-1510 in Jira').closest('[role="button"]')).toBeNull()
+  })
+
+  it('opens the card with a dedicated keyboard control', () => {
     const onOpenCard = vi.fn()
     render(
       <KanbanBoard
@@ -177,7 +206,7 @@ describe('KanbanBoard', () => {
         onReviewGate={() => {}}
       />
     )
-    fireEvent.keyDown(screen.getByText('Cache headers').closest('[role="button"]')!, { key: 'Enter' })
+    fireEvent.click(screen.getByRole('button', { name: 'Open TVP-1510 work order' }))
     expect(onOpenCard).toHaveBeenCalledWith('WO-3')
   })
 })

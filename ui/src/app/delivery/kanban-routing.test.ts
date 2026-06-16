@@ -270,6 +270,40 @@ describe('buildKanbanColumns', () => {
     })
   })
 
+  it('keeps promoted in-dev tickets in the dev column only once when activeDevelopments also contains them', () => {
+    const inbox = makeInbox({
+      activeDevelopments: [
+        {
+          workOrderId: 'WO-9',
+          jiraKey: 'TVP-2138',
+          title: 'Device rail assets',
+          currentStage: 'development',
+          status: 'running',
+          updatedAt: '2026-06-11T00:00:00Z'
+        }
+      ]
+    })
+    inbox.selectedSprint.tickets = [
+      {
+        readinessId: 'R-3',
+        jiraKey: 'TVP-2138',
+        title: 'Device rail assets',
+        estimatedDays: 1.1,
+        priorityRank: 0,
+        urgencyScore: 6,
+        warnings: [],
+        workOrderId: 'WO-9',
+        inDevelopment: true,
+        currentStage: 'development'
+      }
+    ]
+
+    const columns = buildKanbanColumns(inbox, [])
+    const devCards = columns.find(column => column.id === 'dev')!.cards
+
+    expect(devCards.map(card => card.jiraKey)).toEqual(['TVP-2138'])
+  })
+
   it('shows needs_clarification sprint tickets with a Clarify CTA', () => {
     const inbox = makeInbox()
     inbox.selectedSprint.tickets = [

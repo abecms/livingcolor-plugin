@@ -148,7 +148,7 @@ export function buildKanbanColumns(
   }
 
   for (const item of inbox?.activeDevelopments ?? []) {
-    if (gateJiraKeys.has(item.jiraKey)) {
+    if (gateJiraKeys.has(item.jiraKey) || devJiraKeys.has(item.jiraKey)) {
       continue
     }
     devJiraKeys.add(item.jiraKey)

@@ -1,4 +1,4 @@
-import type { KeyboardEvent, MouseEvent } from 'react'
+import type { MouseEvent } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { formatTicketEstimationHours } from '@/lib/delivery-estimation'
@@ -124,13 +124,6 @@ function KanbanCardView({
     openWorkOrder()
   }
 
-  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault()
-      openWorkOrder()
-    }
-  }
-
   const handleCta = (event: MouseEvent<HTMLButtonElement>) => {
     event.preventDefault()
     event.stopPropagation()
@@ -156,22 +149,31 @@ function KanbanCardView({
         openableWorkOrderId ? 'cursor-pointer hover:border-ring/40' : null
       )}
       onClick={openableWorkOrderId ? handleCardClick : undefined}
-      onKeyDown={openableWorkOrderId ? handleKeyDown : undefined}
-      role={openableWorkOrderId ? 'button' : undefined}
-      tabIndex={openableWorkOrderId ? 0 : undefined}
     >
       <TicketKeyBadge>{card.jiraKey}</TicketKeyBadge>
       <div className="mt-2 text-sm font-medium leading-snug text-foreground">
         <JiraTicketTitleLink jiraKey={card.jiraKey}>{card.title}</JiraTicketTitleLink>
         {isDone ? ' ✓' : ''}
       </div>
+      {openableWorkOrderId ? (
+        <button
+          className="sr-only"
+          onClick={event => {
+            event.stopPropagation()
+            openWorkOrder()
+          }}
+          type="button"
+        >
+          Open {card.jiraKey} work order
+        </button>
+      ) : null}
       <div className="mt-1.5 space-y-0.5 text-[10px] text-muted-foreground">
         {card.estimatedDays != null ? <div>Estim. {formatTicketEstimationHours(card.estimatedDays)}</div> : null}
         {card.priorityRank != null ? <div>Prio #{card.priorityRank}</div> : null}
         {card.currentStage ? <div>⚙ {formatWorkOrderStage(card.currentStage, vcsProvider)}</div> : null}
       </div>
       {card.warnings?.length ? (
-        <div className="mt-2 rounded-md border border-amber-400/40 bg-amber-400/10 px-2 py-1 text-[10px] text-amber-100">
+        <div className="mt-2 rounded-md border border-amber-500/40 bg-amber-100/70 px-2 py-1 text-[10px] text-amber-800 dark:border-amber-400/40 dark:bg-amber-400/10 dark:text-amber-100">
           {card.warnings[0]}
         </div>
       ) : null}
