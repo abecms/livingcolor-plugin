@@ -137,7 +137,10 @@ def _run_promote_orchestrator_tick(services, work_order_id: str) -> None:
 
 
 @router.post("/readiness/{record_id}/promote", response_model=PromoteReadinessResponse)
-def promote_readiness(record_id: str, background_tasks: BackgroundTasks) -> PromoteReadinessResponse:
+def promote_readiness(
+    record_id: str,
+    background_tasks: BackgroundTasks = None,
+) -> PromoteReadinessResponse:
     services = get_services()
     try:
         work_order = services.readiness.promote(record_id, tick=False)
@@ -148,7 +151,8 @@ def promote_readiness(record_id: str, background_tasks: BackgroundTasks) -> Prom
     except sqlite3.OperationalError as exc:
         raise HTTPException(status_code=503, detail=_delivery_db_unavailable_detail(exc)) from exc
 
-    background_tasks.add_task(_run_promote_orchestrator_tick, services, work_order["id"])
+    if background_tasks is not None:
+        background_tasks.add_task(_run_promote_orchestrator_tick, services, work_order["id"])
 
     readiness = services.readiness.get_record(record_id)
     if not readiness:
