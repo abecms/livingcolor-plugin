@@ -118,6 +118,18 @@ def test_parse_analyst_completion_rejects_invalid_field_types(field, value, mess
         parse_analyst_completion(_fenced(_payload(**{field: value})), {"key": "TVP-6"})
 
 
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("readinessScore", float("nan"), "readinessScore must be a finite number"),
+        ("confidence", float("inf"), "confidence must be a finite number"),
+    ],
+)
+def test_parse_analyst_completion_rejects_non_finite_numeric_fields(field, value, message):
+    with pytest.raises(AnalystParseError, match=message):
+        parse_analyst_completion(_fenced(_payload(**{field: value})), {"key": "TVP-7"})
+
+
 def test_build_analyst_user_prompt_contains_livingcolor_readiness_semantics():
     prompt = build_analyst_user_prompt(
         {

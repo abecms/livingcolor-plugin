@@ -191,8 +191,11 @@ def parse_analyst_completion(
         raise AnalystParseError(f"analyst completion is missing required fields: {', '.join(missing)}")
 
     readiness_score = payload["readinessScore"]
-    if not isinstance(readiness_score, (int, float)) or isinstance(readiness_score, bool):
-        raise AnalystParseError("readinessScore must be numeric")
+    readiness_score = _require_finite_number(
+        readiness_score,
+        field_name="readinessScore",
+        positive=False,
+    )
     readiness_status = _normalize_analyst_readiness_status(
         str(payload["readinessStatus"] or ""),
         allow_runtime_statuses=allow_runtime_statuses,
@@ -217,17 +220,18 @@ def parse_analyst_completion(
         raise AnalystParseError("recommendedRepos must be a list")
 
     confidence = payload["confidence"]
-    if not isinstance(confidence, (int, float)) or isinstance(confidence, bool):
-        raise AnalystParseError("confidence must be numeric")
+    confidence = _require_finite_number(
+        confidence,
+        field_name="confidence",
+        positive=False,
+    )
 
     estimated_days = payload.get("estimatedDays")
-    if (
-        not isinstance(estimated_days, (int, float))
-        or isinstance(estimated_days, bool)
-        or not math.isfinite(float(estimated_days))
-        or estimated_days <= 0
-    ):
-        raise AnalystParseError("estimatedDays must be a positive finite number")
+    estimated_days = _require_finite_number(
+        estimated_days,
+        field_name="estimatedDays",
+        positive=True,
+    )
 
     return {
         "readinessScore": int(readiness_score),
@@ -239,6 +243,21 @@ def parse_analyst_completion(
         "estimatedDays": float(estimated_days),
         "jiraSnapshot": snapshot,
     }
+
+
+def _require_finite_number(raw: Any, *, field_name: str, positive: bool) -> float:
+    if not isinstance(raw, (int, float)) or isinstance(raw, bool):
+        if positive:
+            raise AnalystParseError(f"{field_name} must be a positive finite number")
+        raise AnalystParseError(f"{field_name} must be numeric")
+    value = float(raw)
+    if not math.isfinite(value):
+        if positive:
+            raise AnalystParseError(f"{field_name} must be a positive finite number")
+        raise AnalystParseError(f"{field_name} must be a finite number")
+    if positive and value <= 0:
+        raise AnalystParseError(f"{field_name} must be a positive finite number")
+    return value
 
 
 def _normalize_analyst_readiness_status(raw: str, *, allow_runtime_statuses: bool = False) -> str | None:
