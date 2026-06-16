@@ -43,6 +43,7 @@ LivingColor Server (this package)
 | `agent_bridge/hermes_runtime.py` | Hermes-backed `AgentRuntimeBridge` |
 | `agent_bridge/hermes_developer.py` | Hermes `AIAgent` loop for patch generation |
 | `agent_bridge/hermes_analyst.py` | Hermes `AIAgent` loop for readiness analysis |
+| `agent_bridge/hermes_sprint_reporter.py` | Hermes `AIAgent` loop for sprint retrospectives posted to messaging |
 | `agent_bridge/developer_backend.py` | Selects Hermes vs heuristic developer backend |
 | `provisioning/provisioner.py` | Writes per-project agent manifests and automation state |
 | `provisioning/prerequisites.py` | Validates Jira/GitLab/MCP prerequisites before setup |
@@ -80,7 +81,10 @@ On success, `ProjectAutomationProvisioner` writes:
   agents/
     orchestrator.yaml        # AgentManifest for orchestrator role (declarative v1; not executed — see docs below)
     analyst.yaml             # AgentManifest for readiness analysis
+    planner.yaml             # AgentManifest for Gate 1 planning
     developer.yaml           # AgentManifest for patch generation
+    publisher.yaml           # AgentManifest for review-request publication
+    reporter.yaml            # AgentManifest for sprint retrospectives (messaging)
 ```
 
 Manifest schema and registry live in `delivery_runtime/agents/` (Hermes-free).
@@ -100,6 +104,6 @@ Templates are bundled under `livingcolor_server/agent_templates/v1/`.
 Returns `400` with `{ error: "prerequisites_missing", missing: [...] }` when setup
 cannot proceed. Returns `404` on GET when automation was never provisioned.
 
-Agent bridges (`hermes_analyst.py`, `hermes_developer.py`) load manifests via
+Agent bridges (`hermes_analyst.py`, `hermes_developer.py`, `hermes_sprint_reporter.py`) load manifests via
 `AgentManifestRegistry` when automation is ready; they fall back to legacy
 prompts when manifests are absent (backward compatibility).

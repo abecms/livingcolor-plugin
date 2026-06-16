@@ -1,13 +1,14 @@
 {
   "repo": "Tamsi/livingcolor-skills",
-  "ref": "v0.1.0",
-  "resolvedCommit": "fdf1be62d61ef74b51d91ae81ed718350dce20d5",
+  "ref": "v0.2.0",
+  "resolvedCommit": "316e3ba0f98aacff910c3f79e64f21e058d11baa",
   "bundle": "code-review-pipeline",
   "skills": [
     "ticket-analyst",
     "code-architect",
     "qa-reviewer",
-    "security-auditor"
+    "security-auditor",
+    "sprint-reporter"
   ],
   "updatedBy": "livingcolor-evolution"
 }

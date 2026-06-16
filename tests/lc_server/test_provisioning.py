@@ -23,7 +23,7 @@ def test_render_developer_template_produces_valid_manifest():
     manifest = parse_agent_manifest(rendered)
     assert manifest.role == "developer"
     assert manifest.context["projectKey"] == "BN"
-    assert manifest.template_version == "1.5.0"
+    assert manifest.template_version == "1.6.0"
     assert manifest.template_checksum.startswith("sha256:")
     assert manifest.runtime.type == "hermes"
     assert manifest.runtime.max_iterations == 60
@@ -48,7 +48,7 @@ def test_render_orchestrator_template_runtime_none():
     manifest = parse_agent_manifest(rendered)
     assert manifest.role == "orchestrator"
     assert manifest.runtime.type == "none"
-    assert manifest.template_version == "1.5.0"
+    assert manifest.template_version == "1.6.0"
     assert manifest.template_checksum.startswith("sha256:")
     assert any(skill.path == "skills/delivery/agent-delivery-standards/SKILL.md" for skill in manifest.skills)
 
@@ -63,7 +63,7 @@ def test_render_analyst_template_runtime_hermes():
     assert manifest.runtime.type == "hermes"
     assert manifest.runtime.max_iterations == 15
     assert manifest.runtime.toolsets == ()
-    assert manifest.template_version == "1.5.0"
+    assert manifest.template_version == "1.6.0"
     assert manifest.template_checksum.startswith("sha256:")
     assert "LivingColor Analyst Agent" in manifest.prompt.system
     assert "readinessScore" in manifest.prompt.system
@@ -371,18 +371,18 @@ def test_provision_writes_manifests_and_mapping(livingcolor_home):
 
     assert result.status == "ready"
     assert result.project_key == "BN"
-    assert result.agents_provisioned == ["analyst", "developer", "orchestrator", "planner", "publisher"]
+    assert result.agents_provisioned == ["analyst", "developer", "orchestrator", "planner", "publisher", "reporter"]
     assert result.repos_discovered == 2
     assert result.default_repo == "group/bn-frontend"
-    assert result.template_version == "1.5.0"
+    assert result.template_version == "1.6.0"
     assert result.warnings == []
 
-    for role in ("orchestrator", "analyst", "planner", "developer", "publisher"):
+    for role in ("orchestrator", "analyst", "planner", "developer", "publisher", "reporter"):
         assert get_agent_manifest_path("BN", role).is_file()
 
     automation = yaml.safe_load(get_automation_state_path("BN").read_text(encoding="utf-8"))
     assert automation["status"] == "ready"
-    assert automation["templateVersion"] == "1.5.0"
+    assert automation["templateVersion"] == "1.6.0"
     assert automation["reposDiscovered"] == 2
     assert automation["defaultRepo"] == "group/bn-frontend"
     assert automation["provisionedAt"]
@@ -486,7 +486,7 @@ def test_upgrade_rewrites_manifest_when_template_newer(livingcolor_home):
 
     developer_path = get_agent_manifest_path("BN", "developer")
     before = parse_agent_manifest(developer_path.read_text(encoding="utf-8"))
-    assert before.template_version == "1.5.0"
+    assert before.template_version == "1.6.0"
 
     with patch(
         "lc_server.provisioning.template_renderer.get_template_version",
@@ -573,7 +573,7 @@ def test_upgrade_skips_manually_edited_manifest(livingcolor_home):
     assert "BN" in upgraded
     developer = parse_agent_manifest(developer_path.read_text(encoding="utf-8"))
     assert developer.manually_edited is True
-    assert developer.template_version == "1.5.0"
+    assert developer.template_version == "1.6.0"
 
     orchestrator = parse_agent_manifest(
         get_agent_manifest_path("BN", "orchestrator").read_text(encoding="utf-8")

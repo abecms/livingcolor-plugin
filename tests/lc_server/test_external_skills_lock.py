@@ -7,10 +7,16 @@ import pytest
 
 VALID_LOCK = {
     "repo": "Tamsi/livingcolor-skills",
-    "ref": "v0.1.0",
-    "resolvedCommit": "fdf1be62d61ef74b51d91ae81ed718350dce20d5",
+    "ref": "v0.2.0",
+    "resolvedCommit": "316e3ba0f98aacff910c3f79e64f21e058d11baa",
     "bundle": "code-review-pipeline",
-    "skills": ["ticket-analyst", "code-architect", "qa-reviewer", "security-auditor"],
+    "skills": [
+        "ticket-analyst",
+        "code-architect",
+        "qa-reviewer",
+        "security-auditor",
+        "sprint-reporter",
+    ],
     "updatedBy": "livingcolor-evolution",
 }
 
@@ -21,10 +27,16 @@ def test_parse_valid_external_skills_lock():
     lock = parse_external_skills_lock(VALID_LOCK)
 
     assert lock.repo == "Tamsi/livingcolor-skills"
-    assert lock.ref == "v0.1.0"
-    assert lock.resolved_commit == "fdf1be62d61ef74b51d91ae81ed718350dce20d5"
+    assert lock.ref == "v0.2.0"
+    assert lock.resolved_commit == "316e3ba0f98aacff910c3f79e64f21e058d11baa"
     assert lock.bundle == "code-review-pipeline"
-    assert lock.skills == ("ticket-analyst", "code-architect", "qa-reviewer", "security-auditor")
+    assert lock.skills == (
+        "ticket-analyst",
+        "code-architect",
+        "qa-reviewer",
+        "security-auditor",
+        "sprint-reporter",
+    )
     assert lock.updated_by == "livingcolor-evolution"
 
 

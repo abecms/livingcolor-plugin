@@ -8,6 +8,14 @@ import os
 import re
 from typing import Any, Callable
 
+from delivery_runtime.agents.registry import AgentManifestRegistry
+from delivery_runtime.agents.schema import AgentManifest
+from lc_server.agent_bridge.manifest_prompt import render_manifest_system_prompt
+from lc_server.integrations.skills import (
+    EXTERNAL_GUIDANCE_RESPONSE_CONTRACT_REMINDER,
+    external_guidance_for_skills,
+)
+
 logger = logging.getLogger(__name__)
 
 SPRINT_REPORTER_TOOLSETS: list[str] = []
@@ -27,6 +35,7 @@ Rules:
 Output ONLY the message body text. Do not wrap it in JSON or code fences.
 """
 
+_registry = AgentManifestRegistry()
 _JSON_BLOCK_RE = re.compile(r"\{[^{}]*\"status\"[^{}]*\}", re.DOTALL)
 
 
@@ -41,24 +50,46 @@ class HermesSprintReporterAgent:
         self,
         *,
         agent_factory: Callable[..., Any] | None = None,
+        registry: AgentManifestRegistry | None = None,
     ) -> None:
         self._agent_factory = agent_factory or _default_sprint_reporter_agent_factory
+        self._registry = registry or _registry
 
     def compose(self, snapshot: dict[str, Any], *, project_key: str) -> str:
         key = project_key.strip().upper()
+        manifest = _resolve_reporter_manifest(key, registry=self._registry)
         sprint_number = snapshot.get("sprintNumber") or snapshot.get("sprint", {}).get("number")
         task_id = f"delivery-sprint-report-{key}-{sprint_number or 'unknown'}"
         prompt = (
             "Compose the sprint retrospective message for this snapshot:\n\n"
             f"{json.dumps(snapshot, indent=2, ensure_ascii=False)}"
         )
+        guidance = external_guidance_for_skills(("sprint-reporter",))
+        if guidance:
+            prompt = f"{prompt}\n\n{guidance}\n\n{EXTERNAL_GUIDANCE_RESPONSE_CONTRACT_REMINDER}"
 
-        agent = self._agent_factory(task_id=task_id, project_key=key)
+        agent = self._agent_factory(
+            task_id=task_id,
+            project_key=key,
+            manifest=manifest,
+        )
         result = agent.run_conversation(prompt, task_id=task_id)
         text = _extract_message_body(str(result.get("final_response") or ""))
         if not text.strip():
             raise SprintReporterError("Sprint reporter returned an empty message")
         return text.strip()
+
+
+def _resolve_reporter_manifest(
+    project_key: str | None,
+    *,
+    registry: AgentManifestRegistry,
+) -> AgentManifest | None:
+    if not project_key:
+        return None
+    if not registry.is_automation_ready(project_key):
+        return None
+    return registry.get(project_key, "reporter")
 
 
 def _extract_message_body(final_response: str) -> str:
@@ -72,7 +103,12 @@ def _extract_message_body(final_response: str) -> str:
     return cleaned
 
 
-def _default_sprint_reporter_agent_factory(*, task_id: str, project_key: str) -> Any:
+def _default_sprint_reporter_agent_factory(
+    *,
+    task_id: str,
+    project_key: str,
+    manifest: AgentManifest | None,
+) -> Any:
     from hermes_cli.config import load_config
     from hermes_cli.fallback_config import get_fallback_chain
     from hermes_cli.runtime_provider import resolve_runtime_provider
@@ -83,6 +119,17 @@ def _default_sprint_reporter_agent_factory(*, task_id: str, project_key: str) ->
 
     os.environ.setdefault("HERMES_YOLO_MODE", "1")
     os.environ.setdefault("HERMES_ACCEPT_HOOKS", "1")
+
+    if manifest:
+        system_prompt = render_manifest_system_prompt(manifest)
+        toolsets = list(manifest.runtime.toolsets)
+        max_iterations = manifest.runtime.max_iterations
+        platform = manifest.identity.platform
+    else:
+        system_prompt = SPRINT_REPORTER_SYSTEM_PROMPT
+        toolsets = list(SPRINT_REPORTER_TOOLSETS)
+        max_iterations = 8
+        platform = "livingcolor-sprint-reporter"
 
     cfg = load_config()
     model_cfg = cfg.get("model") or {}
@@ -110,14 +157,17 @@ def _default_sprint_reporter_agent_factory(*, task_id: str, project_key: str) ->
         provider=runtime.get("provider"),
         api_mode=runtime.get("api_mode"),
         model=effective_model,
-        enabled_toolsets=list(SPRINT_REPORTER_TOOLSETS),
-        max_iterations=8,
+        enabled_toolsets=toolsets,
+        max_iterations=max_iterations,
         quiet_mode=True,
-        platform="livingcolor-sprint-reporter",
+        platform=platform,
         session_id=task_id,
-        ephemeral_system_prompt=SPRINT_REPORTER_SYSTEM_PROMPT,
+        ephemeral_system_prompt=system_prompt,
         skip_context_files=True,
         skip_memory=True,
         fallback_model=fallback or None,
         credential_pool=runtime.get("credential_pool"),
     )
+
+
+__all__ = ["HermesSprintReporterAgent", "SprintReporterError"]

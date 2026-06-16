@@ -4,7 +4,7 @@ from pathlib import Path
 
 from lc_constants import get_livingcolor_home
 
-VALID_ROLES = frozenset({"orchestrator", "analyst", "planner", "developer", "publisher"})
+VALID_ROLES = frozenset({"orchestrator", "analyst", "planner", "developer", "publisher", "reporter"})
 
 
 def _normalize_project_key(project_key: str) -> str:

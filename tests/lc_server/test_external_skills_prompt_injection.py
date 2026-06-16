@@ -130,3 +130,45 @@ def test_resolver_returns_empty_string_when_cache_unavailable(monkeypatch, caplo
 
     assert guidance == ""
     assert f"External skills cache missing for {RESOLVED_COMMIT}" in caplog.text
+
+
+def test_sprint_reporter_prompt_appends_sprint_reporter_guidance(monkeypatch):
+    from lc_server.agent_bridge.hermes_sprint_reporter import HermesSprintReporterAgent
+
+    prompts: list[str] = []
+    requested_skill_names: list[tuple[str, ...]] = []
+
+    def guidance_for(names: tuple[str, ...]) -> str:
+        requested_skill_names.append(names)
+        return "## External LivingColor Skills Guidance\n# Sprint Reporter"
+
+    monkeypatch.setattr(
+        "lc_server.agent_bridge.hermes_sprint_reporter.external_guidance_for_skills",
+        guidance_for,
+    )
+
+    @dataclass
+    class CapturingAgent:
+        def run_conversation(self, prompt: str, *, task_id: str):
+            prompts.append(prompt)
+            return {"final_response": "*Sprint 3* — delivered BN-1."}
+
+    agent = HermesSprintReporterAgent(
+        agent_factory=lambda **kwargs: CapturingAgent(),
+    )
+
+    text = agent.compose(
+        {
+            "projectKey": "BN",
+            "communicationLanguage": "fr",
+            "sprintNumber": 3,
+            "sprint": {"name": "Sprint 3", "startDate": "2026-06-03", "endDate": "2026-06-16"},
+            "ticketsPlanned": [],
+        },
+        project_key="BN",
+    )
+
+    assert text == "*Sprint 3* — delivered BN-1."
+    assert "External LivingColor Skills Guidance" in prompts[0]
+    assert "# Sprint Reporter" in prompts[0]
+    assert requested_skill_names == [("sprint-reporter",)]

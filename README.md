@@ -95,9 +95,11 @@ cache-only.
 
 External skills are rendered as read-only model guidance. They do not grant new
 tool permissions, change delivery tool response contracts, or alter the
-human-gated workflow. To roll back, restore `livingcolor.skills.lock.json` to a
-previous known-good `resolvedCommit`, then re-materialize or warm that cache
-before running delivery again.
+human-gated workflow. The `code-review-pipeline` bundle includes
+`sprint-reporter` for end-of-sprint retrospectives posted to Hermes messaging.
+To roll back, restore `livingcolor.skills.lock.json` to a previous known-good
+`resolvedCommit`, then re-materialize or warm that cache before running delivery
+again.
 
 ## First-time setup
 
@@ -195,7 +197,7 @@ The LivingColor tab is the primary UI:
 | Area | Purpose |
 | --- | --- |
 | **Project dashboard** | Work Orders, readiness queue, gate reviews, delivery status |
-| **Settings** | Per-project delivery configuration |
+| **Settings** | Per-project delivery configuration, sprint reset, sprint report |
 | **Integrations** | Jira / GitLab / GitHub MCP scopes for the project |
 
 Typical flow:

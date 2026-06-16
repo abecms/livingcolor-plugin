@@ -7,7 +7,7 @@ import yaml
 
 API_VERSION = "livingcolor.dev/v1"
 KIND = "AgentManifest"
-VALID_ROLES = frozenset({"orchestrator", "analyst", "planner", "developer", "publisher"})
+VALID_ROLES = frozenset({"orchestrator", "analyst", "planner", "developer", "publisher", "reporter"})
 VALID_RUNTIME_TYPES = frozenset({"hermes", "none"})
 
 
