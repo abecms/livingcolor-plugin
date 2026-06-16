@@ -65,10 +65,30 @@ def build_analyst_user_prompt(snapshot: dict[str, Any]) -> str:
             "### Raw snapshot JSON",
             json.dumps(snapshot, indent=2, sort_keys=True),
             "",
-            "Apply the readiness scoring rubric and finish with a JSON completion block matching",
-            "the analyze_ticket_snapshot schema (readinessScore, readinessStatus, analysisSummary,",
-            "blockers, recommendedRepos, confidence, estimatedDays).",
-            "estimatedDays is your effort estimate in workdays (8h) as a number, e.g. 1.5.",
+            "## LivingColor readiness semantics",
+            "",
+            "- ready: implementation can start from the ticket and available repo context.",
+            "- not_ready: ticket is blocked by missing technical information, dependency, environment, or contradiction.",
+            "- needs_clarification: genuine product/UX/business ambiguity that must be resolved before implementation.",
+            "- not_development: request is not implementation work.",
+            "- analysis_failed: reserved for runtime failures; do not emit it as a normal LLM classification.",
+            "",
+            "Technical tickets can be ready when they include enough operational detail, even when they are",
+            "not written as user stories or formal Gherkin acceptance criteria.",
+            "SEO JSON-LD, schema.org, dataLayer, Airship tracking, BFF behavior, frontend UI,",
+            "backend behavior, and playback/access bugs are development work unless the ticket explicitly says otherwise.",
+            "Prefer ready when the title, description, target behavior, and repo context are sufficient and",
+            "no unresolved comment blocks implementation.",
+            "",
+            "## Response contract",
+            "",
+            "Return strict JSON, either fenced as ```json or as a raw parseable JSON object.",
+            "Use exactly these fields: readinessScore, readinessStatus, analysisSummary, blockers,",
+            "recommendedRepos, confidence, estimatedDays.",
+            "readinessStatus must be one of: ready, not_ready, needs_clarification, not_development.",
+            "Do not use analysis_failed; it is only for runtime/parser failures outside this analysis.",
+            "blockers and recommendedRepos must be arrays. estimatedDays is your effort estimate in",
+            "workdays (8h) as a number, e.g. 1.5.",
         ]
     )
     return "\n".join(sections)
@@ -164,11 +184,17 @@ def parse_analyst_completion(text: str, snapshot: dict[str, Any]) -> dict[str, A
         raise AnalystParseError(f"analyst completion is missing required fields: {', '.join(missing)}")
 
     readiness_score = payload["readinessScore"]
-    if not isinstance(readiness_score, (int, float)):
+    if not isinstance(readiness_score, (int, float)) or isinstance(readiness_score, bool):
         raise AnalystParseError("readinessScore must be numeric")
-    readiness_status = str(payload["readinessStatus"] or "").strip()
-    if readiness_status not in {"ready", "not_ready"}:
-        raise AnalystParseError("readinessStatus must be 'ready' or 'not_ready'")
+    readiness_status = _normalize_analyst_readiness_status(str(payload["readinessStatus"] or ""))
+    if readiness_status is None:
+        raise AnalystParseError(
+            "readinessStatus must be one of: ready, not_ready, needs_clarification, not_development, analysis_failed"
+        )
+
+    analysis_summary = payload["analysisSummary"]
+    if not isinstance(analysis_summary, str):
+        raise AnalystParseError("analysisSummary must be a string")
 
     blockers = payload["blockers"]
     if not isinstance(blockers, list):
@@ -178,7 +204,7 @@ def parse_analyst_completion(text: str, snapshot: dict[str, Any]) -> dict[str, A
         raise AnalystParseError("recommendedRepos must be a list")
 
     confidence = payload["confidence"]
-    if not isinstance(confidence, (int, float)):
+    if not isinstance(confidence, (int, float)) or isinstance(confidence, bool):
         raise AnalystParseError("confidence must be numeric")
 
     estimated_days = payload.get("estimatedDays")
@@ -188,13 +214,27 @@ def parse_analyst_completion(text: str, snapshot: dict[str, Any]) -> dict[str, A
     return {
         "readinessScore": int(readiness_score),
         "readinessStatus": readiness_status,
-        "analysisSummary": str(payload["analysisSummary"] or "").strip(),
+        "analysisSummary": analysis_summary.strip(),
         "blockers": [str(item) for item in blockers],
         "recommendedRepos": [str(item) for item in recommended_repos if str(item).strip()],
         "confidence": float(confidence),
         "estimatedDays": float(estimated_days) if estimated_days else None,
         "jiraSnapshot": snapshot,
     }
+
+
+def _normalize_analyst_readiness_status(raw: str) -> str | None:
+    normalized = raw.strip().lower().replace("-", "_").replace(" ", "_")
+    aliases = {
+        "notready": "not_ready",
+        "needsclarification": "needs_clarification",
+        "notdevelopment": "not_development",
+        "analysisfailed": "analysis_failed",
+    }
+    normalized = aliases.get(normalized, normalized)
+    if normalized in {"ready", "not_ready", "needs_clarification", "not_development", "analysis_failed"}:
+        return normalized
+    return None
 
 
 def _extract_json_object(text: str) -> dict[str, Any] | None:
