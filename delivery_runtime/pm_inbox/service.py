@@ -209,3 +209,18 @@ class PmInboxService:
             payload={"projectKey": project_key.strip().upper()},
         )
         return payload
+
+    def publish_sprint_report(
+        self,
+        *,
+        project_key: str,
+        actor: str = "human",
+        force: bool = False,
+    ) -> dict[str, Any]:
+        from delivery_runtime.pm_inbox.sprint_report import publish_sprint_report
+
+        return publish_sprint_report(
+            project_key=project_key,
+            actor=actor,
+            force=force,
+        )

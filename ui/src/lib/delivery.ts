@@ -541,6 +541,26 @@ export function resetProjectSprint(): Promise<PmInboxPayload['selectedSprint']> 
   })
 }
 
+export interface SprintReportResult {
+  status: string
+  reason?: string | null
+  dedupKey?: string | null
+  platform?: string | null
+  publishedAt?: string | null
+  messagePreview?: string | null
+  error?: string | null
+}
+
+export function publishProjectSprintReport(force = false): Promise<SprintReportResult> {
+  const query = force ? '?force=true' : ''
+  return callDesktopApi({
+    ...profileScoped(),
+    path: `/api/delivery/sprint/report${query}`,
+    method: 'POST',
+    timeoutMs: 120_000
+  })
+}
+
 export function fetchPmInbox(projectKey?: string): Promise<PmInboxPayload> {
   const query = projectKey ? `?project=${encodeURIComponent(projectKey)}` : ''
   return callDesktopApi({

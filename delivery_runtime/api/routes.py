@@ -36,6 +36,7 @@ from delivery_runtime.api.schemas import (
     ProjectConfigUpdateRequest,
     PromoteReadinessResponse,
     SelectedSprintResponse,
+    SprintReportResponse,
     SprintSelectionUpdateRequest,
     TicketEstimationUpdateRequest,
     TicketEstimationUpdateResponse,
@@ -665,6 +666,19 @@ def reset_sprint_selection(request: Request) -> SelectedSprintResponse:
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return SelectedSprintResponse.model_validate(payload)
+
+
+@router.post("/sprint/report", response_model=SprintReportResponse)
+def publish_sprint_report(request: Request, force: bool = False) -> SprintReportResponse:
+    project_key = _activate_local_project_from_request(request)
+    if not project_key:
+        raise HTTPException(status_code=400, detail="Active project key is required")
+    services = get_services()
+    payload = services.pm_inbox.publish_sprint_report(
+        project_key=project_key,
+        force=force,
+    )
+    return SprintReportResponse.model_validate(payload)
 
 
 @router.get("/pm-inbox", response_model=PmInboxResponse)

@@ -5,12 +5,12 @@ from __future__ import annotations
 import logging
 
 from delivery_runtime.automation.config import load_delivery_automation_config
-from delivery_runtime.automation.scheduler import DailyAnalysisScheduler
+from delivery_runtime.automation.scheduler import DeliveryAutomationScheduler
 from lc_server.factory import build_delivery_services
 
 logger = logging.getLogger(__name__)
 
-_scheduler: DailyAnalysisScheduler | None = None
+_scheduler: DeliveryAutomationScheduler | None = None
 
 
 def _run_scheduled_daily_analysis() -> None:
@@ -19,6 +19,14 @@ def _run_scheduled_daily_analysis() -> None:
     services = deps.get_services()
     config = load_delivery_automation_config()
     services.pm_inbox.run_daily_analysis(config.project_key)
+
+
+def _run_scheduled_sprint_report() -> None:
+    from delivery_runtime.api import deps
+
+    services = deps.get_services()
+    config = load_delivery_automation_config()
+    services.pm_inbox.publish_sprint_report(project_key=config.project_key, actor="scheduler")
 
 
 def bootstrap_livingcolor_server() -> None:
@@ -64,12 +72,25 @@ def bootstrap_livingcolor_server() -> None:
         logger.warning("MCP warm connect on startup skipped: %s", exc)
 
     config = load_delivery_automation_config()
-    if config.daily_analysis_cron.enabled:
-        _scheduler = DailyAnalysisScheduler(runner=_run_scheduled_daily_analysis)
-        _scheduler.start()
-        logger.info(
-            "Daily analysis scheduler enabled for %s at %02d:%02d UTC",
-            config.project_key,
-            config.daily_analysis_cron.hour,
-            config.daily_analysis_cron.minute,
+    if config.daily_analysis_cron.enabled or config.sprint_report_cron.enabled:
+        _scheduler = DeliveryAutomationScheduler(
+            daily_runner=_run_scheduled_daily_analysis,
+            sprint_report_runner=_run_scheduled_sprint_report
+            if config.sprint_report_cron.enabled
+            else None,
         )
+        _scheduler.start()
+        if config.daily_analysis_cron.enabled:
+            logger.info(
+                "Daily analysis scheduler enabled for %s at %02d:%02d UTC",
+                config.project_key,
+                config.daily_analysis_cron.hour,
+                config.daily_analysis_cron.minute,
+            )
+        if config.sprint_report_cron.enabled:
+            logger.info(
+                "Sprint report scheduler enabled for %s at %02d:%02d UTC",
+                config.project_key,
+                config.sprint_report_cron.hour,
+                config.sprint_report_cron.minute,
+            )

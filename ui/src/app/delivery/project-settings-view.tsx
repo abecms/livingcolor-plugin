@@ -8,11 +8,12 @@ import {
   DEFAULT_TICKET_SCOPE,
   fetchProjectConfig,
   resetProjectSprint,
+  publishProjectSprintReport,
   saveProjectConfig,
   type TicketScopePayload
 } from '@/lib/delivery'
 import { useFirebaseAuth } from '@/hooks/use-firebase-auth'
-import { RefreshCw, Settings, Share2, SlidersHorizontal, Trash2 } from '@/lib/icons'
+import { RefreshCw, Send, Settings, Share2, SlidersHorizontal, Trash2 } from '@/lib/icons'
 import { bumpProjectConfigRevision } from '@/store/project-config'
 import { notifyError, notify } from '@/store/notifications'
 
@@ -50,6 +51,7 @@ export function ProjectSettingsView() {
   const [configPath, setConfigPath] = useState('')
   const [shareOpen, setShareOpen] = useState(false)
   const [resettingSprint, setResettingSprint] = useState(false)
+  const [publishingSprintReport, setPublishingSprintReport] = useState(false)
 
   const displayName = activeProject?.projectName ?? projectName
   const displayKey = activeProjectKey ?? projectKey
@@ -147,6 +149,64 @@ export function ProjectSettingsView() {
       notifyError(error, 'Could not reset sprint')
     } finally {
       setResettingSprint(false)
+    }
+  }, [])
+
+  const publishSprintReport = useCallback(async () => {
+    setPublishingSprintReport(true)
+    try {
+      const result = await publishProjectSprintReport(false)
+      if (result.status === 'sent') {
+        notify({
+          kind: 'success',
+          message: result.platform
+            ? `Sprint report posted to ${result.platform}.`
+            : 'Sprint report posted to the Hermes messaging channel.'
+        })
+        return
+      }
+      if (result.status === 'skipped' && result.reason === 'already_published') {
+        notify({
+          kind: 'info',
+          message: 'This sprint report was already published. Hold Shift and click again to resend.'
+        })
+        return
+      }
+      if (result.status === 'skipped') {
+        notify({
+          kind: 'info',
+          message: result.reason === 'no_active_sprint'
+            ? 'No active sprint to report yet.'
+            : 'Sprint report was not published.'
+        })
+        return
+      }
+      notifyError(new Error(result.error || 'Sprint report failed'), 'Could not publish sprint report')
+    } catch (error) {
+      notifyError(error, 'Could not publish sprint report')
+    } finally {
+      setPublishingSprintReport(false)
+    }
+  }, [])
+
+  const publishSprintReportForced = useCallback(async () => {
+    setPublishingSprintReport(true)
+    try {
+      const result = await publishProjectSprintReport(true)
+      if (result.status === 'sent') {
+        notify({
+          kind: 'success',
+          message: result.platform
+            ? `Sprint report reposted to ${result.platform}.`
+            : 'Sprint report reposted to the Hermes messaging channel.'
+        })
+        return
+      }
+      notifyError(new Error(result.error || 'Sprint report failed'), 'Could not publish sprint report')
+    } catch (error) {
+      notifyError(error, 'Could not publish sprint report')
+    } finally {
+      setPublishingSprintReport(false)
     }
   }, [])
 
@@ -250,7 +310,21 @@ export function ProjectSettingsView() {
                   </SelectContent>
                 </Select>
                 <Button
-                  disabled={loading || saving || resettingSprint}
+                  disabled={loading || saving || resettingSprint || publishingSprintReport}
+                  onClick={event => {
+                    if (event.shiftKey) {
+                      void publishSprintReportForced()
+                      return
+                    }
+                    void publishSprintReport()
+                  }}
+                  {...dashboardOutlineButtonProps()}
+                >
+                  <Send className="mr-2 size-4" />
+                  {publishingSprintReport ? 'Publishing…' : 'Publish sprint report'}
+                </Button>
+                <Button
+                  disabled={loading || saving || resettingSprint || publishingSprintReport}
                   onClick={() => void resetSprintNow()}
                   {...dashboardOutlineButtonProps()}
                 >
@@ -261,7 +335,9 @@ export function ProjectSettingsView() {
               <p className="text-xs text-(--ui-text-tertiary)">
                 Each sprint starts on this weekday and runs for the configured duration. LivingColor
                 opens a new sprint automatically on the next start day once the previous sprint has
-                ended. Use the button to start a new sprint immediately.
+                ended. Use the button to start a new sprint immediately. At sprint end, LivingColor
+                also posts a retrospective to your Hermes messaging channel (Slack home channel).
+                Shift-click Publish sprint report to force a repost.
               </p>
             </div>
 

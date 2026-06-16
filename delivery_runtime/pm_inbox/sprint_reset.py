@@ -83,6 +83,11 @@ def reset_sprint(*, project_key: str, now: datetime | None = None) -> dict[str, 
     """Clear manual override, bump sprint number, and rebuild ticket selection."""
     project_key = project_key.strip().upper()
     now = now or datetime.now(UTC)
+
+    from delivery_runtime.pm_inbox.sprint_report import maybe_publish_sprint_report_before_reset
+
+    maybe_publish_sprint_report_before_reset(project_key=project_key, now=now)
+
     today = _today(now)
     config = load_delivery_automation_config(project_key=project_key)
     duration_days = max(1, config.sprint.duration_days)

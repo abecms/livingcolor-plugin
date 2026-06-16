@@ -287,6 +287,16 @@ class SelectedSprintResponse(BaseModel):
     tickets: list[SelectedSprintTicketResponse] = Field(default_factory=list)
 
 
+class SprintReportResponse(BaseModel):
+    status: str
+    reason: str | None = None
+    dedupKey: str | None = None
+    platform: str | None = None
+    publishedAt: str | None = None
+    messagePreview: str | None = None
+    error: str | None = None
+
+
 class PmInboxResponse(BaseModel):
     projectKey: str
     projectName: str = "Bibliothèque Numérique"

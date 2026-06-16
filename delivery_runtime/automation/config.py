@@ -31,6 +31,13 @@ class DailyAnalysisCronConfig:
 
 
 @dataclass(frozen=True)
+class SprintReportCronConfig:
+    enabled: bool = True
+    hour: int = 16
+    minute: int = 0
+
+
+@dataclass(frozen=True)
 class SprintConfig:
     duration_days: int = 14
     capacity_days: float = 15.0
@@ -43,6 +50,7 @@ class DeliveryAutomationConfig:
     project_name: str = DEFAULT_PROJECT_NAME
     communication_language: str = DEFAULT_COMMUNICATION_LANGUAGE
     daily_analysis_cron: DailyAnalysisCronConfig = DailyAnalysisCronConfig()
+    sprint_report_cron: SprintReportCronConfig = SprintReportCronConfig()
     sprint: SprintConfig = SprintConfig()
     ticket_scope: "TicketScopeConfig | None" = None
 
@@ -158,6 +166,8 @@ def load_delivery_automation_config(*, project_key: str | None = None) -> Delive
     automation_map = automation if isinstance(automation, dict) else {}
     cron_map = automation_map.get("daily_analysis_cron")
     cron_map = cron_map if isinstance(cron_map, dict) else {}
+    sprint_report_map = automation_map.get("sprint_report_cron")
+    sprint_report_map = sprint_report_map if isinstance(sprint_report_map, dict) else {}
 
     sprint_map = merged.get("sprint")
     sprint_map = sprint_map if isinstance(sprint_map, dict) else {}
@@ -174,6 +184,18 @@ def load_delivery_automation_config(*, project_key: str | None = None) -> Delive
     cron_minute = _parse_int(
         os.environ.get("LIVINGCOLOR_DAILY_ANALYSIS_MINUTE"),
         _parse_int(cron_map.get("minute"), 0),
+    )
+    sprint_report_enabled = _parse_bool(
+        os.environ.get("LIVINGCOLOR_SPRINT_REPORT_ENABLED"),
+        _parse_bool(sprint_report_map.get("enabled"), True),
+    )
+    sprint_report_hour = _parse_int(
+        os.environ.get("LIVINGCOLOR_SPRINT_REPORT_HOUR"),
+        _parse_int(sprint_report_map.get("hour"), 16),
+    )
+    sprint_report_minute = _parse_int(
+        os.environ.get("LIVINGCOLOR_SPRINT_REPORT_MINUTE"),
+        _parse_int(sprint_report_map.get("minute"), 0),
     )
 
     from delivery_runtime.readiness.project_settings import (
@@ -214,6 +236,11 @@ def load_delivery_automation_config(*, project_key: str | None = None) -> Delive
             enabled=cron_enabled,
             hour=max(0, min(23, cron_hour)),
             minute=max(0, min(59, cron_minute)),
+        ),
+        sprint_report_cron=SprintReportCronConfig(
+            enabled=sprint_report_enabled,
+            hour=max(0, min(23, sprint_report_hour)),
+            minute=max(0, min(59, sprint_report_minute)),
         ),
         sprint=SprintConfig(
             duration_days=max(1, sprint_duration),
