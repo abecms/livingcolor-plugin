@@ -15,15 +15,15 @@ from delivery_runtime.readiness.analyst_backend import AnalystBackend
 
 ANALYSIS_PROMPT_SCHEMA_VERSION = "analyst-v2"
 
-AnalysisOutcomeStatus = Literal["success", "cached", "failed"]
+AnalysisOutcomeStatus = Literal["success", "cached", "failed", "skipped"]
 CacheLookup = Callable[[str], "AnalysisCacheEntry | None"]
 
 
 @dataclass(frozen=True)
 class AnalysisCacheEntry:
     jira_key: str
-    analysis_input_hash: str
-    analysis: dict[str, Any]
+    analysis_input_hash: str | None
+    analysis: dict[str, Any] | None
 
 
 @dataclass(frozen=True)
@@ -34,7 +34,7 @@ class AnalysisOutcome:
     duration_ms: int
     analysis: dict[str, Any] | None = None
     error: str | None = None
-    backend_name: str | None = None
+    backend: str | None = None
 
 
 @dataclass(frozen=True)
@@ -63,7 +63,7 @@ class AnalysisDispatchSummary:
                 {
                     "jiraKey": item.jira_key,
                     "status": item.status,
-                    "backend": item.backend_name,
+                    "backend": item.backend,
                     "durationMs": item.duration_ms,
                     "error": item.error,
                 }
@@ -83,20 +83,19 @@ def build_analysis_input_hash(snapshot: dict[str, Any], *, project_key: str) -> 
 
     payload = {
         "schemaVersion": ANALYSIS_PROMPT_SCHEMA_VERSION,
-        "projectKey": project_key,
-        "jira": {
-            "key": snapshot.get("key"),
-            "projectKey": snapshot.get("projectKey"),
-            "summary": snapshot.get("summary"),
-            "description": snapshot.get("description"),
-            "issueType": snapshot.get("issueType"),
-            "status": snapshot.get("status"),
-            "statusCategory": snapshot.get("statusCategory"),
-            "labels": snapshot.get("labels", []),
-            "comments": snapshot.get("comments", []),
-            "attachments": snapshot.get("attachments", []),
-            "attachmentExtracts": snapshot.get("attachmentExtracts", []),
-        },
+        "projectKey": project_key.strip().upper(),
+        "key": snapshot.get("key"),
+        "summary": snapshot.get("summary") or snapshot.get("title"),
+        "description": snapshot.get("description"),
+        "issueType": snapshot.get("issueType") or snapshot.get("issue_type"),
+        "status": snapshot.get("status"),
+        "statusCategory": snapshot.get("statusCategory"),
+        "labels": snapshot.get("labels", []),
+        "assignee": snapshot.get("assignee") or snapshot.get("assigneeDisplayName"),
+        "assigneeEmail": snapshot.get("assigneeEmail"),
+        "comments": snapshot.get("comments", []),
+        "attachments": snapshot.get("attachments", []),
+        "attachmentExtracts": snapshot.get("attachmentExtracts", []),
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
@@ -143,7 +142,7 @@ class ReadinessAnalysisDispatcher:
             success=sum(1 for outcome in outcomes if outcome.status == "success"),
             cached=sum(1 for outcome in outcomes if outcome.status == "cached"),
             failed=sum(1 for outcome in outcomes if outcome.status == "failed"),
-            skipped=0,
+            skipped=sum(1 for outcome in outcomes if outcome.status == "skipped"),
             forced=force,
             duration_ms=_elapsed_ms(started_at),
             items=outcomes,
@@ -159,19 +158,29 @@ class ReadinessAnalysisDispatcher:
         force: bool,
     ) -> AnalysisOutcome:
         started_at = time.perf_counter()
-        jira_key = str(snapshot.get("key") or "")
+        jira_key = str(snapshot.get("key") or "").strip()
+        if not jira_key:
+            return AnalysisOutcome(
+                jira_key="",
+                status="skipped",
+                analysis_input_hash="",
+                duration_ms=_elapsed_ms(started_at),
+                error="Missing Jira key",
+                backend=self._backend.name,
+            )
+
         analysis_input_hash = build_analysis_input_hash(snapshot, project_key=project_key)
 
         if not force:
             cache_entry = await self._lookup_cache(jira_key)
-            if cache_entry and cache_entry.analysis_input_hash == analysis_input_hash:
+            if cache_entry and cache_entry.analysis_input_hash == analysis_input_hash and cache_entry.analysis:
                 return AnalysisOutcome(
                     jira_key=jira_key,
                     status="cached",
                     analysis_input_hash=analysis_input_hash,
                     duration_ms=_elapsed_ms(started_at),
                     analysis=cache_entry.analysis,
-                    backend_name=self._backend.name,
+                    backend=self._backend.name,
                 )
 
         try:
@@ -183,7 +192,7 @@ class ReadinessAnalysisDispatcher:
                 analysis_input_hash=analysis_input_hash,
                 duration_ms=_elapsed_ms(started_at),
                 error=f"Analysis timed out after {self.per_ticket_timeout_sec:g}s",
-                backend_name=self._backend.name,
+                backend=self._backend.name,
             )
         except Exception as exc:
             return AnalysisOutcome(
@@ -192,7 +201,7 @@ class ReadinessAnalysisDispatcher:
                 analysis_input_hash=analysis_input_hash,
                 duration_ms=_elapsed_ms(started_at),
                 error=str(exc),
-                backend_name=self._backend.name,
+                backend=self._backend.name,
             )
 
         return AnalysisOutcome(
@@ -201,7 +210,7 @@ class ReadinessAnalysisDispatcher:
             analysis_input_hash=analysis_input_hash,
             duration_ms=_elapsed_ms(started_at),
             analysis=analysis,
-            backend_name=self._backend.name,
+            backend=self._backend.name,
         )
 
     async def _lookup_cache(self, jira_key: str) -> AnalysisCacheEntry | None:

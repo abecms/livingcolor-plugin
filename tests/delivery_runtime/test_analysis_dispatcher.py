@@ -108,6 +108,7 @@ async def test_dispatcher_uses_cache_when_not_forced():
     assert result.summary.success == 0
     assert backend.calls == []
     assert result.outcomes[0].status == "cached"
+    assert result.outcomes[0].backend == "recording"
 
 
 @pytest.mark.asyncio
@@ -159,6 +160,7 @@ async def test_summary_to_dict_uses_spec_shape_with_durations():
     assert summary["forced"] is True
     assert "durationMs" in summary
     assert summary["items"][0]["jiraKey"] == "TVP-1"
+    assert summary["items"][0]["backend"] == "recording"
     assert "durationMs" in summary["items"][0]
 
 
@@ -175,3 +177,69 @@ async def test_dispatcher_times_out_slow_backend():
     assert result.summary.failed == 1
     assert result.outcomes[0].status == "failed"
     assert result.outcomes[0].error
+
+
+@pytest.mark.asyncio
+async def test_dispatcher_skips_snapshot_without_jira_key():
+    backend = RecordingBackend()
+    dispatcher = ReadinessAnalysisDispatcher(
+        backend=backend,
+        concurrency=3,
+        cache_lookup=lambda jira_key: pytest.fail("cache should not be called"),
+    )
+    snapshot = _snapshot("")
+
+    result = await dispatcher.analyze_many([snapshot], project_key="TVP", run_id="DA-1", force=False)
+
+    assert result.summary.skipped == 1
+    assert result.summary.success == 0
+    assert result.outcomes[0].status == "skipped"
+    assert backend.calls == []
+
+
+@pytest.mark.asyncio
+async def test_dispatcher_ignores_cache_entry_without_analysis():
+    backend = RecordingBackend()
+    snapshot = _snapshot("TVP-1")
+    input_hash = build_analysis_input_hash(snapshot, project_key="TVP")
+    dispatcher = ReadinessAnalysisDispatcher(
+        backend=backend,
+        concurrency=3,
+        cache_lookup=lambda jira_key: AnalysisCacheEntry(
+            jira_key=jira_key,
+            analysis_input_hash=input_hash,
+            analysis=None,
+        ),
+    )
+
+    result = await dispatcher.analyze_many([snapshot], project_key="TVP", run_id="DA-1", force=False)
+
+    assert result.summary.cached == 0
+    assert result.summary.success == 1
+    assert backend.calls == ["TVP-1"]
+
+
+def test_analysis_input_hash_normalizes_project_key_and_uses_fallback_fields():
+    base = {
+        "key": "TVP-1",
+        "title": "Fallback title",
+        "description": "Acceptance criteria: render the page.",
+        "issue_type": "Task",
+        "status": "To Do",
+        "statusCategory": "To Do",
+        "labels": ["front"],
+        "assigneeDisplayName": "Ada Lovelace",
+        "assigneeEmail": "ada@example.com",
+        "comments": [],
+        "attachments": [],
+        "attachmentExtracts": [],
+    }
+
+    normalized = build_analysis_input_hash(base, project_key=" tvp ")
+    upper = build_analysis_input_hash(base, project_key="TVP")
+    changed_title = build_analysis_input_hash({**base, "title": "Changed title"}, project_key="TVP")
+    changed_issue_type = build_analysis_input_hash({**base, "issue_type": "Bug"}, project_key="TVP")
+
+    assert normalized == upper
+    assert changed_title != normalized
+    assert changed_issue_type != normalized
