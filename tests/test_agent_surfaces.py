@@ -55,6 +55,14 @@ def test_promote_tool_supports_legacy_direct_route_call(monkeypatch, tmp_path):
     ctx = _registered(monkeypatch, tmp_path)
     install_phase25_project_mapping()
     init_db()
+    from delivery_runtime.api import routes
+
+    tick_calls: list[str] = []
+
+    def fake_tick(services, work_order_id: str) -> None:
+        tick_calls.append(work_order_id)
+
+    monkeypatch.setattr(routes, "_run_promote_orchestrator_tick", fake_tick)
     with connect() as conn:
         record_id = next_public_id(conn, "RD")
         now = utc_now_iso()
@@ -89,3 +97,4 @@ def test_promote_tool_supports_legacy_direct_route_call(monkeypatch, tmp_path):
 
     assert payload["readiness"]["readinessStatus"] == "promoted"
     assert payload["workOrder"]["jiraKey"] == "AAC-LEGACY"
+    assert tick_calls == [payload["workOrder"]["id"]]

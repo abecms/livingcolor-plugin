@@ -153,6 +153,8 @@ def promote_readiness(
 
     if background_tasks is not None:
         background_tasks.add_task(_run_promote_orchestrator_tick, services, work_order["id"])
+    else:
+        _run_promote_orchestrator_tick(services, work_order["id"])
 
     readiness = services.readiness.get_record(record_id)
     if not readiness:
