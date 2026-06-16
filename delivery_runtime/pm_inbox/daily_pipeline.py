@@ -5,10 +5,14 @@ from __future__ import annotations
 from typing import Any
 
 from delivery_runtime.automation.config import DeliveryAutomationConfig, load_delivery_automation_config
+from delivery_runtime.communication.language import (
+    get_clarification_comment_template,
+    get_not_development_comment_template,
+)
 from delivery_runtime.events.store import EventStore
 from delivery_runtime.persistence.db import connect, json_dumps, utc_now_iso
 from delivery_runtime.pm_inbox.analyst import analyze_for_daily_delivery
-from delivery_runtime.pm_inbox.estimation import estimate_ticket_effort
+from delivery_runtime.pm_inbox.estimation import TicketEstimation, estimate_ticket_effort
 from delivery_runtime.pm_inbox.execution_queue import build_execution_queue, execution_queue_to_dict
 from delivery_runtime.pm_inbox.project_memory import (
     build_project_memory_highlights,
@@ -18,6 +22,42 @@ from delivery_runtime.pm_inbox import store as pm_store
 from delivery_runtime.readiness.errors import ReadinessIntegrationError
 from delivery_runtime.readiness.scanner import ReadinessScanner
 from delivery_runtime.readiness.ticket_scope import load_ticket_scope_for_project, matches_ticket_scope
+
+
+def _should_persist_ticket_estimation(*, readiness_status: str) -> bool:
+    """Estimate dev tickets we may schedule, even when clarification is still pending."""
+    return readiness_status in {"ready", "needs_clarification", "not_ready"}
+
+
+def _comment_proposal_for_status(readiness_status: str, *, language: str) -> tuple[str, str] | tuple[None, None]:
+    """Build Jira comment proposal text from a readiness status (template only, no re-analysis)."""
+    if readiness_status == "needs_clarification":
+        return get_clarification_comment_template(language), "needs_clarification"
+    if readiness_status == "not_development":
+        return get_not_development_comment_template(language), "not_development"
+    return None, None
+
+
+def _estimation_from_readiness_row(row: Any, snapshot: dict[str, Any]) -> TicketEstimation | None:
+    readiness_status = str(row["readiness_status"] or "")
+    if not _should_persist_ticket_estimation(readiness_status=readiness_status):
+        return None
+
+    readiness_score = int(row["readiness_score"] or 0)
+    confidence = float(row["confidence"] or 0.5)
+    llm_days = row["estimated_days"]
+    heuristic = estimate_ticket_effort(
+        snapshot,
+        readiness_score=readiness_score,
+        confidence=confidence,
+    )
+    if llm_days is not None and float(llm_days) > 0:
+        return TicketEstimation(
+            complexity=heuristic.complexity,
+            estimated_days=float(llm_days),
+            confidence=confidence,
+        )
+    return heuristic
 
 
 class DailyAnalysisPipeline:
@@ -32,19 +72,26 @@ class DailyAnalysisPipeline:
         self.scanner = scanner or ReadinessScanner(self.events)
         self.config = config or load_delivery_automation_config()
 
-    def run(self, project_key: str | None = None) -> dict[str, Any]:
+    def run(
+        self,
+        project_key: str | None = None,
+        *,
+        run_id: str | None = None,
+        force: bool = False,
+    ) -> dict[str, Any]:
         project_key = (project_key or self.config.project_key).strip().upper()
         if not project_key:
             raise ValueError("project_key is required")
 
-        with connect() as conn:
-            pm_store.fail_stale_daily_runs(conn)
-            if pm_store.has_running_daily_run(conn):
-                raise ValueError(
-                    "Another daily analysis is already running. "
-                    "Wait for it to finish, then retry."
-                )
-            run_id = pm_store.create_daily_run(conn, project_key=project_key)
+        if run_id is None:
+            with connect() as conn:
+                pm_store.fail_stale_daily_runs(conn)
+                if pm_store.has_running_daily_run(conn, project_key=project_key):
+                    raise ValueError(
+                        "Another daily analysis is already running. "
+                        "Wait for it to finish, then retry."
+                    )
+                run_id = pm_store.create_daily_run(conn, project_key=project_key)
 
         self.events.append(
             event_type="DAILY_ANALYSIS_STARTED",
@@ -55,8 +102,8 @@ class DailyAnalysisPipeline:
             if self.scanner._issue_fetcher is None:
                 raise ReadinessIntegrationError("Jira integration is not configured on this server")
 
-            scan_result = self.scanner.scan_project(project_key)
-            enhanced = self._qualify_and_estimate(project_key=project_key, run_id=run_id)
+            scan_result = self.scanner.scan_project(project_key, run_id=run_id, force=force)
+            enhanced = self._qualify_and_estimate(project_key=project_key, run_id=run_id, preserve_llm_analysis=True)
             execution_queue = self._rebuild_execution_queue(project_key=project_key, run_id=run_id)
             selected_sprint = self._rebuild_selected_sprint(project_key=project_key)
             project_memory = self._refresh_project_memory(project_key=project_key, run_id=run_id)
@@ -73,6 +120,7 @@ class DailyAnalysisPipeline:
                     "skippedExcluded": scan_result.skipped_excluded,
                     "dismissedOutOfScope": scan_result.dismissed_out_of_scope,
                 },
+                "analysisDispatch": scan_result.analysis_dispatch or {},
                 "qualification": enhanced,
                 "executionQueue": execution_queue,
                 "selectedSprint": selected_sprint,
@@ -113,9 +161,16 @@ class DailyAnalysisPipeline:
             )
             raise
 
-    def _qualify_and_estimate(self, *, project_key: str, run_id: str) -> dict[str, Any]:
+    def _qualify_and_estimate(
+        self,
+        *,
+        project_key: str,
+        run_id: str,
+        preserve_llm_analysis: bool = False,
+    ) -> dict[str, Any]:
         analyzed = estimated = proposals_created = 0
         ticket_scope = load_ticket_scope_for_project(project_key)
+        communication_language = self.config.communication_language
 
         with connect() as conn:
             rows = conn.execute(
@@ -127,53 +182,101 @@ class DailyAnalysisPipeline:
                 (project_key,),
             ).fetchall()
 
-            for row in rows:
-                snapshot = json_loads_safe(row["jira_snapshot_json"])
-                if not matches_ticket_scope(snapshot, ticket_scope):
-                    continue
-                analysis = analyze_for_daily_delivery(snapshot)
-                now = utc_now_iso()
-                conn.execute(
-                    """
-                    UPDATE readiness_records SET
-                        readiness_score = ?,
-                        readiness_status = ?,
-                        analysis_summary = ?,
-                        blockers_json = ?,
-                        confidence = ?,
-                        analyzed_at = ?,
-                        updated_at = ?
-                    WHERE id = ?
-                    """,
-                    (
-                        analysis["readinessScore"],
-                        analysis["readinessStatus"],
-                        analysis["analysisSummary"],
-                        json_dumps(analysis["blockers"]),
-                        analysis["confidence"],
-                        now,
-                        now,
-                        row["id"],
-                    ),
+        pending_updates: list[dict[str, Any]] = []
+        for row in rows:
+            snapshot = json_loads_safe(row["jira_snapshot_json"])
+            if not matches_ticket_scope(snapshot, ticket_scope):
+                continue
+
+            if preserve_llm_analysis:
+                readiness_status = str(row["readiness_status"] or "")
+                estimation = _estimation_from_readiness_row(row, snapshot)
+                proposal_body, proposal_type = _comment_proposal_for_status(
+                    readiness_status,
+                    language=communication_language,
                 )
+                pending_updates.append(
+                    {
+                        "row": row,
+                        "analysis": None,
+                        "estimation": estimation,
+                        "proposal_body": proposal_body,
+                        "proposal_type": proposal_type,
+                    }
+                )
+                continue
+
+            analysis = analyze_for_daily_delivery(snapshot)
+            estimation = None
+            if _should_persist_ticket_estimation(readiness_status=str(analysis["readinessStatus"])):
+                estimation = estimate_ticket_effort(
+                    snapshot,
+                    readiness_score=int(analysis["readinessScore"]),
+                    confidence=float(analysis["confidence"]),
+                )
+            pending_updates.append(
+                {
+                    "row": row,
+                    "analysis": analysis,
+                    "estimation": estimation,
+                    "proposal_body": analysis.get("proposedComment") or None,
+                    "proposal_type": analysis.get("proposalType") or None,
+                }
+            )
+
+        if not pending_updates:
+            return {
+                "analyzed": analyzed,
+                "estimated": estimated,
+                "proposalsCreated": proposals_created,
+            }
+
+        with connect() as conn:
+            for item in pending_updates:
+                row = item["row"]
+                analysis = item["analysis"]
+                estimation = item["estimation"]
+                proposal_body = item.get("proposal_body")
+                proposal_type = item.get("proposal_type")
+                now = utc_now_iso()
+
+                if analysis is not None:
+                    conn.execute(
+                        """
+                        UPDATE readiness_records SET
+                            readiness_score = ?,
+                            readiness_status = ?,
+                            analysis_summary = ?,
+                            blockers_json = ?,
+                            confidence = ?,
+                            analyzed_at = ?,
+                            updated_at = ?
+                        WHERE id = ?
+                        """,
+                        (
+                            analysis["readinessScore"],
+                            analysis["readinessStatus"],
+                            analysis["analysisSummary"],
+                            json_dumps(analysis["blockers"]),
+                            analysis["confidence"],
+                            now,
+                            now,
+                            row["id"],
+                        ),
+                    )
                 analyzed += 1
 
-                if analysis.get("proposedComment") and analysis.get("proposalType"):
+                if proposal_body and proposal_type:
                     pm_store.upsert_comment_proposal(
                         conn,
                         readiness_id=row["id"],
                         jira_key=row["jira_key"],
-                        proposal_type=str(analysis["proposalType"]),
-                        body=str(analysis["proposedComment"]),
+                        proposal_type=str(proposal_type),
+                        body=str(proposal_body),
                     )
                     proposals_created += 1
 
-                if analysis.get("actionable"):
-                    estimation = estimate_ticket_effort(
-                        snapshot,
-                        readiness_score=int(analysis["readinessScore"]),
-                        confidence=float(analysis["confidence"]),
-                    )
+                if estimation is not None:
                     pm_store.insert_estimation(
                         conn,
                         readiness_id=row["id"],
@@ -197,7 +300,11 @@ class DailyAnalysisPipeline:
         if not project_key:
             raise ValueError("project_key is required")
 
-        result = self._qualify_and_estimate(project_key=project_key, run_id="COMM-REFRESH")
+        result = self._qualify_and_estimate(
+            project_key=project_key,
+            run_id="COMM-REFRESH",
+            preserve_llm_analysis=True,
+        )
         self.events.append(
             event_type="PROJECT_COMMUNICATIONS_REFRESHED",
             payload={"projectKey": project_key, **result},
@@ -276,7 +383,11 @@ class DailyAnalysisPipeline:
 
     def _rebuild_selected_sprint(self, *, project_key: str) -> dict[str, Any]:
         from delivery_runtime.pm_inbox.sprint_reset import maybe_auto_reset_sprint
-        from delivery_runtime.pm_inbox.sprint_selection import build_selected_sprint_payload, persist_selected_sprint
+        from delivery_runtime.pm_inbox.sprint_selection import (
+            build_selected_sprint_payload,
+            merge_active_work_orders_into_sprint,
+            persist_selected_sprint,
+        )
         from delivery_runtime.pm_inbox import store as pm_store
 
         auto_reset = maybe_auto_reset_sprint(project_key=project_key)
@@ -289,7 +400,12 @@ class DailyAnalysisPipeline:
             return (state or {}).get("recommendation") or build_selected_sprint_payload(project_key=project_key)
 
         payload = build_selected_sprint_payload(project_key=project_key)
-        persist_selected_sprint(project_key=project_key, payload=payload)
+        payload = merge_active_work_orders_into_sprint(payload, project_key=project_key)
+        persist_selected_sprint(
+            project_key=project_key,
+            payload=payload,
+            memory_patch={"emptyBacklogUntilAnalysis": False},
+        )
         return payload
 
     def _refresh_project_memory(self, *, project_key: str, run_id: str) -> dict[str, Any]:

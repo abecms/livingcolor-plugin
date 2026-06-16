@@ -47,17 +47,41 @@ class PmInboxService:
 
         with connect() as conn:
             pm_store.fail_stale_daily_runs(conn)
-            if pm_store.has_running_daily_run(conn):
+            if pm_store.has_running_daily_run(conn, project_key=key):
                 raise ValueError(
                     "Another daily analysis is already running. "
                     "Wait for it to finish, then retry."
                 )
         return key
 
-    def run_daily_analysis(self, project_key: str | None = None) -> dict[str, Any]:
+    def start_daily_analysis(self, project_key: str | None = None) -> tuple[str, str]:
+        """Reserve a daily-analysis run row and return (project_key, run_id)."""
+        key = (project_key or self.config.project_key).strip().upper()
+        if not key:
+            raise ValueError("project_key is required")
+        from delivery_runtime.persistence.db import connect
+        from delivery_runtime.pm_inbox import store as pm_store
+
+        with connect() as conn:
+            pm_store.fail_stale_daily_runs(conn)
+            if pm_store.has_running_daily_run(conn, project_key=key):
+                raise ValueError(
+                    "Another daily analysis is already running. "
+                    "Wait for it to finish, then retry."
+                )
+            run_id = pm_store.create_daily_run(conn, project_key=key)
+        return key, run_id
+
+    def run_daily_analysis(
+        self,
+        project_key: str | None = None,
+        *,
+        run_id: str | None = None,
+        force: bool = False,
+    ) -> dict[str, Any]:
         key = (project_key or self.config.project_key).strip().upper()
         with _ANALYSIS_LOCK:
-            result = self.pipeline.run(key)
+            result = self.pipeline.run(key, run_id=run_id, force=force)
             auto_start = self.queue_consumer.try_consume(key)
         result["autoStart"] = auto_start
         return result
@@ -202,7 +226,12 @@ class PmInboxService:
     def reset_sprint(self, *, project_key: str, actor: str = "human") -> dict[str, Any]:
         from delivery_runtime.pm_inbox.sprint_reset import reset_sprint
 
-        payload = reset_sprint(project_key=project_key)
+        repopulate = actor != "human"
+        payload = reset_sprint(
+            project_key=project_key,
+            repopulate_tickets=repopulate,
+            publish_report=actor != "human",
+        )
         self.events.append(
             event_type="SPRINT_RESET",
             actor=actor,

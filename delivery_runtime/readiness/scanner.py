@@ -2,13 +2,20 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
 from delivery_runtime.events.store import EventStore
 from delivery_runtime.persistence.db import connect, json_dumps, json_loads, next_public_id, utc_now_iso
+from delivery_runtime.readiness.analysis_dispatcher import (
+    AnalysisCacheEntry,
+    AnalysisOutcome,
+    ReadinessAnalysisDispatcher,
+)
 from delivery_runtime.readiness.analyzer import analyze_ticket_snapshot
+from delivery_runtime.readiness.analyst_backend import AnalystBackend, SynchronousAnalystBackend
 from delivery_runtime.readiness.errors import ReadinessIntegrationError
 from delivery_runtime.readiness.ticket_scope import load_ticket_scope_for_project, matches_ticket_scope
 
@@ -23,6 +30,7 @@ class ReadinessScanResult:
     skipped_out_of_scope: int = 0
     skipped_excluded: int = 0
     dismissed_out_of_scope: int = 0
+    analysis_dispatch: dict[str, Any] | None = None
 
     @property
     def in_scope(self) -> int:
@@ -40,14 +48,27 @@ class ReadinessScanner:
         *,
         issue_fetcher: Callable[[str], list[dict[str, Any]]] | None = None,
         analysis_runner: Callable[[dict[str, Any], str], dict[str, Any]] | None = None,
+        analysis_backend: AnalystBackend | None = None,
+        cache_lookup: Callable[[str], AnalysisCacheEntry | None] | None = None,
+        analysis_concurrency: int = 3,
     ) -> None:
         self.events = events or EventStore()
         self._issue_fetcher = issue_fetcher
-        self._analysis_runner = analysis_runner or (
-            lambda snapshot, project_key: analyze_ticket_snapshot(snapshot)
-        )
+        if analysis_backend is not None:
+            self._analysis_backend = analysis_backend
+        else:
+            runner = analysis_runner or (lambda snapshot, project_key: analyze_ticket_snapshot(snapshot))
+            self._analysis_backend = SynchronousAnalystBackend(runner)
+        self._cache_lookup = cache_lookup or self._lookup_cached_analysis
+        self._analysis_concurrency = analysis_concurrency
 
-    def scan_project(self, project_key: str) -> ReadinessScanResult:
+    def scan_project(
+        self,
+        project_key: str,
+        *,
+        run_id: str = "",
+        force: bool = False,
+    ) -> ReadinessScanResult:
         project_key = project_key.strip().upper()
         if not project_key:
             raise ValueError("project_key is required")
@@ -66,27 +87,55 @@ class ReadinessScanner:
         created = updated = skipped = 0
         skipped_out_of_scope = 0
         skipped_excluded = 0
-        with connect() as conn:
-            for snapshot in snapshots:
-                jira_key = str(snapshot.get("key") or "").strip()
-                if not jira_key:
-                    skipped += 1
-                    continue
-                if jira_key in excluded_keys:
-                    skipped += 1
-                    skipped_excluded += 1
-                    continue
-                if not matches_ticket_scope(snapshot, ticket_scope):
-                    skipped += 1
-                    skipped_out_of_scope += 1
-                    continue
+        pending_snapshots: list[dict[str, Any]] = []
 
-                analysis = self._analysis_runner(snapshot, project_key)
+        for snapshot in snapshots:
+            jira_key = str(snapshot.get("key") or "").strip()
+            if not jira_key:
+                skipped += 1
+                continue
+            if jira_key in excluded_keys:
+                skipped += 1
+                skipped_excluded += 1
+                continue
+            if not matches_ticket_scope(snapshot, ticket_scope):
+                skipped += 1
+                skipped_out_of_scope += 1
+                continue
+
+            pending_snapshots.append(snapshot)
+
+        dispatcher = ReadinessAnalysisDispatcher(
+            backend=self._analysis_backend,
+            concurrency=self._analysis_concurrency,
+            cache_lookup=self._cache_lookup,
+        )
+        dispatch_result = asyncio.run(
+            dispatcher.analyze_many(
+                pending_snapshots,
+                project_key=project_key,
+                run_id=run_id or "manual",
+                force=force,
+            )
+        )
+        pending_upserts: list[tuple[dict[str, Any], AnalysisOutcome]] = []
+        for snapshot, outcome in zip(pending_snapshots, dispatch_result.outcomes, strict=True):
+            if outcome.status in {"success", "cached"} and outcome.analysis is not None:
+                analysis_snapshot = outcome.analysis.get("jiraSnapshot")
+                pending_upserts.append((analysis_snapshot if isinstance(analysis_snapshot, dict) else snapshot, outcome))
+
+        dismissed = 0
+        with connect() as conn:
+            for snapshot, outcome in pending_upserts:
+                analysis = outcome.analysis or {}
+                jira_key = str(snapshot.get("key") or "").strip()
                 record_id, was_created = self._upsert_record(
                     conn,
                     jira_key=jira_key,
                     project_key=project_key,
                     analysis=analysis,
+                    analysis_input_hash=outcome.analysis_input_hash,
+                    analysis_backend=outcome.backend,
                 )
                 if was_created:
                     created += 1
@@ -132,6 +181,7 @@ class ReadinessScanner:
             skipped_out_of_scope=skipped_out_of_scope,
             skipped_excluded=skipped_excluded,
             dismissed_out_of_scope=dismissed,
+            analysis_dispatch=dispatch_result.summary.to_dict(),
         )
 
     @staticmethod
@@ -163,6 +213,39 @@ class ReadinessScanner:
         return dismissed
 
     @staticmethod
+    def _lookup_cached_analysis(jira_key: str) -> AnalysisCacheEntry | None:
+        with connect() as conn:
+            row = conn.execute(
+                """
+                SELECT *
+                FROM readiness_records
+                WHERE jira_key = ? AND readiness_status NOT IN ('promoted', 'dismissed')
+                """,
+                (jira_key,),
+            ).fetchone()
+        if row is None:
+            return None
+
+        snapshot = json_loads(row["jira_snapshot_json"], {})
+        if not isinstance(snapshot, dict):
+            snapshot = {}
+        analysis = {
+            "readinessScore": int(row["readiness_score"] or 0),
+            "readinessStatus": str(row["readiness_status"] or ""),
+            "analysisSummary": str(row["analysis_summary"] or ""),
+            "blockers": json_loads(row["blockers_json"], []),
+            "recommendedRepos": json_loads(row["recommended_repos_json"], []),
+            "confidence": float(row["confidence"] or 0),
+            "estimatedDays": row["estimated_days"],
+            "jiraSnapshot": snapshot,
+        }
+        return AnalysisCacheEntry(
+            jira_key=str(row["jira_key"]),
+            analysis_input_hash=row["analysis_input_hash"],
+            analysis=analysis,
+        )
+
+    @staticmethod
     def _excluded_jira_keys() -> set[str]:
         with connect() as conn:
             rows = conn.execute(
@@ -182,6 +265,8 @@ class ReadinessScanner:
         jira_key: str,
         project_key: str,
         analysis: dict[str, Any],
+        analysis_input_hash: str | None = None,
+        analysis_backend: str | None = None,
     ) -> tuple[str, bool]:
         now = utc_now_iso()
         existing = conn.execute(
@@ -209,6 +294,10 @@ class ReadinessScanner:
                     recommended_repos_json = ?,
                     confidence = ?,
                     estimated_days = ?,
+                    analysis_input_hash = ?,
+                    analysis_backend = ?,
+                    last_analysis_error = NULL,
+                    last_analysis_failed_at = NULL,
                     jira_snapshot_json = ?,
                     analyzed_at = ?,
                     updated_at = ?
@@ -224,6 +313,8 @@ class ReadinessScanner:
                     json_dumps(analysis["recommendedRepos"]),
                     analysis["confidence"],
                     analysis.get("estimatedDays"),
+                    analysis_input_hash,
+                    analysis_backend,
                     json_dumps(snapshot),
                     now,
                     now,
@@ -238,8 +329,10 @@ class ReadinessScanner:
             INSERT INTO readiness_records (
                 id, jira_key, project_key, title, readiness_score, readiness_status,
                 analysis_summary, blockers_json, recommended_repos_json, confidence,
-                estimated_days, jira_snapshot_json, analyzed_at, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                estimated_days, analysis_input_hash, analysis_backend,
+                last_analysis_error, last_analysis_failed_at,
+                jira_snapshot_json, analyzed_at, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 record_id,
@@ -253,6 +346,10 @@ class ReadinessScanner:
                 json_dumps(analysis["recommendedRepos"]),
                 analysis["confidence"],
                 analysis.get("estimatedDays"),
+                analysis_input_hash,
+                analysis_backend,
+                None,
+                None,
                 json_dumps(snapshot),
                 now,
                 now,

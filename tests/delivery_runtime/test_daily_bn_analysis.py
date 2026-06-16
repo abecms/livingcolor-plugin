@@ -74,6 +74,20 @@ class TestDailyAnalyst:
         assert analysis["proposalType"] == "not_development"
         assert analysis["proposedComment"]
 
+    def test_schema_faq_page_ticket_is_not_marked_non_development(self):
+        snapshot = {
+            "key": "TVP-2391",
+            "summary": 'Ajout de données structurées sur les pages de catégories "FILMS"',
+            "description": (
+                'Sections "FAQ" SEO avec "@type": "FAQPage" et url https://example.com/fr/films#faq'
+            ),
+            "status": "À FAIRE",
+            "issueType": "Task",
+            "projectKey": "TVP",
+        }
+        analysis = analyze_for_daily_delivery(snapshot)
+        assert analysis["readinessStatus"] != "not_development"
+
     def test_thin_ticket_needs_clarification(self):
         analysis = analyze_for_daily_delivery(_thin_snapshot())
         assert analysis["readinessStatus"] == "needs_clarification"
@@ -137,13 +151,23 @@ class TestDailyPipeline:
 
         from delivery_runtime.readiness.scanner import ReadinessScanner
 
-        scanner = ReadinessScanner(issue_fetcher=lambda _project: snapshots)
+        def _llm_like_analysis_runner(snapshot: dict, project_key: str) -> dict:
+            item = {**snapshot, "projectKey": project_key.strip().upper()}
+            result = analyze_for_daily_delivery(item)
+            if "jiraSnapshot" not in result:
+                result = {**result, "jiraSnapshot": item}
+            return result
+
+        scanner = ReadinessScanner(
+            issue_fetcher=lambda _project: snapshots,
+            analysis_runner=_llm_like_analysis_runner,
+        )
         pipeline = DailyAnalysisPipeline(scanner=scanner)
         result = pipeline.run("AAC")
 
         assert result["scan"]["scanned"] == 3
         assert result["qualification"]["analyzed"] == 3
-        assert result["qualification"]["estimated"] == 1
+        assert result["qualification"]["estimated"] == 2
         assert result["executionQueue"]["items"]
         assert result["executionQueue"]["executableCount"] >= 1
         assert result["selectedSprint"]["capacityDays"] > 0
@@ -160,6 +184,8 @@ class TestDailyPipeline:
         clarification = next(item for item in inbox["needsClarification"] if item["record"]["jiraKey"] == "AAC-502")
         assert clarification["proposal"] is not None
         assert clarification["proposal"]["proposalType"] == "needs_clarification"
+        estimations = pm_store.latest_estimations_by_readiness(project_key="AAC")
+        assert clarification["record"]["id"] in estimations
         assert inbox["executionQueue"]["items"]
         assert all(item["jiraKey"] in sprint_keys for item in inbox["executionQueue"]["items"])
         assert inbox["selectedSprint"]["tickets"]
@@ -188,6 +214,88 @@ class TestDailyPipeline:
         assert result["qualification"]["analyzed"] == 1
         assert result["qualification"]["estimated"] == 1
         assert {ticket["jiraKey"] for ticket in result["selectedSprint"]["tickets"]} == {"AAC-601"}
+
+    def test_manual_daily_analysis_forces_dispatcher_even_when_cached(self):
+        from delivery_runtime.readiness.analysis_dispatcher import AnalysisCacheEntry
+        from delivery_runtime.readiness.analyst_backend import SynchronousAnalystBackend
+        from delivery_runtime.readiness.scanner import ReadinessScanner
+
+        calls: list[str] = []
+        snapshots = [_ready_snapshot("AAC-701")]
+
+        def runner(snapshot: dict, project_key: str) -> dict:
+            calls.append(snapshot["key"])
+            return {
+                "readinessScore": 90,
+                "readinessStatus": "ready",
+                "analysisSummary": "Fresh LLM result",
+                "blockers": [],
+                "recommendedRepos": ["group/bn-frontend"],
+                "confidence": 0.9,
+                "estimatedDays": 1.0,
+                "jiraSnapshot": snapshot,
+            }
+
+        scanner = ReadinessScanner(
+            issue_fetcher=lambda _project: snapshots,
+            analysis_backend=SynchronousAnalystBackend(runner),
+            cache_lookup=lambda _jira_key: AnalysisCacheEntry(
+                jira_key="AAC-701",
+                analysis_input_hash="stale",
+                analysis=runner(snapshots[0], "AAC"),
+            ),
+        )
+        calls.clear()
+        pipeline = DailyAnalysisPipeline(scanner=scanner)
+
+        result = pipeline.run("AAC", force=True)
+
+        assert calls == ["AAC-701"]
+        assert result["analysisDispatch"]["forced"] is True
+        assert result["analysisDispatch"]["success"] == 1
+
+    def test_automatic_daily_analysis_reuses_cached_result(self):
+        from delivery_runtime.readiness.analysis_dispatcher import (
+            AnalysisCacheEntry,
+            build_analysis_input_hash,
+        )
+        from delivery_runtime.readiness.analyst_backend import SynchronousAnalystBackend
+        from delivery_runtime.readiness.scanner import ReadinessScanner
+
+        calls: list[str] = []
+        snapshot = _ready_snapshot("AAC-702")
+        cached_analysis = {
+            "readinessScore": 88,
+            "readinessStatus": "ready",
+            "analysisSummary": "Cached LLM result",
+            "blockers": [],
+            "recommendedRepos": ["group/bn-frontend"],
+            "confidence": 0.88,
+            "estimatedDays": 1.0,
+            "jiraSnapshot": snapshot,
+        }
+        input_hash = build_analysis_input_hash(snapshot, project_key="AAC")
+
+        def runner(snapshot: dict, project_key: str) -> dict:
+            calls.append(snapshot["key"])
+            return cached_analysis
+
+        scanner = ReadinessScanner(
+            issue_fetcher=lambda _project: [snapshot],
+            analysis_backend=SynchronousAnalystBackend(runner),
+            cache_lookup=lambda _jira_key: AnalysisCacheEntry(
+                jira_key="AAC-702",
+                analysis_input_hash=input_hash,
+                analysis=cached_analysis,
+            ),
+        )
+        pipeline = DailyAnalysisPipeline(scanner=scanner)
+
+        result = pipeline.run("AAC", force=False)
+
+        assert calls == []
+        assert result["analysisDispatch"]["cached"] == 1
+        assert result["analysisDispatch"]["success"] == 0
 
 
 class TestPmInboxService:

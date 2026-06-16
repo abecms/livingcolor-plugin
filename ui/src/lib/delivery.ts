@@ -282,6 +282,7 @@ export interface PmInboxPayload {
       priorityRank: number
       urgencyScore: number
       warnings: string[]
+      readinessStatus?: string
       workOrderId?: string
       inDevelopment?: boolean
       currentStage?: string
@@ -469,6 +470,7 @@ export function fetchProjectConfig(): Promise<ProjectConfigPayload> {
 }
 
 export function saveProjectConfig(body: {
+  projectKey?: string
   sprintDurationDays: number
   sprintCapacityDays: number
   sprintStartWeekday?: number
@@ -553,11 +555,12 @@ export async function saveProjectJiraProjectKey(jiraProjectKey: string | null): 
   })
 }
 
-export function resetProjectSprint(): Promise<PmInboxPayload['selectedSprint']> {
+export function resetProjectSprint(projectKey?: string): Promise<PmInboxPayload['selectedSprint']> {
   return callDesktopApi({
     ...profileScoped(),
     path: '/api/delivery/sprint/reset',
     method: 'POST',
+    body: projectKey ? { projectKey } : undefined,
     timeoutMs: DELIVERY_TIMEOUT_MS
   })
 }
@@ -594,6 +597,7 @@ export function fetchPmInbox(projectKey?: string): Promise<PmInboxPayload> {
 export interface DailyAnalysisStartResponse {
   status: 'started'
   projectKey: string
+  force?: boolean
 }
 
 export interface DailyAnalysisResult {
@@ -619,13 +623,14 @@ export interface DailyAnalysisResult {
 }
 
 export function runDailyAnalysis(
-  projectKey?: string
+  projectKey?: string,
+  options: { force?: boolean } = {}
 ): Promise<DailyAnalysisResult | DailyAnalysisStartResponse> {
   return callDesktopApi<DailyAnalysisResult | DailyAnalysisStartResponse>({
     ...profileScoped(),
     path: '/api/delivery/pm-inbox/daily-analysis/run',
     method: 'POST',
-    body: projectKey ? { projectKey } : {},
+    body: { projectKey, force: options.force ?? true },
     timeoutMs: 30_000
   })
 }

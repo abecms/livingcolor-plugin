@@ -37,6 +37,7 @@ from delivery_runtime.api.schemas import (
     PromoteReadinessResponse,
     SelectedSprintResponse,
     SprintReportResponse,
+    SprintResetRequest,
     SprintSelectionUpdateRequest,
     TicketEstimationUpdateRequest,
     TicketEstimationUpdateResponse,
@@ -128,15 +129,26 @@ def get_readiness(record_id: str) -> ReadinessRecordResponse:
     return ReadinessRecordResponse.model_validate(record)
 
 
+def _run_promote_orchestrator_tick(services, work_order_id: str) -> None:
+    try:
+        services.readiness.run_orchestrator_tick(work_order_id)
+    except Exception:
+        _log.exception("Background orchestrator tick failed for %s", work_order_id)
+
+
 @router.post("/readiness/{record_id}/promote", response_model=PromoteReadinessResponse)
-def promote_readiness(record_id: str) -> PromoteReadinessResponse:
+def promote_readiness(record_id: str, background_tasks: BackgroundTasks) -> PromoteReadinessResponse:
     services = get_services()
     try:
-        work_order = services.readiness.promote(record_id)
+        work_order = services.readiness.promote(record_id, tick=False)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except sqlite3.OperationalError as exc:
+        raise HTTPException(status_code=503, detail=_delivery_db_unavailable_detail(exc)) from exc
+
+    background_tasks.add_task(_run_promote_orchestrator_tick, services, work_order["id"])
 
     readiness = services.readiness.get_record(record_id)
     if not readiness:
@@ -332,6 +344,24 @@ def _activate_local_project_from_request(request: Request | None = None) -> str 
     project_key = resolve_request_project_key(request)
     try_activate_local_project(project_key)
     return project_key
+
+
+def _require_project_key(
+    request: Request,
+    *,
+    body_project_key: str | None = None,
+) -> str:
+    from delivery_runtime.automation.project_context import try_activate_local_project
+
+    request_key = _activate_local_project_from_request(request)
+    body_key = (body_project_key or "").strip().upper()
+    if body_key and request_key and body_key != request_key:
+        raise HTTPException(status_code=400, detail="projectKey does not match active project context")
+    resolved = request_key or body_key or None
+    if not resolved:
+        raise HTTPException(status_code=400, detail="Active project key is required")
+    try_activate_local_project(resolved)
+    return resolved
 
 
 def _project_name_for_key(project_key: str, fallback: str) -> str:
@@ -573,7 +603,7 @@ def update_project_config(body: ProjectConfigUpdateRequest, request: Request) ->
     )
     from delivery_runtime.readiness.ticket_scope import parse_ticket_scope
 
-    request_key = _activate_local_project_from_request(request)
+    request_key = _require_project_key(request, body_project_key=body.project_key)
     ticket_scope = parse_ticket_scope(body.ticketScope.model_dump()) if body.ticketScope is not None else None
     save_delivery_project_config(
         capacity_days=body.sprintCapacityDays,
@@ -656,15 +686,21 @@ def update_sprint_selection(
 
 
 @router.post("/sprint/reset", response_model=SelectedSprintResponse)
-def reset_sprint_selection(request: Request) -> SelectedSprintResponse:
-    project_key = _activate_local_project_from_request(request)
-    if not project_key:
-        raise HTTPException(status_code=400, detail="Active project key is required")
+def reset_sprint_selection(
+    request: Request,
+    body: SprintResetRequest | None = None,
+) -> SelectedSprintResponse:
+    project_key = _require_project_key(
+        request,
+        body_project_key=body.project_key if body else None,
+    )
     services = get_services()
     try:
         payload = services.pm_inbox.reset_sprint(project_key=project_key)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except sqlite3.OperationalError as exc:
+        raise HTTPException(status_code=503, detail=_delivery_db_unavailable_detail(exc)) from exc
     return SelectedSprintResponse.model_validate(payload)
 
 
@@ -691,11 +727,11 @@ def get_pm_inbox(project: str | None = None) -> PmInboxResponse:
     return PmInboxResponse.model_validate(payload)
 
 
-def _run_daily_analysis_background(services, project_key: str) -> None:
+def _run_daily_analysis_background(services, project_key: str, run_id: str, force: bool) -> None:
     try:
-        services.pm_inbox.run_daily_analysis(project_key)
+        services.pm_inbox.run_daily_analysis(project_key, run_id=run_id, force=force)
     except Exception:
-        _log.exception("Background daily analysis failed for %s", project_key)
+        _log.exception("Background daily analysis failed for %s (run %s)", project_key, run_id)
 
 
 @router.post("/pm-inbox/daily-analysis/run")
@@ -705,8 +741,12 @@ async def run_daily_analysis(
 ) -> dict[str, Any]:
     services = get_services()
     project_key = body.projectKey.strip().upper() if body and body.projectKey else None
+    force = bool(body.force) if body else False
     try:
-        resolved_key = await asyncio.to_thread(services.pm_inbox.precheck_daily_analysis, project_key)
+        resolved_key, run_id = await asyncio.to_thread(
+            services.pm_inbox.start_daily_analysis,
+            project_key,
+        )
     except ReadinessIntegrationError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except sqlite3.OperationalError as exc:
@@ -714,8 +754,8 @@ async def run_daily_analysis(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    background_tasks.add_task(_run_daily_analysis_background, services, resolved_key)
-    return {"status": "started", "projectKey": resolved_key}
+    background_tasks.add_task(_run_daily_analysis_background, services, resolved_key, run_id, force)
+    return {"status": "started", "projectKey": resolved_key, "runId": run_id, "force": force}
 
 
 @router.get("/projects/{jira_project_key}/share-payload")
