@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import inspect
 import json
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -30,6 +31,7 @@ class AnalysisOutcome:
     jira_key: str
     status: AnalysisOutcomeStatus
     analysis_input_hash: str
+    duration_ms: int
     analysis: dict[str, Any] | None = None
     error: str | None = None
     backend_name: str | None = None
@@ -37,17 +39,36 @@ class AnalysisOutcome:
 
 @dataclass(frozen=True)
 class AnalysisDispatchSummary:
-    total: int
+    backend: str
+    concurrency: int
     success: int
-    failed: int
     cached: int
+    failed: int
+    skipped: int
+    forced: bool
+    duration_ms: int
+    items: list[AnalysisOutcome]
 
-    def to_dict(self) -> dict[str, int]:
+    def to_dict(self) -> dict[str, Any]:
         return {
-            "total": self.total,
+            "backend": self.backend,
+            "concurrency": self.concurrency,
             "success": self.success,
-            "failed": self.failed,
             "cached": self.cached,
+            "failed": self.failed,
+            "skipped": self.skipped,
+            "forced": self.forced,
+            "durationMs": self.duration_ms,
+            "items": [
+                {
+                    "jiraKey": item.jira_key,
+                    "status": item.status,
+                    "backend": item.backend_name,
+                    "durationMs": item.duration_ms,
+                    "error": item.error,
+                }
+                for item in self.items
+            ],
         }
 
 
@@ -88,12 +109,12 @@ class ReadinessAnalysisDispatcher:
         backend: AnalystBackend,
         concurrency: int = 3,
         cache_lookup: CacheLookup | None = None,
-        timeout_seconds: float | None = None,
+        per_ticket_timeout_sec: float = 180.0,
     ) -> None:
         self._backend = backend
         self._concurrency = min(max(1, concurrency), 3)
         self._cache_lookup = cache_lookup
-        self._timeout_seconds = timeout_seconds
+        self.per_ticket_timeout_sec = per_ticket_timeout_sec
 
     async def analyze_many(
         self,
@@ -103,6 +124,7 @@ class ReadinessAnalysisDispatcher:
         run_id: str,
         force: bool = False,
     ) -> AnalysisDispatchResult:
+        started_at = time.perf_counter()
         semaphore = asyncio.Semaphore(self._concurrency)
 
         async def run_one(snapshot: dict[str, Any]) -> AnalysisOutcome:
@@ -116,10 +138,15 @@ class ReadinessAnalysisDispatcher:
 
         outcomes = await asyncio.gather(*(run_one(snapshot) for snapshot in snapshots))
         summary = AnalysisDispatchSummary(
-            total=len(outcomes),
+            backend=self._backend.name,
+            concurrency=self._concurrency,
             success=sum(1 for outcome in outcomes if outcome.status == "success"),
-            failed=sum(1 for outcome in outcomes if outcome.status == "failed"),
             cached=sum(1 for outcome in outcomes if outcome.status == "cached"),
+            failed=sum(1 for outcome in outcomes if outcome.status == "failed"),
+            skipped=0,
+            forced=force,
+            duration_ms=_elapsed_ms(started_at),
+            items=outcomes,
         )
         return AnalysisDispatchResult(outcomes=outcomes, summary=summary)
 
@@ -131,6 +158,7 @@ class ReadinessAnalysisDispatcher:
         run_id: str,
         force: bool,
     ) -> AnalysisOutcome:
+        started_at = time.perf_counter()
         jira_key = str(snapshot.get("key") or "")
         analysis_input_hash = build_analysis_input_hash(snapshot, project_key=project_key)
 
@@ -141,17 +169,28 @@ class ReadinessAnalysisDispatcher:
                     jira_key=jira_key,
                     status="cached",
                     analysis_input_hash=analysis_input_hash,
+                    duration_ms=_elapsed_ms(started_at),
                     analysis=cache_entry.analysis,
                     backend_name=self._backend.name,
                 )
 
         try:
             analysis = await self._run_backend(snapshot, project_key=project_key, run_id=run_id)
+        except asyncio.TimeoutError:
+            return AnalysisOutcome(
+                jira_key=jira_key,
+                status="failed",
+                analysis_input_hash=analysis_input_hash,
+                duration_ms=_elapsed_ms(started_at),
+                error=f"Analysis timed out after {self.per_ticket_timeout_sec:g}s",
+                backend_name=self._backend.name,
+            )
         except Exception as exc:
             return AnalysisOutcome(
                 jira_key=jira_key,
                 status="failed",
                 analysis_input_hash=analysis_input_hash,
+                duration_ms=_elapsed_ms(started_at),
                 error=str(exc),
                 backend_name=self._backend.name,
             )
@@ -160,6 +199,7 @@ class ReadinessAnalysisDispatcher:
             jira_key=jira_key,
             status="success",
             analysis_input_hash=analysis_input_hash,
+            duration_ms=_elapsed_ms(started_at),
             analysis=analysis,
             backend_name=self._backend.name,
         )
@@ -181,6 +221,8 @@ class ReadinessAnalysisDispatcher:
         run_id: str,
     ) -> dict[str, Any]:
         task = self._backend.analyze_ticket(snapshot, project_key=project_key, run_id=run_id)
-        if self._timeout_seconds is None:
-            return await task
-        return await asyncio.wait_for(task, timeout=self._timeout_seconds)
+        return await asyncio.wait_for(task, timeout=self.per_ticket_timeout_sec)
+
+
+def _elapsed_ms(started_at: float) -> int:
+    return int((time.perf_counter() - started_at) * 1000)

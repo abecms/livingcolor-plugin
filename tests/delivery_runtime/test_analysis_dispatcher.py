@@ -65,6 +65,14 @@ class FailingBackend:
         return _analysis(snapshot)
 
 
+class SlowBackend:
+    name = "slow"
+
+    async def analyze_ticket(self, snapshot: dict[str, Any], *, project_key: str, run_id: str) -> dict[str, Any]:
+        await asyncio.sleep(0.05)
+        return _analysis(snapshot)
+
+
 @pytest.mark.asyncio
 async def test_dispatcher_limits_concurrency_to_three():
     backend = RecordingBackend()
@@ -136,3 +144,34 @@ async def test_dispatcher_is_fail_soft():
     failed = next(item for item in result.outcomes if item.jira_key == "TVP-2")
     assert failed.status == "failed"
     assert "LLM unavailable" in (failed.error or "")
+
+
+@pytest.mark.asyncio
+async def test_summary_to_dict_uses_spec_shape_with_durations():
+    backend = RecordingBackend()
+    dispatcher = ReadinessAnalysisDispatcher(backend=backend, concurrency=10)
+    result = await dispatcher.analyze_many([_snapshot("TVP-1")], project_key="TVP", run_id="DA-1", force=True)
+
+    summary = result.summary.to_dict()
+
+    assert summary["backend"] == "recording"
+    assert summary["concurrency"] == 3
+    assert summary["forced"] is True
+    assert "durationMs" in summary
+    assert summary["items"][0]["jiraKey"] == "TVP-1"
+    assert "durationMs" in summary["items"][0]
+
+
+@pytest.mark.asyncio
+async def test_dispatcher_times_out_slow_backend():
+    dispatcher = ReadinessAnalysisDispatcher(
+        backend=SlowBackend(),
+        concurrency=3,
+        per_ticket_timeout_sec=0.001,
+    )
+
+    result = await dispatcher.analyze_many([_snapshot("TVP-1")], project_key="TVP", run_id="DA-1", force=True)
+
+    assert result.summary.failed == 1
+    assert result.outcomes[0].status == "failed"
+    assert result.outcomes[0].error
