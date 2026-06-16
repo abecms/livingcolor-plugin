@@ -287,6 +287,7 @@ export interface PmInboxPayload {
       currentStage?: string
       status?: string
     }>
+    activeDevelopmentCount?: number
   }
   needsClarification: Array<{
     record: import('@/app/delivery/types').ReadinessRecord
