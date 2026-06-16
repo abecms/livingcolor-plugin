@@ -31,12 +31,27 @@ def _fenced(payload: dict) -> str:
 
 @pytest.mark.parametrize(
     "status",
-    ["needs_clarification", "not_development", "analysis_failed"],
+    ["needs_clarification", "not_development"],
 )
-def test_parse_analyst_completion_accepts_runtime_statuses(status):
+def test_parse_analyst_completion_accepts_llm_statuses(status):
     result = parse_analyst_completion(_fenced(_payload(readinessStatus=status)), {"key": "TVP-1"})
 
     assert result["readinessStatus"] == status
+
+
+def test_parse_analyst_completion_rejects_analysis_failed_by_default():
+    with pytest.raises(AnalystParseError, match="readinessStatus"):
+        parse_analyst_completion(_fenced(_payload(readinessStatus="analysis_failed")), {"key": "TVP-1"})
+
+
+def test_parse_analyst_completion_accepts_analysis_failed_when_runtime_enabled():
+    result = parse_analyst_completion(
+        _fenced(_payload(readinessStatus="analysis_failed")),
+        {"key": "TVP-1"},
+        allow_runtime_statuses=True,
+    )
+
+    assert result["readinessStatus"] == "analysis_failed"
 
 
 def test_parse_analyst_completion_handles_fenced_json():
@@ -52,6 +67,13 @@ def test_parse_analyst_completion_handles_raw_json():
     assert result["readinessStatus"] == "not_ready"
 
 
+def test_parse_analyst_completion_rejects_prose_wrapped_json():
+    text = "Analysis summary:\n" + json.dumps(_payload()) + "\nThanks."
+
+    with pytest.raises(AnalystParseError, match="missing a JSON block"):
+        parse_analyst_completion(text, {"key": "TVP-3"})
+
+
 def test_parse_analyst_completion_rejects_missing_json():
     with pytest.raises(AnalystParseError, match="missing a JSON block"):
         parse_analyst_completion("No structured readiness result.", {"key": "TVP-4"})
@@ -60,6 +82,20 @@ def test_parse_analyst_completion_rejects_missing_json():
 def test_parse_analyst_completion_rejects_invalid_status():
     with pytest.raises(AnalystParseError, match="readinessStatus"):
         parse_analyst_completion(_fenced(_payload(readinessStatus="ambiguous")), {"key": "TVP-5"})
+
+
+def test_parse_analyst_completion_rejects_missing_estimated_days():
+    payload = _payload()
+    payload.pop("estimatedDays")
+
+    with pytest.raises(AnalystParseError, match="estimatedDays"):
+        parse_analyst_completion(_fenced(payload), {"key": "TVP-6"})
+
+
+@pytest.mark.parametrize("value", ["soon", True, 0, -2, None])
+def test_parse_analyst_completion_rejects_invalid_estimated_days(value):
+    with pytest.raises(AnalystParseError, match="estimatedDays must be a positive number"):
+        parse_analyst_completion(_fenced(_payload(estimatedDays=value)), {"key": "TVP-6"})
 
 
 @pytest.mark.parametrize(

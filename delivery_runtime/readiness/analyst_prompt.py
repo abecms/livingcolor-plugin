@@ -19,6 +19,7 @@ _REQUIRED_FIELDS = (
     "blockers",
     "recommendedRepos",
     "confidence",
+    "estimatedDays",
 )
 
 
@@ -173,7 +174,12 @@ def _build_comments_section(
     return "\n".join(lines).rstrip()
 
 
-def parse_analyst_completion(text: str, snapshot: dict[str, Any]) -> dict[str, Any]:
+def parse_analyst_completion(
+    text: str,
+    snapshot: dict[str, Any],
+    *,
+    allow_runtime_statuses: bool = False,
+) -> dict[str, Any]:
     """Extract readiness analysis JSON from an analyst agent completion."""
     payload = _extract_json_object(text)
     if payload is None:
@@ -186,10 +192,16 @@ def parse_analyst_completion(text: str, snapshot: dict[str, Any]) -> dict[str, A
     readiness_score = payload["readinessScore"]
     if not isinstance(readiness_score, (int, float)) or isinstance(readiness_score, bool):
         raise AnalystParseError("readinessScore must be numeric")
-    readiness_status = _normalize_analyst_readiness_status(str(payload["readinessStatus"] or ""))
+    readiness_status = _normalize_analyst_readiness_status(
+        str(payload["readinessStatus"] or ""),
+        allow_runtime_statuses=allow_runtime_statuses,
+    )
     if readiness_status is None:
+        allowed_statuses = "ready, not_ready, needs_clarification, not_development"
+        if allow_runtime_statuses:
+            allowed_statuses += ", analysis_failed"
         raise AnalystParseError(
-            "readinessStatus must be one of: ready, not_ready, needs_clarification, not_development, analysis_failed"
+            f"readinessStatus must be one of: {allowed_statuses}"
         )
 
     analysis_summary = payload["analysisSummary"]
@@ -209,7 +221,7 @@ def parse_analyst_completion(text: str, snapshot: dict[str, Any]) -> dict[str, A
 
     estimated_days = payload.get("estimatedDays")
     if not isinstance(estimated_days, (int, float)) or isinstance(estimated_days, bool) or estimated_days <= 0:
-        estimated_days = None
+        raise AnalystParseError("estimatedDays must be a positive number")
 
     return {
         "readinessScore": int(readiness_score),
@@ -218,12 +230,12 @@ def parse_analyst_completion(text: str, snapshot: dict[str, Any]) -> dict[str, A
         "blockers": [str(item) for item in blockers],
         "recommendedRepos": [str(item) for item in recommended_repos if str(item).strip()],
         "confidence": float(confidence),
-        "estimatedDays": float(estimated_days) if estimated_days else None,
+        "estimatedDays": float(estimated_days),
         "jiraSnapshot": snapshot,
     }
 
 
-def _normalize_analyst_readiness_status(raw: str) -> str | None:
+def _normalize_analyst_readiness_status(raw: str, *, allow_runtime_statuses: bool = False) -> str | None:
     normalized = raw.strip().lower().replace("-", "_").replace(" ", "_")
     aliases = {
         "notready": "not_ready",
@@ -232,7 +244,10 @@ def _normalize_analyst_readiness_status(raw: str) -> str | None:
         "analysisfailed": "analysis_failed",
     }
     normalized = aliases.get(normalized, normalized)
-    if normalized in {"ready", "not_ready", "needs_clarification", "not_development", "analysis_failed"}:
+    allowed = {"ready", "not_ready", "needs_clarification", "not_development"}
+    if allow_runtime_statuses:
+        allowed.add("analysis_failed")
+    if normalized in allowed:
         return normalized
     return None
 
@@ -256,13 +271,6 @@ def _extract_json_object(text: str) -> dict[str, Any] | None:
     try:
         parsed = json.loads(payload)
     except json.JSONDecodeError:
-        brace_start = (text or "").rfind("{")
-        brace_end = (text or "").rfind("}")
-        if brace_start == -1 or brace_end <= brace_start:
-            return None
-        try:
-            parsed = json.loads((text or "")[brace_start : brace_end + 1])
-        except json.JSONDecodeError:
-            return None
+        return None
 
     return parsed if isinstance(parsed, dict) else None

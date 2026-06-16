@@ -15,6 +15,7 @@ _BASE_COMPLETION = {
     "blockers": [],
     "recommendedRepos": ["tv5mondeplus-front"],
     "confidence": 0.8,
+    "estimatedDays": 1.0,
 }
 
 
@@ -27,7 +28,8 @@ def test_parse_analyst_completion_extracts_json_block():
         "Summary here\n"
         "```json\n"
         '{"readinessScore": 82, "readinessStatus": "ready", "analysisSummary": "OK", '
-        '"blockers": [], "recommendedRepos": ["group/bn-frontend"], "confidence": 0.9}\n'
+        '"blockers": [], "recommendedRepos": ["group/bn-frontend"], "confidence": 0.9, '
+        '"estimatedDays": 1}\n'
         "```"
     )
     snapshot = {"key": "BN-1", "projectKey": "BN"}
@@ -48,27 +50,30 @@ def test_parse_analyst_completion_extracts_estimated_days():
     assert result["estimatedDays"] == 1.5
 
 
-def test_parse_analyst_completion_estimated_days_optional():
-    result = parse_analyst_completion(_completion_text(_BASE_COMPLETION), {})
-    assert result.get("estimatedDays") is None
+def test_parse_analyst_completion_rejects_missing_estimated_days():
+    payload = dict(_BASE_COMPLETION)
+    payload.pop("estimatedDays")
+
+    with pytest.raises(AnalystParseError, match="estimatedDays"):
+        parse_analyst_completion(_completion_text(payload), {})
 
 
 def test_parse_analyst_completion_ignores_invalid_estimated_days():
     payload = {**_BASE_COMPLETION, "estimatedDays": "soon"}
-    result = parse_analyst_completion(_completion_text(payload), {})
-    assert result.get("estimatedDays") is None
+    with pytest.raises(AnalystParseError, match="estimatedDays"):
+        parse_analyst_completion(_completion_text(payload), {})
 
 
 def test_parse_analyst_completion_rejects_boolean_estimated_days():
     payload = {**_BASE_COMPLETION, "estimatedDays": True}
-    result = parse_analyst_completion(_completion_text(payload), {})
-    assert result.get("estimatedDays") is None
+    with pytest.raises(AnalystParseError, match="estimatedDays"):
+        parse_analyst_completion(_completion_text(payload), {})
 
 
 def test_parse_analyst_completion_rejects_negative_estimated_days():
     payload = {**_BASE_COMPLETION, "estimatedDays": -2}
-    result = parse_analyst_completion(_completion_text(payload), {})
-    assert result.get("estimatedDays") is None
+    with pytest.raises(AnalystParseError, match="estimatedDays"):
+        parse_analyst_completion(_completion_text(payload), {})
 
 
 def test_parse_analyst_completion_raises_on_missing_json():
@@ -80,7 +85,7 @@ def test_parse_analyst_completion_raises_on_invalid_status():
     text = (
         "```json\n"
         '{"readinessScore": 50, "readinessStatus": "maybe", "analysisSummary": "x", '
-        '"blockers": [], "recommendedRepos": [], "confidence": 0.5}\n'
+        '"blockers": [], "recommendedRepos": [], "confidence": 0.5, "estimatedDays": 1}\n'
         "```"
     )
     with pytest.raises(AnalystParseError, match="readinessStatus"):
@@ -186,7 +191,8 @@ def test_hermes_analyst_agent_uses_mock_factory():
                 "final_response": (
                     "```json\n"
                     '{"readinessScore": 75, "readinessStatus": "ready", "analysisSummary": "Looks good", '
-                    '"blockers": [], "recommendedRepos": ["group/repo"], "confidence": 0.75}\n'
+                    '"blockers": [], "recommendedRepos": ["group/repo"], "confidence": 0.75, '
+                    '"estimatedDays": 1}\n'
                     "```"
                 )
             }
