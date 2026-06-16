@@ -65,6 +65,12 @@ def build_pm_inbox(*, project_key: str | None = None, queue_consumer: Any | None
     project_memory_row = pm_store.get_project_memory(project_key=project_key)
     selected_sprint = load_selected_sprint_payload(project_key=project_key)
     sprint_keys = {ticket["jiraKey"] for ticket in selected_sprint.get("tickets", [])}
+    latest_pipeline = latest_run.get("pipeline") if isinstance(latest_run, dict) else None
+    analysis_dispatch = (
+        latest_pipeline.get("analysisDispatch")
+        if isinstance(latest_pipeline, dict) and isinstance(latest_pipeline.get("analysisDispatch"), dict)
+        else None
+    )
 
     current_active = None
     if queue_consumer is not None:
@@ -187,6 +193,7 @@ def build_pm_inbox(*, project_key: str | None = None, queue_consumer: Any | None
         "productIdentity": "Autonomous Development Scheduler",
         "jiraBrowseBaseUrl": resolve_jira_browse_base_url(project_key),
         "lastRun": latest_run,
+        "analysisDispatch": analysis_dispatch,
         "recommendedNext": recommended_next,
         "currentActiveDelivery": current_active,
         "executionQueue": {

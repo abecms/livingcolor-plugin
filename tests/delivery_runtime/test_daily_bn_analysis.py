@@ -297,6 +297,46 @@ class TestDailyPipeline:
         assert result["analysisDispatch"]["cached"] == 1
         assert result["analysisDispatch"]["success"] == 0
 
+    def test_pm_inbox_includes_latest_analysis_dispatch(self):
+        dispatch = {
+            "backend": "hermes_subagent",
+            "concurrency": 3,
+            "success": 2,
+            "cached": 1,
+            "failed": 1,
+            "skipped": 0,
+            "forced": True,
+            "durationMs": 1234,
+            "items": [
+                {
+                    "jiraKey": "AAC-901",
+                    "status": "failed",
+                    "backend": "hermes_subagent",
+                    "durationMs": 250,
+                    "error": "subagent timeout",
+                }
+            ],
+        }
+        with connect() as conn:
+            run_id = pm_store.create_daily_run(conn, project_key="AAC")
+            pm_store.complete_daily_run(
+                conn,
+                run_id=run_id,
+                status="completed",
+                jira_synced=4,
+                analyzed=2,
+                estimated=1,
+                pipeline={
+                    "scan": {"scanned": 4, "inScope": 4},
+                    "analysisDispatch": dispatch,
+                },
+            )
+
+        inbox = build_pm_inbox(project_key="AAC")
+
+        assert inbox["lastRun"]["status"] == "completed"
+        assert inbox["analysisDispatch"] == dispatch
+
     def test_failed_analysis_preserves_previous_readiness_record(self):
         from delivery_runtime.readiness.analyst_backend import SynchronousAnalystBackend
         from delivery_runtime.readiness.scanner import ReadinessScanner
