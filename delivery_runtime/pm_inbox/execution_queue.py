@@ -36,6 +36,8 @@ class ExecutionQueueSnapshot:
 def _queue_status(readiness_status: str) -> str:
     if readiness_status == "ready":
         return "executable"
+    if readiness_status == "analysis_failed":
+        return "blocked"
     if readiness_status == "needs_clarification":
         return "blocked"
     if readiness_status == "not_development":

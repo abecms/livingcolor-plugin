@@ -165,6 +165,22 @@ class ReadinessScanner:
                     conn=conn,
                 )
 
+            for snapshot, outcome in zip(pending_snapshots, dispatch_result.outcomes, strict=True):
+                if outcome.status != "failed":
+                    continue
+                jira_key = str(snapshot.get("key") or outcome.jira_key or "").strip()
+                if not jira_key:
+                    continue
+                self._record_analysis_failure(
+                    conn,
+                    jira_key=jira_key,
+                    project_key=project_key,
+                    snapshot=snapshot,
+                    error=outcome.error or "LLM analysis failed",
+                    analysis_input_hash=outcome.analysis_input_hash,
+                    analysis_backend=outcome.backend,
+                )
+
             dismissed = self._dismiss_out_of_scope_records(
                 conn,
                 project_key=project_key,
@@ -244,6 +260,70 @@ class ReadinessScanner:
             analysis_input_hash=row["analysis_input_hash"],
             analysis=analysis,
         )
+
+    @staticmethod
+    def _record_analysis_failure(
+        conn,
+        *,
+        jira_key: str,
+        project_key: str,
+        snapshot: dict[str, Any],
+        error: str,
+        analysis_input_hash: str,
+        analysis_backend: str,
+    ) -> str:
+        now = utc_now_iso()
+        existing = conn.execute(
+            """
+            SELECT id FROM readiness_records
+            WHERE jira_key = ? AND readiness_status NOT IN ('promoted', 'dismissed')
+            """,
+            (jira_key,),
+        ).fetchone()
+        if existing:
+            conn.execute(
+                """
+                UPDATE readiness_records SET
+                    last_analysis_error = ?,
+                    last_analysis_failed_at = ?,
+                    analysis_input_hash = ?,
+                    analysis_backend = ?,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (error, now, analysis_input_hash, analysis_backend, now, existing["id"]),
+            )
+            return str(existing["id"])
+
+        record_id = next_public_id(conn, "RD")
+        title = str(snapshot.get("summary") or snapshot.get("title") or jira_key)
+        conn.execute(
+            """
+            INSERT INTO readiness_records (
+                id, jira_key, project_key, title, readiness_score, readiness_status,
+                analysis_summary, blockers_json, recommended_repos_json, confidence,
+                estimated_days, jira_snapshot_json, analyzed_at,
+                analysis_input_hash, analysis_backend, last_analysis_error, last_analysis_failed_at,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, 0, 'analysis_failed',
+                      'LLM analysis failed before producing a valid readiness result.',
+                      '[]', '[]', 0, NULL, ?, NULL, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                record_id,
+                jira_key,
+                project_key,
+                title,
+                json_dumps(snapshot),
+                analysis_input_hash,
+                analysis_backend,
+                error,
+                now,
+                now,
+                now,
+            ),
+        )
+        return record_id
 
     @staticmethod
     def _excluded_jira_keys() -> set[str]:

@@ -297,6 +297,68 @@ class TestDailyPipeline:
         assert result["analysisDispatch"]["cached"] == 1
         assert result["analysisDispatch"]["success"] == 0
 
+    def test_failed_analysis_preserves_previous_readiness_record(self):
+        from delivery_runtime.readiness.analyst_backend import SynchronousAnalystBackend
+        from delivery_runtime.readiness.scanner import ReadinessScanner
+
+        snapshot = _ready_snapshot("AAC-801")
+        with connect() as conn:
+            now = utc_now_iso()
+            conn.execute(
+                """
+                INSERT INTO readiness_records (
+                    id, jira_key, project_key, title, readiness_score, readiness_status,
+                    analysis_summary, blockers_json, recommended_repos_json, confidence,
+                    estimated_days, jira_snapshot_json, analyzed_at, created_at, updated_at
+                ) VALUES ('RD-801', 'AAC-801', 'AAC', 'Previous ready', 88, 'ready',
+                          'Previous LLM result', '[]', '["group/bn-frontend"]', 0.88,
+                          1.0, ?, ?, ?, ?)
+                """,
+                (json_dumps(snapshot), now, now, now),
+            )
+
+        def failing_runner(snapshot: dict, project_key: str) -> dict:
+            raise RuntimeError("subagent timeout")
+
+        scanner = ReadinessScanner(
+            issue_fetcher=lambda _project: [snapshot],
+            analysis_backend=SynchronousAnalystBackend(failing_runner),
+        )
+        pipeline = DailyAnalysisPipeline(scanner=scanner)
+        result = pipeline.run("AAC", force=True)
+
+        assert result["analysisDispatch"]["failed"] == 1
+        with connect() as conn:
+            row = conn.execute(
+                "SELECT readiness_status, last_analysis_error FROM readiness_records WHERE jira_key = 'AAC-801'"
+            ).fetchone()
+        assert row["readiness_status"] == "ready"
+        assert "subagent timeout" in row["last_analysis_error"]
+
+    def test_failed_analysis_without_previous_record_creates_analysis_failed(self):
+        from delivery_runtime.readiness.analyst_backend import SynchronousAnalystBackend
+        from delivery_runtime.readiness.scanner import ReadinessScanner
+
+        snapshot = _ready_snapshot("AAC-802")
+
+        def failing_runner(snapshot: dict, project_key: str) -> dict:
+            raise RuntimeError("subagent timeout")
+
+        scanner = ReadinessScanner(
+            issue_fetcher=lambda _project: [snapshot],
+            analysis_backend=SynchronousAnalystBackend(failing_runner),
+        )
+        pipeline = DailyAnalysisPipeline(scanner=scanner)
+        result = pipeline.run("AAC", force=True)
+
+        assert result["analysisDispatch"]["failed"] == 1
+        with connect() as conn:
+            row = conn.execute(
+                "SELECT readiness_status, last_analysis_error FROM readiness_records WHERE jira_key = 'AAC-802'"
+            ).fetchone()
+        assert row["readiness_status"] == "analysis_failed"
+        assert "subagent timeout" in row["last_analysis_error"]
+
 
 class TestPmInboxService:
     @pytest.fixture(autouse=True)
