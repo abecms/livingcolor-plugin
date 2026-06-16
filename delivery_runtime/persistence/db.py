@@ -503,13 +503,10 @@ CREATE INDEX IF NOT EXISTS idx_mr_drafts_work_order
 """
 
 _init_lock = threading.Lock()
-_db_lock = threading.RLock()
 _initialized_paths: set[str] = set()
-_BUSY_TIMEOUT_MS = 30_000
+_BUSY_TIMEOUT_MS = 5_000
 _MIGRATION_BUSY_TIMEOUT_MS = 30_000
 _MIGRATION_ATTEMPTS = 8
-_CONNECTION_ATTEMPTS = 8
-_CONNECTION_TIMEOUT_SEC = 30.0
 
 
 def utc_now_iso() -> str:
@@ -620,18 +617,6 @@ def _apply_schema_migrations(conn: sqlite3.Connection) -> None:
 def _configure_connection(conn: sqlite3.Connection, *, busy_timeout_ms: int = _BUSY_TIMEOUT_MS) -> None:
     conn.execute(f"PRAGMA busy_timeout={busy_timeout_ms}")
     conn.execute("PRAGMA foreign_keys=ON")
-    conn.execute("PRAGMA journal_mode=WAL")
-
-
-def _is_database_locked_error(exc: sqlite3.OperationalError) -> bool:
-    return "locked" in str(exc).lower()
-
-
-def _open_connection(path: Path) -> sqlite3.Connection:
-    conn = sqlite3.connect(path, timeout=_CONNECTION_TIMEOUT_SEC, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    _configure_connection(conn)
-    return conn
 
 
 @contextmanager
@@ -769,29 +754,17 @@ def init_db(db_path=None) -> Path:
 def connect(db_path=None) -> Iterator[sqlite3.Connection]:
     """Open a connection with schema initialized."""
     path = init_db(db_path)
-    last_error: sqlite3.OperationalError | None = None
-
-    with _db_lock:
-        for attempt in range(_CONNECTION_ATTEMPTS):
-            conn = _open_connection(path)
-            try:
-                yield conn
-                conn.commit()
-                return
-            except sqlite3.OperationalError as exc:
-                conn.rollback()
-                last_error = exc
-                if not _is_database_locked_error(exc) or attempt == _CONNECTION_ATTEMPTS - 1:
-                    raise
-                time.sleep(0.05 * (attempt + 1))
-            except Exception:
-                conn.rollback()
-                raise
-            finally:
-                conn.close()
-
-        if last_error is not None:
-            raise last_error
+    conn = sqlite3.connect(path)
+    conn.row_factory = sqlite3.Row
+    try:
+        _configure_connection(conn)
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def next_public_id(conn: sqlite3.Connection, prefix: str) -> str:

@@ -282,13 +282,11 @@ export interface PmInboxPayload {
       priorityRank: number
       urgencyScore: number
       warnings: string[]
-      readinessStatus?: string
       workOrderId?: string
       inDevelopment?: boolean
       currentStage?: string
       status?: string
     }>
-    activeDevelopmentCount?: number
   }
   needsClarification: Array<{
     record: import('@/app/delivery/types').ReadinessRecord
@@ -470,7 +468,6 @@ export function fetchProjectConfig(): Promise<ProjectConfigPayload> {
 }
 
 export function saveProjectConfig(body: {
-  projectKey?: string
   sprintDurationDays: number
   sprintCapacityDays: number
   sprintStartWeekday?: number
@@ -555,12 +552,11 @@ export async function saveProjectJiraProjectKey(jiraProjectKey: string | null): 
   })
 }
 
-export function resetProjectSprint(projectKey?: string): Promise<PmInboxPayload['selectedSprint']> {
+export function resetProjectSprint(): Promise<PmInboxPayload['selectedSprint']> {
   return callDesktopApi({
     ...profileScoped(),
     path: '/api/delivery/sprint/reset',
     method: 'POST',
-    body: projectKey ? { projectKey } : undefined,
     timeoutMs: DELIVERY_TIMEOUT_MS
   })
 }

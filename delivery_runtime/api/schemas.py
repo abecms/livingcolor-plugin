@@ -275,11 +275,6 @@ class SelectedSprintTicketResponse(BaseModel):
     priorityRank: int = 0
     urgencyScore: float = 0
     warnings: list[str] = Field(default_factory=list)
-    readinessStatus: str | None = None
-    workOrderId: str | None = None
-    inDevelopment: bool = False
-    currentStage: str | None = None
-    status: str | None = None
 
 
 class SelectedSprintResponse(BaseModel):
@@ -290,7 +285,6 @@ class SelectedSprintResponse(BaseModel):
     overflowRisk: bool = False
     warnings: list[str] = Field(default_factory=list)
     tickets: list[SelectedSprintTicketResponse] = Field(default_factory=list)
-    activeDevelopmentCount: int = 0
 
 
 class SprintReportResponse(BaseModel):
@@ -434,7 +428,6 @@ class LocalProjectCreateRequest(BaseModel):
 class ProjectConfigUpdateRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    project_key: str | None = Field(default=None, alias="projectKey")
     sprintDurationDays: int = Field(ge=1, le=90)
     sprintCapacityDays: float = Field(ge=0.5, le=120)
     sprintStartWeekday: int | None = Field(default=None, ge=1, le=7)
@@ -471,12 +464,6 @@ class TicketEstimationUpdateResponse(BaseModel):
 class SprintSwapRequest(BaseModel):
     a: str
     b: str
-
-
-class SprintResetRequest(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
-    project_key: str | None = Field(default=None, alias="projectKey")
 
 
 class SprintSelectionUpdateRequest(BaseModel):
