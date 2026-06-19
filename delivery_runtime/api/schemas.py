@@ -305,6 +305,13 @@ class SprintReportResponse(BaseModel):
     publishedAt: str | None = None
     messagePreview: str | None = None
     error: str | None = None
+    billingStatus: str | None = None
+    billingWarning: str | None = None
+    invoiceId: str | None = None
+    invoiceUrl: str | None = None
+    invoiceStatus: str | None = None
+    invoiceTotalCents: int | None = None
+    invoiceCurrency: str | None = None
 
 
 class AnalysisDispatchItemResponse(BaseModel):
@@ -405,6 +412,15 @@ class JiraProjectPayload(BaseModel):
 class JiraProjectsResponse(BaseModel):
     items: list[JiraProjectPayload] = Field(default_factory=list)
     linkedProjectKey: str | None = None
+
+
+class BillingConfigPayload(BaseModel):
+    stripeCustomerId: str | None = None
+    dailyRateCents: int | None = Field(default=None, ge=1)
+    currency: str = "eur"
+    invoiceMode: str = "draft"
+    approvalRequired: bool = False
+    maxInvoiceCents: int | None = Field(default=None, ge=1)
 
 
 class ProjectConfigResponse(BaseModel):

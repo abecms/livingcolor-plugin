@@ -40,8 +40,10 @@ from jira_dashboard.routes import router as jira_router
 from lc_server.api.cloud_proxy import router as cloud_proxy_router
 from lc_server.api.firebase_routes import router as firebase_router
 from lc_server.api.mcp_routes import router as mcp_router
+from lc_server.api.plugin_settings_routes import legacy_router as plugin_settings_legacy_router
 
 router = APIRouter()
+router.include_router(plugin_settings_legacy_router)
 router.include_router(delivery_router, prefix="/delivery")
 router.include_router(jira_router, prefix="/jira")
 router.include_router(firebase_router, prefix="/firebase")

@@ -1,0 +1,8 @@
+1
+00:00:00,000 --> 00:00:04,000
+LivingColor — Autonomous Delivery Platform
+
+2
+00:00:03,800 --> 00:00:07,800
+Plugin + Skills + Evolution = full autonomy
+

@@ -1,0 +1,6 @@
+# This file is used internally by FFMPEG.
+file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script/480p15/partial_movie_files/Scene1_PluginConnection/1777723614_703747588_223132457.mp4'
+file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script/480p15/partial_movie_files/Scene1_PluginConnection/570263860_2318836581_355647998.mp4'
+file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script/480p15/partial_movie_files/Scene1_PluginConnection/570263860_3648533364_2348441569.mp4'
+file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script/480p15/partial_movie_files/Scene1_PluginConnection/570263860_2950721455_1571205452.mp4'
+file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script/480p15/partial_movie_files/Scene1_PluginConnection/570263860_960341146_2358810818.mp4'

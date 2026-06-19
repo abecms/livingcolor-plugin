@@ -4,6 +4,10 @@ from __future__ import annotations
 
 import pytest
 
+from delivery_http_client import mount_livingcolor_api_routes
+
+__all__ = ["mount_livingcolor_api_routes", "livingcolor_home"]
+
 
 @pytest.fixture
 def livingcolor_home(tmp_path, monkeypatch):

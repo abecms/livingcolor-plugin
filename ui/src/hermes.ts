@@ -3,6 +3,7 @@
  * Delivery UI only needs Jira/GitLab MCP helpers and config reads.
  */
 import { callDesktopApi } from '@/lib/desktop-api'
+import type { BillingConfigPayload } from '@/lib/delivery'
 import type { GitHubConnectResponse, GitHubConnectionStatus } from '@/lib/github-dashboard'
 import type { GitLabConnectResponse, GitLabConnectionStatus } from '@/lib/gitlab-dashboard'
 import type { JiraConnectResponse, JiraDashboardPayload } from '@/lib/jira-dashboard'
@@ -118,6 +119,27 @@ export function fetchJiraMcpStatus(serverName = 'jira'): Promise<import('@/lib/j
   return callDesktopApi({
     path: `/api/mcp/servers/${encodeURIComponent(serverName)}/status`,
     timeoutMs: JIRA_DASHBOARD_TIMEOUT_MS
+  })
+}
+
+export interface PluginSettingsPayload {
+  stripeSecretConfigured: boolean
+  stripeSecretKeyPreview?: string | null
+  billing?: BillingConfigPayload
+}
+
+export function fetchPluginSettings(): Promise<PluginSettingsPayload> {
+  return callDesktopApi<PluginSettingsPayload>({ path: '/api/settings' })
+}
+
+export function savePluginSettings(body: {
+  stripeSecretKey?: string | null
+  billing?: BillingConfigPayload
+}): Promise<PluginSettingsPayload> {
+  return callDesktopApi<PluginSettingsPayload>({
+    path: '/api/settings',
+    method: 'PUT',
+    body
   })
 }
 

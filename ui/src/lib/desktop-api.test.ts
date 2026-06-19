@@ -22,6 +22,27 @@ describe('callDesktopApi', () => {
     expect((init.headers as Headers).get('Authorization')).toBe('Bearer test-token')
   })
 
+  it('rewrites plugin settings to the delivery plugin-settings route', async () => {
+    await callDesktopApi({ path: '/api/settings', method: 'GET' })
+
+    const sdk = (window as any).__HERMES_PLUGIN_SDK__
+    const [path] = sdk.fetchJSON.mock.calls[0]
+    expect(path).toBe('/api/plugins/livingcolor/delivery/plugin-settings')
+  })
+
+  it('rewrites plugin settings save with PUT', async () => {
+    await callDesktopApi({
+      path: '/api/settings',
+      method: 'PUT',
+      body: { billing: { stripeCustomerId: 'cus_test' } }
+    })
+
+    const sdk = (window as any).__HERMES_PLUGIN_SDK__
+    const [path, init] = sdk.fetchJSON.mock.calls[0]
+    expect(path).toBe('/api/plugins/livingcolor/delivery/plugin-settings')
+    expect(init.method).toBe('PUT')
+  })
+
   it('rewrites MCP server management paths to the LivingColor plugin', async () => {
     await callDesktopApi({
       path: '/api/mcp/servers/Atlassian',

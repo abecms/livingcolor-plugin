@@ -42,5 +42,6 @@ else
   echo "python not found; livingcolor-pm profile will be created on first dashboard load"
 fi
 
-echo "Done. Restart Hermes to load backend + dashboard changes:"
-echo "  hermes gateway restart"
+echo "Done. Restart the Hermes dashboard (not just the gateway) to load backend + UI changes:"
+echo "  hermes dashboard --stop && hermes dashboard"
+echo "  # or restart from the Hermes desktop app, then hard-refresh the browser (Cmd+Shift+R)"

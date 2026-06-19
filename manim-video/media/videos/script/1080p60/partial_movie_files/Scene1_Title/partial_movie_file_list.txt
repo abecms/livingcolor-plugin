@@ -1,0 +1,11 @@
+# This file is used internally by FFMPEG.
+file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script/1080p60/partial_movie_files/Scene1_Title/2873985843_2835564963_223132457.mp4'
+file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script/1080p60/partial_movie_files/Scene1_Title/3496312638_3420211690_2991949991.mp4'
+file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script/1080p60/partial_movie_files/Scene1_Title/3496312638_3366045169_1990336861.mp4'
+file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script/1080p60/partial_movie_files/Scene1_Title/3496312638_2107024405_4108250823.mp4'
+file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script/1080p60/partial_movie_files/Scene1_Title/3496312638_2513142812_3468661619.mp4'
+file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script/1080p60/partial_movie_files/Scene1_Title/3496312638_765172328_2044539905.mp4'
+file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script/1080p60/partial_movie_files/Scene1_Title/3496312638_842152012_2802204107.mp4'
+file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script/1080p60/partial_movie_files/Scene1_Title/3496312638_156096444_2503733985.mp4'
+file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script/1080p60/partial_movie_files/Scene1_Title/3496312638_3484913905_3516534241.mp4'
+file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script/1080p60/partial_movie_files/Scene1_Title/3496312638_2554174251_2358810818.mp4'

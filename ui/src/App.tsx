@@ -7,10 +7,11 @@ import {
   ProjectWorkspaceLandingRedirect,
   ProjectWorkspaceLayout
 } from './app/delivery'
+import { PluginSettingsRoute } from './app/delivery/plugin-settings-route'
 import { ProjectDeliveryDashboardView } from './app/delivery/project-dashboard'
-import { LegacySettingsRedirect } from './app/delivery/legacy-settings-redirect'
 import { DASHBOARD_ROUTE, DELIVERY_ROUTE } from './app/routes'
 import { FirebaseAuthGate } from '@/components/firebase-auth-gate'
+import { AppNotifications } from '@/components/app-notifications'
 import { OfflineBanner } from '@/components/offline-banner'
 import { FirebaseAuthProvider } from '@/contexts/firebase-auth-provider'
 import { I18nProvider } from '@/i18n'
@@ -27,12 +28,14 @@ function DeliveryApp() {
             path={DELIVERY_ROUTE.slice(1)}
           />
           <Route element={<ProjectWorkspaceLandingRedirect />} path={DASHBOARD_ROUTE.slice(1)} />
-          <Route element={<ProjectWorkspaceLayout />} path="projects/:projectKey">
-            <Route element={<ProjectDeliveryDashboardView />} index />
-            <Route element={<ProjectSettingsView />} path="settings" />
-            <Route element={<ProjectIntegrationsView />} path="integrations" />
+          <Route element={<ProjectWorkspaceLayout />}>
+            <Route element={<PluginSettingsRoute />} path="settings" />
+            <Route path="projects/:projectKey">
+              <Route element={<ProjectDeliveryDashboardView />} index />
+              <Route element={<ProjectSettingsView />} path="settings" />
+              <Route element={<ProjectIntegrationsView />} path="integrations" />
+            </Route>
           </Route>
-          <Route element={<LegacySettingsRedirect />} path="settings" />
           <Route element={<Navigate replace to="/" />} path="*" />
         </Routes>
         </BrowserRouter>
@@ -64,6 +67,7 @@ export default function App() {
       <FirebaseAuthGate>
         <div className="lc-app">
           <OfflineBanner />
+          <AppNotifications />
           <div className="lc-app-body">
             <DeliveryApp />
           </div>

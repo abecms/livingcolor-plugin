@@ -1,7 +1,7 @@
 import type { IconComponent } from '@/lib/icons'
 import { BarChart3, Globe, Settings } from '@/lib/icons'
 
-import { DASHBOARD_ROUTE, DELIVERY_ROUTE, PROJECTS_ROUTE_PREFIX } from '../routes'
+import { DASHBOARD_ROUTE, DELIVERY_ROUTE, PROJECTS_ROUTE_PREFIX, SETTINGS_ROUTE } from '../routes'
 
 export interface ProjectTabDef {
   href: string
@@ -86,8 +86,13 @@ export function isProjectWorkspacePath(pathname: string): boolean {
     pathname === '/' ||
     pathname === DASHBOARD_ROUTE ||
     pathname === DELIVERY_ROUTE ||
+    pathname === SETTINGS_ROUTE ||
     pathname.startsWith(`${PROJECTS_ROUTE_PREFIX}/`)
   )
+}
+
+export function isGlobalSettingsPath(pathname: string): boolean {
+  return pathname === SETTINGS_ROUTE || pathname.startsWith(`${SETTINGS_ROUTE}/`)
 }
 
 export function isProjectTabActive(pathname: string, projectKey: string, tabHref: string): boolean {

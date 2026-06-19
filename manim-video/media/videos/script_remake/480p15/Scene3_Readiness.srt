@@ -1,0 +1,12 @@
+1
+00:00:00,000 --> 00:00:04,000
+Before any coding, the ticket is measured.
+
+2
+00:00:04,700 --> 00:00:09,700
+Comments, acceptance criteria, repository mapping, and blockers are checked.
+
+3
+00:00:06,800 --> 00:00:10,800
+The ticket becomes a measurable work order candidate: 85 percent confidence.
+

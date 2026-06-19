@@ -29,6 +29,16 @@ class ProjectDeliverySettings:
     communication_language: str = DEFAULT_COMMUNICATION_LANGUAGE
 
 
+@dataclass(frozen=True)
+class BillingSettings:
+    stripe_customer_id: str | None = None
+    daily_rate_cents: int | None = None
+    currency: str = "eur"
+    invoice_mode: str = "draft"
+    approval_required: bool = False
+    max_invoice_cents: int | None = None
+
+
 def normalize_sprint_start_weekday(value: Any) -> int:
     try:
         weekday = int(value)
@@ -123,6 +133,54 @@ def load_project_delivery_settings(project_key: str) -> ProjectDeliverySettings:
         sprint_capacity_days=capacity,
         sprint_start_weekday=normalize_sprint_start_weekday(start_weekday_raw),
         communication_language=normalize_communication_language(language_raw),
+    )
+
+
+def _normalize_optional_positive_int(value: Any) -> int | None:
+    if value is None or value == "":
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed > 0 else None
+
+
+def _normalize_billing_currency(value: Any) -> str:
+    text = str(value or "eur").strip().lower()
+    return text if len(text) == 3 and text.isalpha() else "eur"
+
+
+def _normalize_invoice_mode(value: Any) -> str:
+    text = str(value or "draft").strip().lower()
+    return text if text in {"draft", "finalize"} else "draft"
+
+
+def load_project_billing_settings(project_key: str) -> BillingSettings:
+    from lc_server.integrations.plugin_billing import load_plugin_billing_settings
+
+    return load_plugin_billing_settings()
+
+
+def persist_project_billing_settings(
+    *,
+    project_key: str,
+    stripe_customer_id: str | None,
+    daily_rate_cents: int | None,
+    currency: str = "eur",
+    invoice_mode: str = "draft",
+    approval_required: bool = False,
+    max_invoice_cents: int | None = None,
+) -> BillingSettings:
+    from lc_server.integrations.plugin_billing import persist_plugin_billing_settings
+
+    return persist_plugin_billing_settings(
+        stripe_customer_id=stripe_customer_id,
+        daily_rate_cents=daily_rate_cents,
+        currency=currency,
+        invoice_mode=invoice_mode,
+        approval_required=approval_required,
+        max_invoice_cents=max_invoice_cents,
     )
 
 

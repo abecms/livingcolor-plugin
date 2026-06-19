@@ -1,0 +1,12 @@
+# This file is used internally by FFMPEG.
+file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script/1080p60/partial_movie_files/Scene7_Resolution/2873985843_3841426433_223132457.mp4'
+file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script/1080p60/partial_movie_files/Scene7_Resolution/3496312638_2318836581_512258050.mp4'
+file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script/1080p60/partial_movie_files/Scene7_Resolution/3496312638_1629059726_962593699.mp4'
+file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script/1080p60/partial_movie_files/Scene7_Resolution/3496312638_2834709167_84876815.mp4'
+file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script/1080p60/partial_movie_files/Scene7_Resolution/3496312638_2298246141_4083440302.mp4'
+file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script/1080p60/partial_movie_files/Scene7_Resolution/3496312638_2834709167_2728154016.mp4'
+file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script/1080p60/partial_movie_files/Scene7_Resolution/3496312638_2910890483_441559813.mp4'
+file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script/1080p60/partial_movie_files/Scene7_Resolution/3496312638_3366045169_1117008266.mp4'
+file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script/1080p60/partial_movie_files/Scene7_Resolution/3496312638_4168577635_33510617.mp4'
+file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script/1080p60/partial_movie_files/Scene7_Resolution/3496312638_2950721455_2665944898.mp4'
+file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script/1080p60/partial_movie_files/Scene7_Resolution/3496312638_2699683603_2358810818.mp4'

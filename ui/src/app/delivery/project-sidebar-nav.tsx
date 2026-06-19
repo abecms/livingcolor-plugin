@@ -11,7 +11,7 @@ import {
 } from './project-navigation'
 import { useProjectWorkspace } from '@/hooks/use-project-workspace'
 
-function NavItem({
+function ProjectNavItem({
   href,
   label,
   icon: Icon,
@@ -82,7 +82,7 @@ export function ProjectSidebarNav({ collapsed = false }: { collapsed?: boolean }
     <nav className={cn('space-y-0.5', collapsed ? 'flex flex-col items-center' : 'px-2')}>
       <SectionHeading collapsed={collapsed} label="Project" />
       {PROJECT_TAB_DEFS.map(tab => (
-        <NavItem
+        <ProjectNavItem
           active={isProjectTabActive(location.pathname, projectKey, tab.href)}
           collapsed={collapsed}
           href={tab.href}

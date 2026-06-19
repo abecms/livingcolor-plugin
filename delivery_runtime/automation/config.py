@@ -53,6 +53,7 @@ class DeliveryAutomationConfig:
     sprint_report_cron: SprintReportCronConfig = SprintReportCronConfig()
     sprint: SprintConfig = SprintConfig()
     ticket_scope: "TicketScopeConfig | None" = None
+    billing: "BillingSettings | None" = None
 
 
 def _parse_bool(value: Any, default: bool) -> bool:
@@ -199,6 +200,7 @@ def load_delivery_automation_config(*, project_key: str | None = None) -> Delive
     )
 
     from delivery_runtime.readiness.project_settings import (
+        load_project_billing_settings,
         load_project_delivery_settings,
         mapping_has_delivery_settings,
     )
@@ -227,6 +229,7 @@ def load_delivery_automation_config(*, project_key: str | None = None) -> Delive
         communication_language = normalize_communication_language(per_project.communication_language)
 
     ticket_scope = load_ticket_scope_for_project(project_key_resolved) or default_ticket_scope()
+    billing = load_project_billing_settings(project_key_resolved)
 
     return DeliveryAutomationConfig(
         project_key=project_key_resolved,
@@ -248,6 +251,7 @@ def load_delivery_automation_config(*, project_key: str | None = None) -> Delive
             start_weekday=per_project.sprint_start_weekday,
         ),
         ticket_scope=ticket_scope or default_ticket_scope(),
+        billing=billing,
     )
 
 

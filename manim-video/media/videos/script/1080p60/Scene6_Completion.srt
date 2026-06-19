@@ -1,0 +1,16 @@
+1
+00:00:00,000 --> 00:00:05,000
+Jira comment + transition + ticket closed
+
+2
+00:00:02,600 --> 00:00:04,600
+Jira issue transitioned to 'To Test'
+
+3
+00:00:03,900 --> 00:00:05,900
+Delivery comment posted with MR URL
+
+4
+00:00:05,300 --> 00:00:08,300
+Ticket closed — done in minutes, not days
+

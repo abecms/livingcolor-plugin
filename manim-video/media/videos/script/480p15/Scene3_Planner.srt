@@ -1,0 +1,12 @@
+1
+00:00:00,000 --> 00:00:06,000
+Planner analyzes ticket + comments → implementation plan
+
+2
+00:00:02,733 --> 00:00:04,733
+Analyzing ticket, comments, repo structure...
+
+3
+00:00:06,400 --> 00:00:09,400
+Human gate: approve the plan before development
+

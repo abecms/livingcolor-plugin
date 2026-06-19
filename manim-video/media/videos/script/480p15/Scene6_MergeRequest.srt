@@ -1,0 +1,8 @@
+1
+00:00:00,000 --> 00:00:04,000
+Le Publisher crée une Merge Request
+
+2
+00:00:04,266 --> 00:00:08,266
+En attente de validation humaine...
+

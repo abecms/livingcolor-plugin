@@ -1,0 +1,4 @@
+1
+00:00:08,366 --> 00:00:11,366
+From Jira ticket to merged PR — zero human touch
+

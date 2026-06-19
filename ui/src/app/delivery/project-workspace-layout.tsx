@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, Navigate, Outlet, useParams } from 'react-router-dom'
+import { Link, Navigate, Outlet, useLocation, useParams } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -21,7 +21,7 @@ import { ProjectWorkspaceSplit } from './project-workspace-split'
 import { useProjectSidebarCollapsed } from './sidebar-preference'
 import { WorkspaceOrgSwitcher } from './workspace-org-switcher'
 import { WorkspaceSidebarUserMenu } from './workspace-sidebar-user-menu'
-import { projectRoute, projectTabRoute } from './project-navigation'
+import { projectRoute, projectTabRoute, isGlobalSettingsPath } from './project-navigation'
 
 const SIDEBAR_WIDTH_EXPANDED = 'w-60'
 const SIDEBAR_WIDTH_COLLAPSED = 'w-14'
@@ -52,9 +52,14 @@ function ProjectWorkspaceMain({
   targetTab?: '' | '/settings' | '/integrations'
 }) {
   const params = useParams()
+  const location = useLocation()
   const projectKey = params.projectKey?.trim().toUpperCase()
   const { projects, loading, activeProjectKey } = useProjectWorkspace()
   const [createOpen, setCreateOpen] = useState(false)
+
+  if (isGlobalSettingsPath(location.pathname)) {
+    return <Outlet />
+  }
 
   if (projectKey) {
     return <Outlet />

@@ -7,18 +7,9 @@ from delivery_runtime.validation.mapping_setup import install_phase25_project_ma
 
 
 def _client():
-    try:
-        from starlette.testclient import TestClient
-    except ImportError:
-        pytest.skip("fastapi/starlette not installed")
+    from delivery_http_client import delivery_api_client
 
-    from delivery_runtime.persistence.db import init_db
-    from hermes_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
-
-    init_db()
-    client = TestClient(app)
-    client.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
-    return client
+    return delivery_api_client()
 
 
 def _seed_ready_record(jira_key: str = "AAC-9") -> str:

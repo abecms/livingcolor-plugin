@@ -355,6 +355,15 @@ export interface TicketScopePayload {
 
 export type VcsProvider = 'gitlab' | 'github'
 
+export interface BillingConfigPayload {
+  stripeCustomerId?: string | null
+  dailyRateCents?: number | null
+  currency?: string
+  invoiceMode?: 'draft' | 'finalize'
+  approvalRequired?: boolean
+  maxInvoiceCents?: number | null
+}
+
 export interface ProjectConfigPayload {
   projectKey: string
   projectName: string
@@ -575,6 +584,9 @@ export interface SprintReportResult {
   publishedAt?: string | null
   messagePreview?: string | null
   error?: string | null
+  billingStatus?: string | null
+  billingWarning?: string | null
+  invoiceUrl?: string | null
 }
 
 export function publishProjectSprintReport(force = false): Promise<SprintReportResult> {

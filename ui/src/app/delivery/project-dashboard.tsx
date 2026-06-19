@@ -42,6 +42,7 @@ import { PatchReviewPanel } from './patch-review-panel'
 import { parseProjectKeyFromPath, isProjectWorkspacePath } from './project-navigation'
 import { reviewRequestShortLabel } from './review-request-labels'
 import { SprintHeaderStrip } from './sprint-header-strip'
+import { StripeSetupBanner } from './stripe-setup-banner'
 import { useDailyAnalysis } from './use-daily-analysis'
 import { WorkOrderProgressPanel } from './work-order-progress-panel'
 import type { DeliveryGate, WorkOrder } from './types'
@@ -396,6 +397,7 @@ export function ProjectDeliveryDashboardView() {
       />
 
       <div className="flex min-h-0 flex-1 flex-col gap-6">
+        <StripeSetupBanner />
         <JiraBrowseProvider baseUrl={inbox?.jiraBrowseBaseUrl}>
           <SprintHeaderStrip
             analysisRunning={analysisRunning}

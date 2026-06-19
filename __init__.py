@@ -27,6 +27,20 @@ def register(ctx) -> None:
     install_hermes_cli_jira_dashboard_shim()
     install_mcp_tool_shims()
 
+    try:
+        from lc_constants import ensure_livingcolor_home_layout
+
+        ensure_livingcolor_home_layout()
+    except Exception:
+        logger.exception("LivingColor home layout bootstrap failed during plugin register")
+
+    try:
+        from lc_server.bootstrap import bootstrap_livingcolor_server
+
+        bootstrap_livingcolor_server()
+    except Exception:
+        logger.exception("LivingColor server bootstrap failed during plugin register")
+
     from agent_surfaces import register_surfaces
 
     register_surfaces(ctx)

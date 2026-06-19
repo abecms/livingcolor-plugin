@@ -11,18 +11,9 @@ from lc_server.provisioning.provisioner import ProvisionResult
 
 
 def _client():
-    try:
-        from starlette.testclient import TestClient
-    except ImportError:
-        pytest.skip("fastapi/starlette not installed")
+    from delivery_http_client import delivery_api_client
 
-    from delivery_runtime.persistence.db import init_db
-    from hermes_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
-
-    init_db()
-    client = TestClient(app)
-    client.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
-    return client
+    return delivery_api_client()
 
 
 def _provision_result(*, warnings: list[str] | None = None) -> ProvisionResult:
@@ -352,3 +343,92 @@ class TestProjectConfigApi:
         state = get_sprint_state(project_key="TVP")
         assert state is not None
         assert state["memory"]["manualOverride"] is False
+
+
+class TestSprintReportApi:
+    @pytest.fixture(autouse=True)
+    def _setup(self, _isolate_hermes_home, livingcolor_home):
+        self.client = _client()
+
+    def test_sprint_report_response_includes_billing_fields(self, monkeypatch, livingcolor_home):
+        from delivery_runtime.pm_inbox.sprint_selection import persist_selected_sprint
+
+        persist_selected_sprint(
+            project_key="TVP",
+            payload={
+                "sprintName": "LivingColor Sprint",
+                "capacityDays": 15,
+                "usedDays": 1,
+                "durationDays": 14,
+                "overflowRisk": False,
+                "warnings": [],
+                "tickets": [],
+            },
+            memory_patch={
+                "sprintNumber": 1,
+                "sprintStartDate": "2026-06-17",
+                "sprintEndDate": "2026-06-30",
+            },
+        )
+
+        def fake_publish_sprint_report(*, project_key, force=False, actor="human"):
+            return {
+                "status": "sent",
+                "dedupKey": "1:2026-06-30",
+                "platform": "slack",
+                "publishedAt": "2026-06-30T16:00:00+00:00",
+                "messagePreview": "Sprint report",
+                "billingStatus": "draft_created",
+                "invoiceId": "in_123",
+                "invoiceUrl": "https://invoice.stripe.com/in_123",
+                "invoiceStatus": "draft",
+                "invoiceTotalCents": 160000,
+                "invoiceCurrency": "eur",
+                "billingWarning": None,
+            }
+
+        monkeypatch.setattr(
+            "delivery_runtime.pm_inbox.sprint_report.publish_sprint_report",
+            fake_publish_sprint_report,
+        )
+
+        response = self.client.post("/api/delivery/sprint/report", headers={"x-lc-project-key": "TVP"})
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["billingStatus"] == "draft_created"
+        assert payload["invoiceUrl"] == "https://invoice.stripe.com/in_123"
+        assert payload["invoiceTotalCents"] == 160000
+
+
+    def test_project_config_ignores_legacy_billing_payload(self, livingcolor_home, monkeypatch):
+        monkeypatch.setenv("STRIPE_SECRET_KEY", "sk_test_example")
+
+        response = self.client.put(
+            "/api/delivery/project-config",
+            headers={"x-lc-project-key": "TVP"},
+            json={
+                "sprintDurationDays": 14,
+                "sprintCapacityDays": 15,
+                "communicationLanguage": "fr",
+                "billing": {
+                    "stripeCustomerId": "cus_123",
+                    "dailyRateCents": 80000,
+                },
+            },
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert "billing" not in payload
+
+        settings = self.client.get("/api/delivery/plugin-settings")
+        assert settings.status_code == 200
+        assert settings.json()["billing"]["stripeCustomerId"] is None
+
+        get_response = self.client.get(
+            "/api/delivery/project-config",
+            headers={"x-lc-project-key": "TVP"},
+        )
+        assert get_response.status_code == 200
+        assert "billing" not in get_response.json()

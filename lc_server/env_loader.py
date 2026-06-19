@@ -18,6 +18,13 @@ _INFERENCE_ENV_KEYS = frozenset(
     }
 )
 
+_STRIPE_ENV_KEYS = ("STRIPE_SECRET_KEY", "STRIPE_API_KEY")
+
+_LIVINGCOLOR_ENV_TEMPLATE = """\
+# LivingColor product secrets (optional — ~/.hermes/.env is also loaded)
+# STRIPE_SECRET_KEY=sk_test_...
+"""
+
 
 def get_livingcolor_env_path() -> Path:
     from lc_constants import get_livingcolor_home
@@ -68,6 +75,26 @@ def load_livingcolor_dotenv(*, override: bool = True) -> Path | None:
         loaded = env_path
         logger.debug("Loaded LivingColor environment from %s", env_path)
     return loaded
+
+
+def ensure_livingcolor_env_template() -> Path:
+    """Create ~/.hermes/livingcolor/.env with commented Stripe guidance when missing."""
+    from lc_constants import ensure_livingcolor_home_layout
+
+    home = ensure_livingcolor_home_layout()
+    env_path = home / ".env"
+    if not env_path.exists():
+        env_path.write_text(_LIVINGCOLOR_ENV_TEMPLATE, encoding="utf-8")
+        logger.info("Created LivingColor env template at %s", env_path)
+    return env_path
+
+
+def stripe_api_key_configured() -> bool:
+    """Return True when a Stripe secret key is available in the environment."""
+    from lc_server.integrations.plugin_secrets import stripe_secret_key_configured
+
+    prepare_delivery_agent_environment()
+    return stripe_secret_key_configured()
 
 
 def prepare_delivery_agent_environment() -> None:

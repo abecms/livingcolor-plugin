@@ -1,0 +1,8 @@
+1
+00:00:00,000 --> 00:00:05,000
+Final writeback: Jira comment, ticket movement, and delivery closure.
+
+2
+00:00:04,000 --> 00:00:09,000
+Four agents, three gates, and validations at every step.
+

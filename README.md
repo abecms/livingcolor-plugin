@@ -315,6 +315,28 @@ non-zero tool count.
   when configuring servers manually.
 - Never commit tokens to git or paste them into chat logs.
 
+### Sprint Stripe invoices
+
+On install, LivingColor automatically installs the **Stripe Python SDK** and
+creates `~/.hermes/livingcolor/.env` with setup hints. End-of-sprint reports can
+create a **Stripe Billing invoice** from delivered tickets
+(`estimatedDays × dailyRate`).
+
+**One-time setup (about 2 minutes):**
+
+1. In the dashboard, open **Project Settings → Stripe billing** and set:
+   - Stripe secret key (`sk_test_...` or `sk_live_...`)
+   - Stripe customer ID (`cus_...`)
+   - Daily rate (EUR)
+2. Click **Save settings**.
+
+The secret key is stored in `~/.hermes/livingcolor/.env` (plugin config). You can
+also set `STRIPE_SECRET_KEY` in `~/.hermes/.env` if you prefer Hermes env files.
+
+You can also edit `billing:` in `project_mapping.yaml` if you prefer files over
+the UI. Invoice creation runs when the sprint report is published; billing
+failures appear as warnings in the report but do not block publication.
+
 ### 5. Enable agent tools (optional)
 
 In Hermes, add the `livingcolor` toolset to your session or platform config so

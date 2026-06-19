@@ -31,6 +31,8 @@ Rules:
 - Be factual — only use data from the snapshot.
 - Keep the message under 3500 characters.
 - Write in the language given by communicationLanguage in the snapshot.
+- If billing.invoiceUrl is present, include the Stripe invoice link in a short billing line.
+- If billing.warning is present and billing.invoiceUrl is absent, include the invoice warning factually.
 
 Output ONLY the message body text. Do not wrap it in JSON or code fences.
 """

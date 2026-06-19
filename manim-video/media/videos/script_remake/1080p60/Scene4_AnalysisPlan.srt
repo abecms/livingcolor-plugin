@@ -1,0 +1,12 @@
+1
+00:00:00,000 --> 00:00:05,000
+The Analyst and Planner turn the ticket into a controlled plan.
+
+2
+00:00:04,900 --> 00:00:08,900
+The plan includes understanding, files, risks, and effort.
+
+3
+00:00:07,700 --> 00:00:12,700
+Approval creates a Scope Contract and writes OriginalEstimate back to Jira.
+

@@ -1,0 +1,8 @@
+1
+00:00:00,000 --> 00:00:05,000
+What if a Jira ticket could deliver itself — without giving up control?
+
+2
+00:00:03,600 --> 00:00:07,600
+A ticket enters the LivingColor pipeline.
+

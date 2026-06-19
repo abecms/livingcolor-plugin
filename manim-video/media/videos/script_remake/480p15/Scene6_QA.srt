@@ -1,0 +1,8 @@
+1
+00:00:00,000 --> 00:00:06,000
+Quality is not a separate afterthought. It is injected into the development pass.
+
+2
+00:00:05,466 --> 00:00:10,466
+Architecture, QA, and security guidance produce a pass/fail review signal.
+

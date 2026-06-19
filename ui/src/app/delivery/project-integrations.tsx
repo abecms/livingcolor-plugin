@@ -49,7 +49,6 @@ import { useProjectWorkspace } from '@/hooks/use-project-workspace'
 import { ManagerSection } from '../manager-page-layout'
 
 import { dashboardOutlineButtonProps, dashboardPrimaryButtonProps } from './dashboard-ui'
-
 import { GitHubTokenDialog, type GitHubCredentialsFormValues } from '@/lib/integrations/github-token-dialog'
 import { GitLabTokenDialog, type GitLabCredentialsFormValues } from '@/lib/integrations/gitlab-token-dialog'
 import { JiraApiTokenDialog, type JiraCredentialsFormValues } from '@/lib/integrations/jira-api-token-dialog'

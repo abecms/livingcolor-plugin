@@ -836,3 +836,8 @@ def decide_comment_proposal(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return JiraCommentProposalResponse.model_validate(proposal)
+
+
+from lc_server.api.plugin_settings_routes import router as plugin_settings_router
+
+router.include_router(plugin_settings_router)

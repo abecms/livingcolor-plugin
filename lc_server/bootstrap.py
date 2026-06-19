@@ -10,6 +10,7 @@ from lc_server.factory import build_delivery_services
 
 logger = logging.getLogger(__name__)
 
+_bootstrap_done = False
 _scheduler: DeliveryAutomationScheduler | None = None
 
 
@@ -31,7 +32,24 @@ def _run_scheduled_sprint_report() -> None:
 
 def bootstrap_livingcolor_server() -> None:
     """Wire delivery runtime API dependencies to server-owned services."""
-    global _scheduler
+    global _scheduler, _bootstrap_done
+    if _bootstrap_done:
+        return
+
+    try:
+        from lc_server.integrations.plugin_dependencies import ensure_plugin_python_dependencies
+
+        ensure_plugin_python_dependencies()
+    except Exception as exc:
+        logger.warning("LivingColor plugin dependency install skipped: %s", exc)
+
+    try:
+        from lc_server.env_loader import ensure_livingcolor_env_template
+
+        ensure_livingcolor_env_template()
+    except Exception as exc:
+        logger.warning("LivingColor env template setup skipped: %s", exc)
+
     from jira_dashboard.compat import install_hermes_cli_jira_dashboard_shim
 
     install_hermes_cli_jira_dashboard_shim()
@@ -103,3 +121,4 @@ def bootstrap_livingcolor_server() -> None:
                 config.sprint_report_cron.hour,
                 config.sprint_report_cron.minute,
             )
+    _bootstrap_done = True

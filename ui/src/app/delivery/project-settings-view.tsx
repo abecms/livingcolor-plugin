@@ -133,7 +133,15 @@ export function ProjectSettingsView() {
     } finally {
       setSaving(false)
     }
-  }, [activeProjectKey, assigneeInput, capacityDays, communicationLanguage, durationDays, sprintStartWeekday, ticketScope])
+  }, [
+    activeProjectKey,
+    assigneeInput,
+    capacityDays,
+    communicationLanguage,
+    durationDays,
+    sprintStartWeekday,
+    ticketScope
+  ])
 
   const resetSprintNow = useCallback(async () => {
     if (!activeProjectKey) {
@@ -162,11 +170,17 @@ export function ProjectSettingsView() {
     try {
       const result = await publishProjectSprintReport(false)
       if (result.status === 'sent') {
+        const billingNote =
+          result.billingStatus === 'draft_created' || result.billingStatus === 'finalized'
+            ? ' Stripe invoice link included.'
+            : result.billingWarning
+              ? ` Billing: ${result.billingWarning}`
+              : ''
         notify({
           kind: 'success',
           message: result.platform
-            ? `Sprint report posted to ${result.platform}.`
-            : 'Sprint report posted to the Hermes messaging channel.'
+            ? `Sprint report posted to ${result.platform}.${billingNote}`
+            : `Sprint report posted to the Hermes messaging channel.${billingNote}`
         })
         return
       }
@@ -249,7 +263,7 @@ export function ProjectSettingsView() {
   return (
     <ManagerPageShell wide={false}>
       <ManagerPageHeader
-        description="Configure sprint capacity, ticket scope, and communication defaults for this Jira project."
+        description="Sprint capacity, ticket scope, and communication defaults for this project."
         eyebrow={`${displayKey} · ${displayName}`}
         icon={Settings}
         title="Project Settings"

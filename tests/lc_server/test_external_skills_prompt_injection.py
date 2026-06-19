@@ -172,3 +172,10 @@ def test_sprint_reporter_prompt_appends_sprint_reporter_guidance(monkeypatch):
     assert "External LivingColor Skills Guidance" in prompts[0]
     assert "# Sprint Reporter" in prompts[0]
     assert requested_skill_names == [("sprint-reporter",)]
+
+
+def test_sprint_reporter_system_prompt_mentions_billing_links():
+    from lc_server.agent_bridge.hermes_sprint_reporter import SPRINT_REPORTER_SYSTEM_PROMPT
+
+    assert "billing.invoiceUrl" in SPRINT_REPORTER_SYSTEM_PROMPT
+    assert "invoice warning" in SPRINT_REPORTER_SYSTEM_PROMPT
