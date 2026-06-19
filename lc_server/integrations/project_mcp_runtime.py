@@ -63,7 +63,7 @@ def install_project_mcp_hooks() -> None:
 
     original_save = mcp_config._save_mcp_server
 
-    def _save_with_project_scope(name: str, server_config: dict[str, Any]) -> None:
+    def _save_with_project_scope(name: str, server_config: dict[str, Any]) -> bool:
         from lc_server.context import get_project_context
         from lc_server.integrations.mcp_server_resolver import is_gitlab_mcp_server, is_jira_mcp_server
 
@@ -80,7 +80,7 @@ def install_project_mcp_hooks() -> None:
                 canonical = "gitlab"
             if canonical:
                 persist_project_mcp_server(project_key, canonical, server_config)
-        original_save(name, server_config)
+        return original_save(name, server_config)
 
     mcp_config._save_mcp_server = _save_with_project_scope
     mcp_config._livingcolor_project_mcp_hook_installed = True

@@ -212,6 +212,7 @@ def upsert_integration_server_config(name: str, body: dict[str, Any]) -> dict[st
         raise ValueError("Provide either a URL (HTTP/SSE server) or a command (stdio server)")
 
     from hermes_cli.mcp_config import _save_mcp_server
+    from hermes_cli.mcp_security import validate_mcp_server_entry
     from lc_server.integrations.mcp_config_bridge import load_effective_mcp_servers
 
     servers = load_effective_mcp_servers()
@@ -220,6 +221,10 @@ def upsert_integration_server_config(name: str, body: dict[str, Any]) -> dict[st
     merged = {**existing, **body}
     if isinstance(body.get("env"), dict):
         merged["env"] = dict(body["env"])
+
+    issues = validate_mcp_server_entry(target_name, merged)
+    if issues:
+        raise ValueError(f"Server rejected: {issues[0]}")
 
     if not _save_mcp_server(target_name, merged):
         raise ValueError("Server rejected: suspicious command/args configuration")

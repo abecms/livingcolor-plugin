@@ -183,6 +183,138 @@ In the dashboard, open a project → **Integrations** and connect Jira plus the
 project's VCS provider (GitLab or GitHub). LivingColor never writes MCP config
 silently — you opt in per project.
 
+### GitLab MCP (setup & troubleshooting)
+
+LivingColor connects to GitLab through a **Hermes MCP stdio server** (not through
+Cursor, Claude Desktop, or VS Code MCP settings). Credentials are saved to
+`~/.hermes/config.yaml` when you click **Connect GitLab** in the dashboard.
+
+#### Prerequisites on the machine running the Hermes gateway
+
+| Requirement | Why |
+| --- | --- |
+| **Node.js 18+** | The official GitLab MCP server is a Node package |
+| **`npx` on the gateway `PATH`** | Default launch command used by the dashboard |
+| **GitLab personal access token** | Scope `api` on your instance (e.g. `gitlab.com` or self-hosted) |
+
+#### Connect via the dashboard (recommended)
+
+1. Open **Project → Integrations**.
+2. Set **VCS provider** to **GitLab**.
+3. Click **Connect GitLab**.
+4. Enter:
+   - **Instance URL** — e.g. `https://gitlab.com` or `https://gitlab.example.com`
+     (do not append `/api/v4`; LivingColor normalizes it).
+   - **Personal access token** — `glpat-…` with API scope.
+5. Click **Connect**. LivingColor saves the MCP entry and runs a connection test.
+
+The saved MCP config looks like this (you normally do not edit it by hand):
+
+```yaml
+mcp_servers:
+  gitlab:
+    command: npx
+    args:
+      - -y
+      - "@modelcontextprotocol/server-gitlab"
+    connect_timeout: 120
+    env:
+      GITLAB_API_URL: https://gitlab.example.com/api/v4/
+      GITLAB_PERSONAL_ACCESS_TOKEN: glpat-...
+```
+
+#### Error: `Server rejected: suspicious command/args configuration`
+
+This message comes from **Hermes security** when saving MCP config through
+LivingColor (`PUT /api/plugins/livingcolor/mcp/servers/gitlab`). It is **not**
+returned by GitLab or by Cursor.
+
+Hermes blocks only a narrow pattern: a **shell interpreter** (`bash`, `sh`, `zsh`,
+…) whose `args` look like network exfiltration (`curl`, `wget`, `POST`, etc.).
+The default `npx` GitLab config is allowed.
+
+If you see this error:
+
+1. **Inspect the existing entry** — a leftover manual config may still use `bash`/`sh`:
+
+   ```bash
+   grep -A15 gitlab ~/.hermes/config.yaml
+   hermes mcp list
+   ```
+
+   `command` must be `npx` or `mcp-server-gitlab`, not `bash` or `sh`.
+
+2. **Remove the bad entry** and reconnect from the dashboard:
+
+   ```bash
+   hermes mcp remove gitlab   # or your custom server name, e.g. gitlab-tv5
+   ```
+
+3. **Reconnect** via **Project → Integrations → Connect GitLab**.
+
+After a plugin update, the API may return a more specific rejection reason (e.g.
+*shell interpreter 'bash' with network egress in args*).
+
+#### Alternative: install the MCP server globally (no `npx` at runtime)
+
+Use this when the gateway process cannot find `npx` (systemd service, minimal
+`PATH`, air-gapped install after a one-time `npm install`).
+
+```bash
+npm install -g @modelcontextprotocol/server-gitlab
+```
+
+Then either edit `~/.hermes/config.yaml`:
+
+```yaml
+mcp_servers:
+  gitlab:
+    command: mcp-server-gitlab
+    connect_timeout: 120
+    env:
+      GITLAB_API_URL: https://gitlab.example.com/api/v4/
+      GITLAB_PERSONAL_ACCESS_TOKEN: ${GITLAB_PERSONAL_ACCESS_TOKEN}
+```
+
+and store the token in `~/.hermes/.env`:
+
+```bash
+# ~/.hermes/.env
+GITLAB_PERSONAL_ACCESS_TOKEN=glpat-...
+```
+
+or add via CLI:
+
+```bash
+hermes mcp add gitlab \
+  --command npx \
+  --args -y \
+  --args @modelcontextprotocol/server-gitlab
+```
+
+Restart the gateway after manual config changes:
+
+```bash
+hermes gateway restart
+```
+
+#### CLI checks
+
+```bash
+hermes mcp list
+hermes mcp test gitlab
+```
+
+In the dashboard, **Integrations** should show GitLab as **Connected** with a
+non-zero tool count.
+
+#### Security notes
+
+- Create a dedicated PAT per machine or user; revoke it when offboarding.
+- Prefer `${GITLAB_PERSONAL_ACCESS_TOKEN}` in `config.yaml` plus `~/.hermes/.env`
+  when configuring servers manually.
+- Never commit tokens to git or paste them into chat logs.
+
 ### 5. Enable agent tools (optional)
 
 In Hermes, add the `livingcolor` toolset to your session or platform config so
