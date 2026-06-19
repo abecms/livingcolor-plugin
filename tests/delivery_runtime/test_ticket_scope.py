@@ -117,9 +117,24 @@ def test_build_ticket_scope_jql_includes_assignee_filter():
     assert 'assignee in ("Tamsi Besson", "Grégory Besson")' in variants[0]
     assert "statusCategory = \"To Do\"" in variants[0]
     assert "Rouvert" in variants[0]
+    assert "ROUVERT" in variants[0]
+    assert "À FAIRE" in variants[0]
+
+
+def test_build_ticket_scope_jql_includes_french_todo_statuses():
+    scope = TicketScopeConfig(status_groups=("todo",))
+    variants = build_ticket_scope_jql_variants("TVP", scope)
+    assert "À FAIRE" in variants[0]
+    assert "ROUVERT" in variants[0]
 
 
 def test_needs_broad_jira_fetch():
-    assert needs_broad_jira_fetch(TicketScopeConfig(status_groups=("todo",))) is True
-    assert needs_broad_jira_fetch(TicketScopeConfig(status_groups=("in_progress",))) is True
-    assert needs_broad_jira_fetch(TicketScopeConfig(assignees=("Ada",))) is True
+    assert needs_broad_jira_fetch(TicketScopeConfig(status_groups=("todo",))) is False
+    assert needs_broad_jira_fetch(TicketScopeConfig(status_groups=("in_progress",))) is False
+    assert needs_broad_jira_fetch(TicketScopeConfig(assignees=("Ada",))) is False
+    assert (
+        needs_broad_jira_fetch(
+            TicketScopeConfig(status_groups=("todo",), assignees=("Ada Lovelace",))
+        )
+        is False
+    )

@@ -15,11 +15,23 @@ _PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 if str(_PLUGIN_ROOT) not in sys.path:
     sys.path.insert(0, str(_PLUGIN_ROOT))
 
-from jira_dashboard.compat import install_hermes_cli_jira_dashboard_shim
-from jira_dashboard.mcp_compat import install_mcp_tool_shims
+logger = logging.getLogger(__name__)
 
-install_hermes_cli_jira_dashboard_shim()
-install_mcp_tool_shims()
+try:
+    from jira_dashboard.compat import install_hermes_cli_jira_dashboard_shim
+    from jira_dashboard.mcp_compat import install_mcp_tool_shims
+
+    install_hermes_cli_jira_dashboard_shim()
+    install_mcp_tool_shims()
+
+    from lc_server.integrations.livingcolor_pm_profile import ensure_livingcolor_pm_profile
+    from lc_server.integrations.project_chat_context import install_project_chat_context_hooks
+
+    ensure_livingcolor_pm_profile()
+    install_project_chat_context_hooks()
+    logger.info("LivingColor project chat hooks installed from dashboard plugin_api")
+except Exception:
+    logger.exception("LivingColor project chat bootstrap failed during dashboard import")
 
 from fastapi import APIRouter
 
@@ -28,8 +40,6 @@ from jira_dashboard.routes import router as jira_router
 from lc_server.api.cloud_proxy import router as cloud_proxy_router
 from lc_server.api.firebase_routes import router as firebase_router
 from lc_server.api.mcp_routes import router as mcp_router
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter()
 router.include_router(delivery_router, prefix="/delivery")

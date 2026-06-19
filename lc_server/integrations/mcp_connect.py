@@ -27,9 +27,9 @@ def resolve_integration_server_name(name: str, servers: dict[str, Any] | None = 
         return None
 
     if servers is None:
-        from hermes_cli.mcp_config import _get_mcp_servers
+        from lc_server.integrations.mcp_config_bridge import load_effective_mcp_servers
 
-        servers = _get_mcp_servers()
+        servers = load_effective_mcp_servers()
 
     if safe_name in servers:
         return safe_name
@@ -49,9 +49,9 @@ def resolve_integration_server_entry(
     if not resolved:
         return None
     if servers is None:
-        from hermes_cli.mcp_config import _get_mcp_servers
+        from lc_server.integrations.mcp_config_bridge import load_effective_mcp_servers
 
-        servers = _get_mcp_servers()
+        servers = load_effective_mcp_servers()
     cfg = servers.get(resolved)
     if not isinstance(cfg, dict) or not cfg:
         return None
@@ -61,9 +61,9 @@ def resolve_integration_server_entry(
 def preferred_integration_server_name(kind: str, servers: dict[str, Any] | None = None) -> str:
     kind = (kind or "").strip().lower()
     if servers is None:
-        from hermes_cli.mcp_config import _get_mcp_servers
+        from lc_server.integrations.mcp_config_bridge import load_effective_mcp_servers
 
-        servers = _get_mcp_servers()
+        servers = load_effective_mcp_servers()
 
     if kind == "jira":
         return active_jira_mcp_name(servers)
@@ -149,9 +149,9 @@ def status_mcp_server(name: str, cfg: dict[str, Any]) -> dict[str, Any]:
 
 
 def connect_gitlab_mcp() -> dict[str, Any]:
-    from hermes_cli.mcp_config import _get_mcp_servers
+    from lc_server.integrations.mcp_config_bridge import load_effective_mcp_servers
 
-    servers = _get_mcp_servers()
+    servers = load_effective_mcp_servers()
     entry = resolve_integration_server_entry("gitlab", servers)
     if not entry:
         return {
@@ -166,9 +166,9 @@ def connect_gitlab_mcp() -> dict[str, Any]:
 
 
 def connect_github_mcp() -> dict[str, Any]:
-    from hermes_cli.mcp_config import _get_mcp_servers
+    from lc_server.integrations.mcp_config_bridge import load_effective_mcp_servers
 
-    servers = _get_mcp_servers()
+    servers = load_effective_mcp_servers()
     entry = resolve_integration_server_entry("github", servers)
     if not entry:
         return {
@@ -183,9 +183,9 @@ def connect_github_mcp() -> dict[str, Any]:
 
 
 def integration_status(kind: str) -> dict[str, Any]:
-    from hermes_cli.mcp_config import _get_mcp_servers
+    from lc_server.integrations.mcp_config_bridge import load_effective_mcp_servers
 
-    servers = _get_mcp_servers()
+    servers = load_effective_mcp_servers()
     entry = resolve_integration_server_entry(kind, servers)
     if not entry:
         label = kind.capitalize()
@@ -211,9 +211,10 @@ def upsert_integration_server_config(name: str, body: dict[str, Any]) -> dict[st
     if not body.get("url") and not body.get("command"):
         raise ValueError("Provide either a URL (HTTP/SSE server) or a command (stdio server)")
 
-    from hermes_cli.mcp_config import _get_mcp_servers, _save_mcp_server
+    from hermes_cli.mcp_config import _save_mcp_server
+    from lc_server.integrations.mcp_config_bridge import load_effective_mcp_servers
 
-    servers = _get_mcp_servers()
+    servers = load_effective_mcp_servers()
     target_name = resolve_integration_server_name(safe_name, servers) or safe_name
     existing = servers.get(target_name) or {}
     merged = {**existing, **body}

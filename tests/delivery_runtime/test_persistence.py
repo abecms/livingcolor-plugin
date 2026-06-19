@@ -171,6 +171,24 @@ def test_connect_handles_concurrent_readers(_isolate_hermes_home):
     assert all(result == 0 for result in results)
 
 
+def test_connect_handles_concurrent_writers(_isolate_hermes_home):
+    init_db()
+    store = EventStore()
+
+    def append_event(index: int) -> str:
+        created = store.append(
+            event_type="READINESS_SCAN_STARTED",
+            actor="system",
+            payload={"index": index},
+        )
+        return created["id"]
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        event_ids = list(pool.map(append_event, range(16)))
+
+    assert len(set(event_ids)) == 16
+
+
 def test_event_store_is_append_only(_isolate_hermes_home):
     init_db()
     store = EventStore()

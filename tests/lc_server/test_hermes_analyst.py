@@ -81,6 +81,12 @@ def test_parse_analyst_completion_raises_on_missing_json():
         parse_analyst_completion("No structured output", snapshot={"key": "BN-2"})
 
 
+def test_parse_analyst_completion_accepts_extended_statuses():
+    payload = {**_BASE_COMPLETION, "readinessStatus": "needs_clarification"}
+    result = parse_analyst_completion(_completion_text(payload), {})
+    assert result["readinessStatus"] == "needs_clarification"
+
+
 def test_parse_analyst_completion_raises_on_invalid_status():
     text = (
         "```json\n"

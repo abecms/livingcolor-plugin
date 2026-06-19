@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { fetchPmInbox, fetchProjectConfig, fetchWorkOrder, type PmInboxPayload } from '@/lib/delivery'
+import { notify } from '@/store/notifications'
 
 import { ProjectDeliveryDashboardView } from './project-dashboard'
 
@@ -261,6 +262,20 @@ describe('ProjectDeliveryDashboardView', () => {
     await waitFor(() => {
       expect(fetchWorkOrder).toHaveBeenCalledWith('WO-1')
       expect(screen.getByText('Analysis + Plan Review')).toBeTruthy()
+    })
+  })
+
+  it('refetches inbox when refresh is clicked', async () => {
+    vi.mocked(fetchPmInbox).mockResolvedValue(emptyInboxPayload)
+    renderDashboard()
+    await screen.findByRole('button', { name: 'Refresh' })
+
+    vi.mocked(fetchPmInbox).mockClear()
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+
+    await waitFor(() => {
+      expect(fetchPmInbox).toHaveBeenCalledWith('BN')
+      expect(notify).toHaveBeenCalledWith({ kind: 'success', message: 'Dashboard refreshed.' })
     })
   })
 })

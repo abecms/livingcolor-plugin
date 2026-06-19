@@ -56,7 +56,7 @@ def _row_to_estimation(row) -> dict[str, Any]:
     }
 
 
-def fail_stale_daily_runs(conn, *, max_age_minutes: int = 15) -> int:
+def fail_stale_daily_runs(conn, *, max_age_minutes: int = 90) -> int:
     """Mark abandoned ``running`` rows as failed so new analyses can proceed."""
     from datetime import UTC, datetime, timedelta
 
@@ -74,7 +74,17 @@ def fail_stale_daily_runs(conn, *, max_age_minutes: int = 15) -> int:
     return conn.total_changes
 
 
-def has_running_daily_run(conn) -> bool:
+def has_running_daily_run(conn, *, project_key: str | None = None) -> bool:
+    if project_key:
+        row = conn.execute(
+            """
+            SELECT 1 FROM daily_analysis_runs
+            WHERE status = 'running' AND project_key = ?
+            LIMIT 1
+            """,
+            (project_key.strip().upper(),),
+        ).fetchone()
+        return row is not None
     row = conn.execute(
         "SELECT 1 FROM daily_analysis_runs WHERE status = 'running' LIMIT 1"
     ).fetchone()
@@ -188,6 +198,14 @@ def insert_estimation(
             utc_now_iso(),
             run_id,
         ),
+    )
+    conn.execute(
+        """
+        UPDATE readiness_records
+        SET estimated_days = ?, updated_at = ?
+        WHERE id = ?
+        """,
+        (estimated_days, utc_now_iso(), readiness_id),
     )
     return estimation_id
 

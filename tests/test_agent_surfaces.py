@@ -35,6 +35,11 @@ def test_registers_delivery_command_and_tools(monkeypatch, tmp_path):
         "delivery_promote",
         "delivery_gate_decision",
         "delivery_work_order_status",
+        "livingcolor_get_delivery_context",
+        "livingcolor_update_ticket_estimation",
+        "livingcolor_update_sprint_selection",
+        "livingcolor_promote_ticket",
+        "livingcolor_run_daily_analysis",
     ):
         assert tool in ctx.tools
 

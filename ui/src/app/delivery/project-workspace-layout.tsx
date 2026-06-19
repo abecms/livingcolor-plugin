@@ -17,6 +17,7 @@ import { ProjectSwitcher, ProjectSwitcherTooltipProvider, SidebarTooltipItem } f
 import { useProjectWorkspace } from '@/hooks/use-project-workspace'
 
 import { ProjectWorkspaceProvider } from './project-workspace-provider'
+import { ProjectWorkspaceSplit } from './project-workspace-split'
 import { useProjectSidebarCollapsed } from './sidebar-preference'
 import { WorkspaceOrgSwitcher } from './workspace-org-switcher'
 import { WorkspaceSidebarUserMenu } from './workspace-sidebar-user-menu'
@@ -161,7 +162,9 @@ function ProjectWorkspaceShell({
     <div className="flex h-full min-w-0 overflow-hidden">
       <ProjectWorkspaceSidebar />
       <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
-        <ProjectWorkspaceMain targetTab={targetTab} />
+        <ProjectWorkspaceSplit>
+          <ProjectWorkspaceMain targetTab={targetTab} />
+        </ProjectWorkspaceSplit>
       </div>
     </div>
   )

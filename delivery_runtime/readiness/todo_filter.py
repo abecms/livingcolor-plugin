@@ -24,12 +24,26 @@ REOPENED_JIRA_STATUS_NAMES = (
     "Reopened",
     "Rouvert",
     "Rouverte",
+    "ROUVERT",
+    "ROUVERTE",
     "Re-opened",
     "Re-ouvert",
     "Réouvert",
     "Ré-ouvert",
     "REOPENED",
-    "ROUVERT",
+)
+
+# Explicit To Do status names when statusCategory is missing or localized.
+TODO_JIRA_STATUS_NAMES = (
+    "To Do",
+    "Todo",
+    "Open",
+    "Backlog",
+    "New",
+    "À faire",
+    "A faire",
+    "À FAIRE",
+    "A FAIRE",
 )
 
 

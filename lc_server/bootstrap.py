@@ -65,6 +65,15 @@ def bootstrap_livingcolor_server() -> None:
         logger.warning("Could not install per-project MCP hooks: %s", exc)
 
     try:
+        from lc_server.integrations.project_chat_context import install_project_chat_context_hooks
+        from lc_server.integrations.livingcolor_pm_profile import ensure_livingcolor_pm_profile
+
+        ensure_livingcolor_pm_profile()
+        install_project_chat_context_hooks()
+    except Exception as exc:
+        logger.warning("Could not install LivingColor project chat hooks: %s", exc)
+
+    try:
         from lc_server.integrations.mcp_warmup import warm_configured_mcp_connections
 
         warm_configured_mcp_connections()

@@ -6,8 +6,11 @@ by the Hermes web server's dashboard-plugin system).
 """
 from __future__ import annotations
 
+import logging
 import sys
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # The ported packages (delivery_runtime, lc_server, jira_dashboard,
 # lc_constants) use absolute imports; make them importable.
@@ -27,3 +30,12 @@ def register(ctx) -> None:
     from agent_surfaces import register_surfaces
 
     register_surfaces(ctx)
+
+    try:
+        from lc_server.integrations.livingcolor_pm_profile import ensure_livingcolor_pm_profile
+        from lc_server.integrations.project_chat_context import install_project_chat_context_hooks
+
+        ensure_livingcolor_pm_profile()
+        install_project_chat_context_hooks()
+    except Exception:
+        logger.exception("LivingColor project chat bootstrap failed during plugin register")

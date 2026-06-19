@@ -90,6 +90,7 @@ describe('ProjectSettingsView', () => {
 
     await waitFor(() => {
       expect(saveProjectConfig).toHaveBeenCalledWith({
+        projectKey: 'BN',
         sprintDurationDays: 21,
         sprintCapacityDays: 18,
         sprintStartWeekday: 1,

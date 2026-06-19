@@ -111,3 +111,16 @@
 [data-slot='context-menu-content'] .codicon {
   font-family: codicon;
 }
+
+.hermes-chat-xterm-host .xterm {
+  height: 100%;
+}
+
+.hermes-chat-xterm-host .xterm-viewport,
+.hermes-chat-xterm-host .xterm-screen {
+  background-color: var(--theme-terminal-background, #000000) !important;
+}
+
+.hermes-chat-xterm-host .xterm-viewport {
+  overflow-y: auto !important;
+}

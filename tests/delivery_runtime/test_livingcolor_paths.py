@@ -16,6 +16,7 @@ def test_livingcolor_home_layout(_isolate_hermes_home, monkeypatch):
     hermes_home = _isolate_hermes_home
     livingcolor_home = hermes_home / "livingcolor"
     livingcolor_home.mkdir(parents=True)
+    monkeypatch.setenv("LIVINGCOLOR_HOME", str(livingcolor_home))
 
     assert get_livingcolor_home() == livingcolor_home
     assert get_delivery_db_path() == livingcolor_home / "runtime.db"
@@ -30,7 +31,7 @@ def test_livingcolor_home_layout(_isolate_hermes_home, monkeypatch):
 def test_legacy_hermes_delivery_db_is_migrated(monkeypatch, tmp_path):
     hermes_home = tmp_path / "hermes"
     livingcolor_home = hermes_home / "livingcolor"
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("LIVINGCOLOR_HOME", str(livingcolor_home))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     legacy_db = tmp_path / ".hermes" / "delivery" / "delivery.db"
     legacy_db.parent.mkdir(parents=True)

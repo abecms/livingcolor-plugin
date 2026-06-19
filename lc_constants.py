@@ -17,9 +17,26 @@ def _hermes_home() -> Path:
     return Path(override) if override else Path.home() / ".hermes"
 
 
+def _default_hermes_root() -> Path:
+    try:
+        from hermes_constants import get_default_hermes_root
+
+        return Path(get_default_hermes_root())
+    except ImportError:
+        return Path.home() / ".hermes"
+
+
 def get_livingcolor_home() -> Path:
-    """Return the plugin data home (default: ~/.hermes/livingcolor)."""
-    return _hermes_home() / "livingcolor"
+    """Return the plugin data home (default: ~/.hermes/livingcolor).
+
+    Delivery state is shared across Hermes profiles. Project dashboard chat runs
+    under an isolated profile (``profiles/livingcolor-pm``) but must read the
+    same ``project_mapping.yaml``, SQLite DB, and config as the gateway.
+    """
+    override = os.environ.get("LIVINGCOLOR_HOME", "").strip()
+    if override:
+        return Path(override).expanduser()
+    return _default_hermes_root() / "livingcolor"
 
 
 def ensure_livingcolor_home_layout() -> Path:

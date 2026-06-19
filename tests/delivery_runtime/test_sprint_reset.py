@@ -14,12 +14,20 @@ from delivery_runtime.pm_inbox.sprint_reset import (
     sprint_end_date,
 )
 from delivery_runtime.pm_inbox.sprint_selection import load_selected_sprint_payload
-from delivery_runtime.persistence.db import connect
+from delivery_runtime.persistence.db import connect, json_dumps
 
 
 def _seed_ready_ticket(*, project_key: str, jira_key: str, estimated_days: float) -> str:
     now = "2026-06-16T10:00:00+00:00"
     readiness_id = f"RD-{jira_key}"
+    snapshot = json_dumps(
+        {
+            "key": jira_key,
+            "summary": f"Title {jira_key}",
+            "status": "To Do",
+            "statusCategory": "To Do",
+        }
+    )
     with connect() as conn:
         conn.execute(
             """
@@ -27,9 +35,9 @@ def _seed_ready_ticket(*, project_key: str, jira_key: str, estimated_days: float
                 id, jira_key, project_key, title, readiness_score, readiness_status,
                 analysis_summary, blockers_json, recommended_repos_json, confidence,
                 jira_snapshot_json, analyzed_at, promoted_work_order_id, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, 80, 'ready', '', '[]', '[]', 0.8, '{}', ?, NULL, ?, ?)
+            ) VALUES (?, ?, ?, ?, 80, 'ready', '', '[]', '[]', 0.8, ?, ?, NULL, ?, ?)
             """,
-            (readiness_id, jira_key, project_key, f"Title {jira_key}", now, now, now),
+            (readiness_id, jira_key, project_key, f"Title {jira_key}", snapshot, now, now, now),
         )
         pm_store.insert_estimation(
             conn,
@@ -49,7 +57,7 @@ def test_sprint_end_date_spans_configured_duration():
     assert sprint_end_date(start=start, duration_days=1) == date(2026, 6, 3)
 
 
-def test_reset_sprint_clears_manual_override_and_increments_number(_isolate_hermes_home):
+def test_manual_reset_clears_manual_override_and_empties_sprint(_isolate_hermes_home):
     project_key = "TVP"
     _seed_ready_ticket(project_key=project_key, jira_key="TVP-1", estimated_days=1.0)
     save_delivery_project_config(
@@ -73,8 +81,10 @@ def test_reset_sprint_clears_manual_override_and_increments_number(_isolate_herm
     )
 
     wednesday = datetime(2026, 6, 3, 9, 0, tzinfo=UTC)
-    payload = reset_sprint(project_key=project_key, now=wednesday)
+    payload = reset_sprint(project_key=project_key, now=wednesday, repopulate_tickets=False)
 
+    assert payload["tickets"] == []
+    assert payload["usedDays"] == 0
     assert payload["sprintName"] == "LivingColor Sprint 1"
     state = pm_store.get_sprint_state(project_key=project_key)
     assert state is not None
@@ -136,6 +146,49 @@ def test_load_selected_sprint_payload_keeps_number_after_reset(_isolate_hermes_h
     )
 
     monday = datetime(2026, 6, 15, 10, 0, tzinfo=UTC)
-    reset_sprint(project_key=project_key, now=monday)
+    reset_sprint(project_key=project_key, now=monday, repopulate_tickets=True)
     payload = load_selected_sprint_payload(project_key=project_key)
     assert payload["sprintName"] == "LivingColor Sprint 1"
+
+
+def test_load_selected_sprint_payload_keeps_empty_sprint_after_manual_reset(_isolate_hermes_home):
+    project_key = "TVP"
+    _seed_ready_ticket(project_key=project_key, jira_key="TVP-2138", estimated_days=1.0)
+    save_delivery_project_config(
+        duration_days=14,
+        capacity_days=2,
+        start_weekday=1,
+        project_key=project_key,
+    )
+
+    reset_sprint(project_key=project_key, repopulate_tickets=False)
+    payload = load_selected_sprint_payload(project_key=project_key)
+
+    assert payload["tickets"] == []
+    assert payload["usedDays"] == 0
+    state = pm_store.get_sprint_state(project_key=project_key)
+    assert state is not None
+    assert state["memory"]["emptyBacklogUntilAnalysis"] is True
+
+
+def test_daily_rebuild_refills_sprint_after_manual_reset(_isolate_hermes_home):
+    from delivery_runtime.pm_inbox.daily_pipeline import DailyAnalysisPipeline
+
+    project_key = "TVP"
+    _seed_ready_ticket(project_key=project_key, jira_key="TVP-2140", estimated_days=1.0)
+    save_delivery_project_config(
+        duration_days=14,
+        capacity_days=2,
+        start_weekday=1,
+        project_key=project_key,
+    )
+
+    reset_sprint(project_key=project_key, repopulate_tickets=False)
+    pipeline = DailyAnalysisPipeline()
+    payload = pipeline._rebuild_selected_sprint(project_key=project_key)
+
+    assert payload["tickets"]
+    assert payload["tickets"][0]["jiraKey"] == "TVP-2140"
+    state = pm_store.get_sprint_state(project_key=project_key)
+    assert state is not None
+    assert state["memory"]["emptyBacklogUntilAnalysis"] is False

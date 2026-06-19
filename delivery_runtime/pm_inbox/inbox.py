@@ -58,8 +58,11 @@ def _in_selected_sprint(jira_key: str | None, sprint_keys: set[str]) -> bool:
 
 
 def build_pm_inbox(*, project_key: str | None = None, queue_consumer: Any | None = None) -> dict[str, Any]:
-    config = load_delivery_automation_config()
-    project_key = (project_key or config.project_key).strip().upper()
+    resolved_key = (project_key or "").strip().upper()
+    if not resolved_key:
+        resolved_key = load_delivery_automation_config().project_key.strip().upper()
+    config = load_delivery_automation_config(project_key=resolved_key)
+    project_key = resolved_key
     project_name = config.project_name
     ticket_scope = load_ticket_scope_for_project(project_key)
     latest_run = pm_store.get_latest_daily_run(project_key=project_key)

@@ -79,14 +79,21 @@ def should_auto_reset_sprint(*, project_key: str, now: datetime | None = None) -
     return (today - last_start).days >= duration_days
 
 
-def reset_sprint(*, project_key: str, now: datetime | None = None) -> dict[str, Any]:
-    """Clear manual override, bump sprint number, and rebuild ticket selection."""
+def reset_sprint(
+    *,
+    project_key: str,
+    now: datetime | None = None,
+    repopulate_tickets: bool = True,
+    publish_report: bool = True,
+) -> dict[str, Any]:
+    """Clear manual override, bump sprint number, and optionally rebuild ticket selection."""
     project_key = project_key.strip().upper()
     now = now or datetime.now(UTC)
 
-    from delivery_runtime.pm_inbox.sprint_report import maybe_publish_sprint_report_before_reset
+    if publish_report:
+        from delivery_runtime.pm_inbox.sprint_report import maybe_publish_sprint_report_before_reset
 
-    maybe_publish_sprint_report_before_reset(project_key=project_key, now=now)
+        maybe_publish_sprint_report_before_reset(project_key=project_key, now=now)
 
     today = _today(now)
     config = load_delivery_automation_config(project_key=project_key)
@@ -94,11 +101,23 @@ def reset_sprint(*, project_key: str, now: datetime | None = None) -> dict[str, 
     sprint_number = _current_sprint_number(project_key) + 1
     end = sprint_end_date(start=today, duration_days=duration_days)
 
-    payload = build_selected_sprint_payload(
-        project_key=project_key,
-        sprint_number=sprint_number,
-    )
-    payload = merge_active_work_orders_into_sprint(payload, project_key=project_key)
+    if repopulate_tickets:
+        payload = build_selected_sprint_payload(
+            project_key=project_key,
+            sprint_number=sprint_number,
+        )
+        payload = merge_active_work_orders_into_sprint(payload, project_key=project_key)
+    else:
+        sprint_name = f"LivingColor Sprint {sprint_number}" if sprint_number else "LivingColor Sprint"
+        payload = {
+            "sprintName": sprint_name,
+            "capacityDays": config.sprint.capacity_days,
+            "usedDays": 0.0,
+            "durationDays": duration_days,
+            "overflowRisk": False,
+            "warnings": [],
+            "tickets": [],
+        }
 
     persist_selected_sprint(
         project_key=project_key,
@@ -106,6 +125,7 @@ def reset_sprint(*, project_key: str, now: datetime | None = None) -> dict[str, 
         memory_patch={
             "manualOverride": False,
             "manualOverrideAt": None,
+            "emptyBacklogUntilAnalysis": not repopulate_tickets,
             "sprintNumber": sprint_number,
             "sprintStartDate": today.isoformat(),
             "sprintEndDate": end.isoformat(),

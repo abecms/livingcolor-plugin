@@ -18,6 +18,8 @@ from typing import Any, Callable, Dict, List, Optional
 
 from hermes_cli.mcp_config import _get_mcp_servers, _oauth_tokens_present, _save_mcp_server
 
+from lc_server.integrations.mcp_config_bridge import get_mcp_server_config, load_effective_mcp_servers
+
 logger = logging.getLogger(__name__)
 
 JIRA_MCP_NAME = "jira"
@@ -41,7 +43,7 @@ class JiraDashboardError(Exception):
 
 def ensure_jira_mcp_config() -> dict:
     """Ensure the Jira MCP preset exists in config.yaml."""
-    servers = _get_mcp_servers()
+    servers = load_effective_mcp_servers()
     existing = servers.get(JIRA_MCP_NAME)
     if existing:
         if _uses_env_auth(existing):
@@ -71,7 +73,7 @@ def connect_jira_mcp() -> dict:
 
     resolved = resolve_jira_mcp_server_name()
     if resolved:
-        cfg = dict(_get_mcp_servers().get(resolved) or {})
+        cfg = dict(load_effective_mcp_servers().get(resolved) or {})
         name = resolved
     else:
         cfg = ensure_jira_mcp_config()
@@ -110,7 +112,7 @@ def ensure_jira_mcp_connected() -> None:
     Saved credentials or MCP config alone are not enough: the LivingColor backend
     must hold an active MCP session before tools such as daily analysis can run.
     """
-    cfg = _get_mcp_servers().get(_active_jira_mcp_name())
+    cfg = get_mcp_server_config(_active_jira_mcp_name())
     if not cfg:
         raise JiraDashboardError("Jira MCP is not configured. Connect Jira before scanning.")
 
@@ -1157,7 +1159,7 @@ def fetch_jira_attachment_preview(
     if not safe_key:
         raise JiraDashboardError("Issue key is required.")
 
-    cfg = _get_mcp_servers().get(_active_jira_mcp_name())
+    cfg = get_mcp_server_config(_active_jira_mcp_name())
     if not cfg:
         raise JiraDashboardError("Jira is not configured.")
 
@@ -1281,7 +1283,7 @@ def fetch_jira_issue_attachments(issue_key: str) -> List[dict]:
     if not safe_key:
         raise JiraDashboardError("Issue key is required.")
 
-    cfg = _get_mcp_servers().get(_active_jira_mcp_name())
+    cfg = get_mcp_server_config(_active_jira_mcp_name())
     if not cfg:
         raise JiraDashboardError("Jira is not configured.")
 
@@ -1319,7 +1321,7 @@ def fetch_jira_dashboard(
     if force_sample:
         return _sample_dashboard()
 
-    cfg = _get_mcp_servers().get(_active_jira_mcp_name())
+    cfg = get_mcp_server_config(_active_jira_mcp_name())
     if not cfg:
         return _sample_dashboard()
 

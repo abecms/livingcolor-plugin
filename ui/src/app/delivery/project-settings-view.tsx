@@ -109,6 +109,7 @@ export function ProjectSettingsView() {
     setSaving(true)
     try {
       const config = await saveProjectConfig({
+        projectKey: activeProjectKey ?? undefined,
         sprintDurationDays: parsedDuration,
         sprintCapacityDays: parsedCapacity,
         sprintStartWeekday: parsedStartWeekday,
@@ -132,25 +133,29 @@ export function ProjectSettingsView() {
     } finally {
       setSaving(false)
     }
-  }, [assigneeInput, capacityDays, communicationLanguage, durationDays, sprintStartWeekday, ticketScope])
+  }, [activeProjectKey, assigneeInput, capacityDays, communicationLanguage, durationDays, sprintStartWeekday, ticketScope])
 
   const resetSprintNow = useCallback(async () => {
+    if (!activeProjectKey) {
+      notifyError(new Error('No active project'), 'Select a project before resetting the sprint')
+      return
+    }
     setResettingSprint(true)
     try {
-      const sprint = await resetProjectSprint()
+      const sprint = await resetProjectSprint(activeProjectKey)
       bumpProjectConfigRevision()
       notify({
         kind: 'success',
         message: sprint?.sprintName
-          ? `Sprint reset — ${sprint.sprintName} is ready with ${sprint.tickets?.length ?? 0} ticket(s).`
-          : 'Sprint reset with a fresh ticket selection.'
+          ? `${sprint.sprintName} started with an empty backlog. Run daily analysis to refill it.`
+          : 'Sprint reset with an empty backlog.'
       })
     } catch (error) {
       notifyError(error, 'Could not reset sprint')
     } finally {
       setResettingSprint(false)
     }
-  }, [])
+  }, [activeProjectKey])
 
   const publishSprintReport = useCallback(async () => {
     setPublishingSprintReport(true)

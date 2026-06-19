@@ -26,7 +26,7 @@ describe('JiraTicketTitleLink', () => {
       </JiraTicketTitleLink>
     )
 
-    fireEvent.click(screen.getByRole('link', { name: /Audio player insight bug/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Audio player insight bug/i }))
 
     expect(openExternalLink).toHaveBeenCalledWith('https://jira.example.com/browse/BN-441')
   })

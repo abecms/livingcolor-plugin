@@ -47,13 +47,12 @@ def list_jira_projects_for_readiness(project_key: str) -> list[dict[str, str]]:
     ]
 
 
-def fetch_issues_for_readiness(project_key: str, *, max_results: int = 100) -> list[dict[str, Any]]:
+def fetch_issues_for_readiness(project_key: str, *, max_results: int = 200) -> list[dict[str, Any]]:
     """Fetch and normalize Jira issues for readiness analysis."""
     from delivery_runtime.readiness.project_settings import resolve_jira_project_key
     from delivery_runtime.readiness.ticket_scope import (
         build_ticket_scope_jql_variants,
         load_ticket_scope_for_project,
-        needs_broad_jira_fetch,
     )
 
     livingcolor_project_key = str(project_key or "").strip().upper()
@@ -93,11 +92,7 @@ def fetch_issues_for_readiness(project_key: str, *, max_results: int = 100) -> l
             raise ReadinessIntegrationError(f"Unknown Jira project key: {jira_project_key}")
 
         cloud_id = _ensure_cloud_id(cfg, tool_names, invoke)
-        jql_variants = (
-            _issue_jql_variants(selected_project)
-            if needs_broad_jira_fetch(ticket_scope)
-            else build_ticket_scope_jql_variants(selected_project, ticket_scope)
-        )
+        jql_variants = build_ticket_scope_jql_variants(selected_project, ticket_scope)
         raw_issues = _search_issues_with_fallbacks(
             tool_names,
             invoke,

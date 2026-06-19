@@ -216,10 +216,11 @@ def _escape_jql_string(value: str) -> str:
 
 
 def _todo_status_jql_clause() -> str:
-    from delivery_runtime.readiness.todo_filter import REOPENED_JIRA_STATUS_NAMES
+    from delivery_runtime.readiness.todo_filter import REOPENED_JIRA_STATUS_NAMES, TODO_JIRA_STATUS_NAMES
 
-    reopened = ", ".join(f'"{_escape_jql_string(name)}"' for name in REOPENED_JIRA_STATUS_NAMES)
-    return f'(statusCategory = "To Do" OR status in ({reopened}))'
+    status_names = list(dict.fromkeys([*TODO_JIRA_STATUS_NAMES, *REOPENED_JIRA_STATUS_NAMES]))
+    quoted = ", ".join(f'"{_escape_jql_string(name)}"' for name in status_names)
+    return f'(statusCategory = "To Do" OR status in ({quoted}))'
 
 
 def _status_jql_clause(scope: TicketScopeConfig) -> str | None:
@@ -282,17 +283,16 @@ def build_ticket_scope_jql_variants(
 
 
 def needs_broad_jira_fetch(scope: TicketScopeConfig | None = None) -> bool:
-    """Use a broad Jira fetch when Python-side filtering is required for accuracy."""
+    """Use a broad Jira fetch only when no scoped JQL can express the filter."""
     resolved = scope or default_ticket_scope()
-    if resolved.assignees:
+    groups = {_normalize_status_group(group) for group in resolved.status_groups}
+    groups.discard("")
+    if not groups and not resolved.assignees:
         return True
-    groups = set(resolved.status_groups)
-    if not groups:
-        return True
-    # Reopened status names vary per Jira workflow — always post-filter in Python for todo scope.
-    if _STATUS_GROUP_TODO in groups:
-        return True
-    return bool(groups - {_STATUS_GROUP_TODO})
+    # Todo / in-progress / assignee filters are all expressible in scoped JQL.
+    if groups <= {_STATUS_GROUP_TODO, _STATUS_GROUP_IN_PROGRESS}:
+        return False
+    return True
 
 
 def load_ticket_scope_for_project(project_key: str) -> TicketScopeConfig:

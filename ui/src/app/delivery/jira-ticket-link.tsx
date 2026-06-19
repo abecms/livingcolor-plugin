@@ -24,22 +24,21 @@ export function JiraTicketTitleLink({
   }
 
   return (
-    <a
+    <button
       className={cn(
-        'group inline-flex cursor-pointer items-start gap-1.5 text-inherit no-underline decoration-muted-foreground underline-offset-[3px] transition-colors hover:text-foreground hover:underline',
+        'group inline-flex cursor-pointer items-start gap-1.5 border-0 bg-transparent p-0 text-left text-inherit no-underline decoration-muted-foreground underline-offset-[3px] transition-colors hover:text-foreground hover:underline',
         className
       )}
-      href={href}
       onClick={event => {
         event.preventDefault()
+        event.stopPropagation()
         openExternalLink(href)
       }}
-      rel="noopener noreferrer"
-      target="_blank"
       title={`Open ${jiraKey} in Jira`}
+      type="button"
     >
       <span>{children}</span>
       <ArrowUpRight className="mt-0.5 size-3.5 shrink-0 text-(--ui-text-tertiary) opacity-70 transition-opacity group-hover:text-foreground group-hover:opacity-100" />
-    </a>
+    </button>
   )
 }

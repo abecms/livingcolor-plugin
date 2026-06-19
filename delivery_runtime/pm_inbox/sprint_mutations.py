@@ -74,7 +74,7 @@ def _build_payload_from_keys(
     project_key: str,
     ticket_keys: list[str],
 ) -> dict[str, Any]:
-    config = load_delivery_automation_config()
+    config = load_delivery_automation_config(project_key=project_key)
     candidates: list[dict[str, Any]] = []
     missing: list[str] = []
     for jira_key in ticket_keys:
@@ -128,7 +128,11 @@ def persist_manual_sprint(*, project_key: str, payload: dict[str, Any]) -> dict[
     persist_selected_sprint(
         project_key=project_key,
         payload=payload,
-        memory_patch={"manualOverride": True, "manualOverrideAt": utc_now_iso()},
+        memory_patch={
+            "manualOverride": True,
+            "manualOverrideAt": utc_now_iso(),
+            "emptyBacklogUntilAnalysis": False,
+        },
     )
     return payload
 

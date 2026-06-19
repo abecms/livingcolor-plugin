@@ -20,11 +20,16 @@ declare global {
   interface Window {
     livingColorDesktop?: LivingColorDesktopBridge
     __HERMES_PLUGIN_SDK__?: {
+      sdkVersion?: string
       fetchJSON: (path: string, init?: RequestInit) => Promise<unknown>
+      buildWsUrl?: (path: string, params?: Record<string, string>) => Promise<string>
+      buildWsAuthParam?: () => Promise<[string, string]>
+      api?: Record<string, (...args: never[]) => unknown>
       React?: typeof import('react')
     }
     __HERMES_PLUGINS__?: {
       register: (name: string, component: unknown) => void
+      registerSlot?: (plugin: string, slot: string, component: unknown) => void
     }
   }
 }

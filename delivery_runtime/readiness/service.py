@@ -79,23 +79,34 @@ class ReadinessService:
             "skipped": result.skipped,
         }
 
-    def promote(self, record_id: str, *, actor: str = "human") -> dict[str, Any]:
+    def promote(self, record_id: str, *, actor: str = "human", tick: bool = True) -> dict[str, Any]:
         record = self.get_record(record_id)
         if not record:
             raise LookupError("Readiness record not found")
         if record["readinessStatus"] != "ready":
             raise ValueError("Only ready tickets can be promoted to a work order")
         work_order = self.work_orders.create_from_readiness(record, actor=actor)
-        if self.orchestrator:
-            try:
-                self.orchestrator.tick(work_order["id"])
-            except Exception:
-                pass
-            refreshed = self.work_orders.get_work_order(work_order["id"])
-            if refreshed:
-                work_order = refreshed
+        if tick:
+            work_order = self._run_orchestrator_tick(work_order)
         self._mark_queue_item_in_progress(record, work_order)
         return work_order
+
+    def run_orchestrator_tick(self, work_order_id: str) -> None:
+        """Advance a work order graph; safe to call from a background task."""
+        work_order = self.work_orders.get_work_order(work_order_id)
+        if not work_order:
+            return
+        self._run_orchestrator_tick(work_order)
+
+    def _run_orchestrator_tick(self, work_order: dict[str, Any]) -> dict[str, Any]:
+        if not self.orchestrator:
+            return work_order
+        try:
+            self.orchestrator.tick(work_order["id"])
+        except Exception:
+            pass
+        refreshed = self.work_orders.get_work_order(work_order["id"])
+        return refreshed or work_order
 
     @staticmethod
     def _mark_queue_item_in_progress(record: dict[str, Any], work_order: dict[str, Any]) -> None:

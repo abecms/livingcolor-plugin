@@ -77,25 +77,25 @@ def _resolve_server_name(
 
 def resolve_jira_mcp_server_name(servers: dict[str, Any] | None = None) -> str | None:
     if servers is None:
-        from hermes_cli.mcp_config import _get_mcp_servers
+        from lc_server.integrations.mcp_config_bridge import load_effective_mcp_servers
 
-        servers = _get_mcp_servers()
+        servers = load_effective_mcp_servers()
     return _resolve_server_name(canonical=CANONICAL_JIRA_MCP_NAME, predicate=is_jira_mcp_server, servers=servers)
 
 
 def resolve_gitlab_mcp_server_name(servers: dict[str, Any] | None = None) -> str | None:
     if servers is None:
-        from hermes_cli.mcp_config import _get_mcp_servers
+        from lc_server.integrations.mcp_config_bridge import load_effective_mcp_servers
 
-        servers = _get_mcp_servers()
+        servers = load_effective_mcp_servers()
     return _resolve_server_name(canonical=CANONICAL_GITLAB_MCP_NAME, predicate=is_gitlab_mcp_server, servers=servers)
 
 
 def resolve_github_mcp_server_name(servers: dict[str, Any] | None = None) -> str | None:
     if servers is None:
-        from hermes_cli.mcp_config import _get_mcp_servers
+        from lc_server.integrations.mcp_config_bridge import load_effective_mcp_servers
 
-        servers = _get_mcp_servers()
+        servers = load_effective_mcp_servers()
     return _resolve_server_name(canonical=CANONICAL_GITHUB_MCP_NAME, predicate=is_github_mcp_server, servers=servers)
 
 

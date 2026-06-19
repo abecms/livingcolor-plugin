@@ -7,6 +7,7 @@ import json
 import logging
 import mimetypes
 import re
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -379,6 +380,20 @@ def _persist_attachment_bytes(issue_key: str, name: str, raw_bytes: bytes) -> Pa
     return target_path
 
 
+def _run_async(coro: Any) -> Any:
+    """Run a coroutine from sync code, even when an event loop is already active."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+
+    def _run_in_thread() -> Any:
+        return asyncio.run(coro)
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(_run_in_thread).result()
+
+
 def _safe_filename(name: str) -> str:
     cleaned = re.sub(r"[^\w.\-()+ ]+", "_", str(name or "attachment").strip())
     return cleaned[:180] or "attachment"
@@ -388,13 +403,14 @@ def _describe_image_attachment(local_path: Path) -> str:
     from tools.vision_tools import vision_analyze_tool
 
     try:
-        raw_result = asyncio.run(
+        raw_result = _run_async(
             vision_analyze_tool(
                 str(local_path),
                 VISION_PROMPT,
             )
         )
     except Exception as exc:
+        logger.warning("Vision analysis failed for %s: %s", local_path, exc)
         return f"(Vision analysis failed: {exc})"
 
     text = str(raw_result or "").strip()

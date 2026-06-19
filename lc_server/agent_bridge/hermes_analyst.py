@@ -29,6 +29,7 @@ This is read-only analysis — never mutate Jira, create Work Orders, or promote
 
 Apply the readiness scoring rubric and finish with a JSON completion block containing:
 readinessScore, readinessStatus, analysisSummary, blockers, recommendedRepos, confidence, estimatedDays.
+readinessStatus must be one of: ready, needs_clarification, not_development, not_ready.
 estimatedDays is your effort estimate in 8-hour workdays as a number, e.g. 1.5.
 
 Always incorporate Jira comments when present. For reopened or re-analyzed tickets, comments

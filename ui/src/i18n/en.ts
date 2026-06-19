@@ -1415,6 +1415,7 @@ export const en: Translations = {
     projectChatTitle: 'Chat',
     projectChatNew: 'New workstream (/new)',
     projectChatReset: 'Reset workstream (/reset)',
+    projectChatLoading: 'Restoring chat session…',
     appControls: 'App controls',
     modelMenu: {
       search: 'Search models',

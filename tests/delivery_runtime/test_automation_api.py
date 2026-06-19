@@ -273,3 +273,82 @@ class TestProjectConfigApi:
 
         mapping = yaml.safe_load((livingcolor_home / "project_mapping.yaml").read_text(encoding="utf-8"))
         assert mapping["TVP"]["integration_branch"] == "develop"
+
+    def test_update_project_config_does_not_rebuild_sprint_selection(self, livingcolor_home):
+        from delivery_runtime.pm_inbox.sprint_mutations import persist_manual_sprint
+        from delivery_runtime.pm_inbox.store import get_sprint_state
+
+        persist_manual_sprint(
+            project_key="TVP",
+            payload={
+                "sprintName": "LivingColor Sprint",
+                "capacityDays": 15,
+                "usedDays": 1,
+                "durationDays": 14,
+                "overflowRisk": False,
+                "warnings": [],
+                "tickets": [
+                    {
+                        "readinessId": "RD-TVP-9",
+                        "jiraKey": "TVP-9",
+                        "title": "Manual ticket",
+                        "estimatedDays": 1,
+                    }
+                ],
+            },
+        )
+
+        response = self.client.put(
+            "/api/delivery/project-config",
+            headers={"x-lc-project-key": "TVP"},
+            json={
+                "projectKey": "TVP",
+                "sprintDurationDays": 21,
+                "sprintCapacityDays": 18,
+                "communicationLanguage": "fr",
+            },
+        )
+
+        assert response.status_code == 200
+        state = get_sprint_state(project_key="TVP")
+        assert state is not None
+        recommendation = state["recommendation"]
+        assert recommendation["tickets"][0]["jiraKey"] == "TVP-9"
+        assert state["memory"]["manualOverride"] is True
+
+    def test_reset_sprint_clears_backlog_for_manual_reset(self, livingcolor_home):
+        from delivery_runtime.pm_inbox.sprint_mutations import persist_manual_sprint
+        from delivery_runtime.pm_inbox.store import get_sprint_state
+
+        persist_manual_sprint(
+            project_key="TVP",
+            payload={
+                "sprintName": "LivingColor Sprint",
+                "capacityDays": 15,
+                "usedDays": 2,
+                "durationDays": 14,
+                "overflowRisk": False,
+                "warnings": [],
+                "tickets": [
+                    {
+                        "readinessId": "RD-TVP-9",
+                        "jiraKey": "TVP-9",
+                        "title": "Manual ticket",
+                        "estimatedDays": 2,
+                    }
+                ],
+            },
+        )
+
+        response = self.client.post(
+            "/api/delivery/sprint/reset",
+            headers={"x-lc-project-key": "TVP"},
+            json={"projectKey": "TVP"},
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["tickets"] == []
+        state = get_sprint_state(project_key="TVP")
+        assert state is not None
+        assert state["memory"]["manualOverride"] is False

@@ -189,9 +189,17 @@ export function useLinkTitle(url?: null | string): string {
 }
 
 export function openExternalLink(href: string): void {
-  if (href) {
-    void window.livingColorDesktop?.openExternal?.(href)
+  if (!href) {
+    return
   }
+
+  const bridge = window.livingColorDesktop?.openExternal ?? window.livingColorDesktop?.api?.openExternal
+  if (bridge) {
+    void bridge(href)
+    return
+  }
+
+  window.open(href, '_blank', 'noopener,noreferrer')
 }
 
 interface ExternalLinkProps extends Omit<ComponentProps<'a'>, 'href' | 'target'> {

@@ -170,7 +170,9 @@ class DailyAnalysisPipeline:
     ) -> dict[str, Any]:
         analyzed = estimated = proposals_created = 0
         ticket_scope = load_ticket_scope_for_project(project_key)
-        communication_language = self.config.communication_language
+        communication_language = load_delivery_automation_config(
+            project_key=project_key
+        ).communication_language
 
         with connect() as conn:
             rows = conn.execute(

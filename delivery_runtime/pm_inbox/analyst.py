@@ -30,7 +30,6 @@ NOT_DEVELOPMENT_KEYWORDS = (
     "wording",
     "support request",
     "business question",
-    "faq",
     "documentation only",
     "translate",
     "translation",
@@ -115,14 +114,20 @@ def _missing_information(snapshot: dict[str, Any], blockers: list[str]) -> tuple
 
 def analyze_for_daily_delivery(snapshot: dict[str, Any]) -> dict[str, Any]:
     """Extended analyst used by the daily pipeline (does not publish to Jira)."""
-    language = load_delivery_automation_config().communication_language
+    project_key = str(snapshot.get("projectKey") or "").strip().upper()
+    if not project_key:
+        key = str(snapshot.get("key") or "")
+        project_key = key.split("-")[0].upper() if "-" in key else ""
+
+    language = load_delivery_automation_config(project_key=project_key or None).communication_language
     clarification_template = get_clarification_comment_template(language)
     not_development_template = get_not_development_comment_template(language)
     base = analyze_ticket_snapshot(snapshot)
-    project_key = str(snapshot.get("projectKey") or base["jiraSnapshot"].get("projectKey") or "").strip()
     if not project_key:
-        key = str(snapshot.get("key") or "")
-        project_key = key.split("-")[0] if "-" in key else ""
+        project_key = str(base["jiraSnapshot"].get("projectKey") or "").strip().upper()
+        if not project_key:
+            key = str(snapshot.get("key") or "")
+            project_key = key.split("-")[0].upper() if "-" in key else ""
 
     repos = resolve_recommended_repos(project_key, snapshot)
     score_result = score_ticket(snapshot, recommended_repos=repos)

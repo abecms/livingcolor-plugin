@@ -159,3 +159,17 @@ def test_developer_prompt_includes_jira_description_and_attachments():
 
     assert "See PJ" in prompt
     assert "Expected title ABC" in prompt
+
+
+def test_run_async_works_inside_running_event_loop():
+    import asyncio
+
+    from lc_server.integrations.jira_attachment_extract import _run_async
+
+    async def work() -> str:
+        return "vision-ok"
+
+    async def outer() -> str:
+        return _run_async(work())
+
+    assert asyncio.run(outer()) == "vision-ok"

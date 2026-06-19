@@ -17,5 +17,30 @@ rsync -a --delete \
   --exclude 'assets/' \
   "${ROOT}/" "${TARGET}/"
 
+echo "Ensuring Hermes profile livingcolor-pm..."
+PYTHON_BIN="${HERMES_PYTHON:-}"
+if [ -z "${PYTHON_BIN}" ] && [ -x "${HOME}/.hermes/hermes-agent/venv/bin/python" ]; then
+  PYTHON_BIN="${HOME}/.hermes/hermes-agent/venv/bin/python"
+fi
+if [ -z "${PYTHON_BIN}" ]; then
+  PYTHON_BIN="$(command -v python3 || true)"
+fi
+
+if [ -n "${PYTHON_BIN}" ]; then
+  if ! PYTHONPATH="${TARGET}${PYTHONPATH:+:${PYTHONPATH}}" "${PYTHON_BIN}" -c "import yaml" 2>/dev/null; then
+    echo "PyYAML not available in ${PYTHON_BIN}; livingcolor-pm profile will be created when Hermes starts"
+  else
+    PYTHONPATH="${TARGET}${PYTHONPATH:+:${PYTHONPATH}}" "${PYTHON_BIN}" -c "
+import sys
+sys.path.insert(0, '${TARGET}')
+from lc_server.integrations.livingcolor_pm_profile import ensure_livingcolor_pm_profile
+profile_dir = ensure_livingcolor_pm_profile()
+print(f'livingcolor-pm profile ready at {profile_dir}')
+"
+  fi
+else
+  echo "python not found; livingcolor-pm profile will be created on first dashboard load"
+fi
+
 echo "Done. Restart Hermes to load backend + dashboard changes:"
 echo "  hermes gateway restart"

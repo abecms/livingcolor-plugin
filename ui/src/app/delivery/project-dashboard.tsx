@@ -14,11 +14,16 @@ import {
   promoteReadinessRecord,
   resumeWorkOrder,
   type PmInboxPayload,
+  type PromoteReadinessResult,
   type VcsProvider
 } from '@/lib/delivery'
-import { RefreshCw } from '@/lib/icons'
+import { MessageCircle, RefreshCw } from '@/lib/icons'
+import { cn } from '@/lib/utils'
 import { $projectConfigRevision } from '@/store/project-config'
 import { notify, notifyError } from '@/store/notifications'
+
+import { useI18n } from '@/i18n'
+import { $projectChatOpen, toggleProjectChatOpen } from '@/store/project-chat-layout'
 
 import { DashboardGhostButton, DashboardPageHeader, DashboardPageShell } from './dashboard-ui'
 
@@ -40,6 +45,49 @@ import { SprintHeaderStrip } from './sprint-header-strip'
 import { useDailyAnalysis } from './use-daily-analysis'
 import { WorkOrderProgressPanel } from './work-order-progress-panel'
 import type { DeliveryGate, WorkOrder } from './types'
+
+function applyPromoteResultToInbox(
+  inbox: PmInboxPayload | null,
+  result: PromoteReadinessResult
+): PmInboxPayload | null {
+  if (!inbox?.selectedSprint) {
+    return inbox
+  }
+
+  const { workOrder } = result
+  const tickets = inbox.selectedSprint.tickets.map(ticket =>
+    ticket.jiraKey === workOrder.jiraKey
+      ? {
+          ...ticket,
+          workOrderId: workOrder.id,
+          inDevelopment: true,
+          currentStage: workOrder.currentStage,
+          status: workOrder.status
+        }
+      : ticket
+  )
+  const activeDevelopments = [
+    ...(inbox.activeDevelopments ?? []).filter(item => item.jiraKey !== workOrder.jiraKey),
+    {
+      workOrderId: workOrder.id,
+      jiraKey: workOrder.jiraKey,
+      title: workOrder.title,
+      currentStage: workOrder.currentStage,
+      status: workOrder.status,
+      updatedAt: workOrder.updatedAt
+    }
+  ]
+
+  return {
+    ...inbox,
+    selectedSprint: {
+      ...inbox.selectedSprint,
+      tickets,
+      activeDevelopmentCount: activeDevelopments.length
+    },
+    activeDevelopments
+  }
+}
 
 function genericGateReviewTitle(gateType?: string): string {
   switch (gateType) {
@@ -65,6 +113,8 @@ async function findNextReviewGate(workOrder: WorkOrder): Promise<DeliveryGate | 
 }
 
 export function ProjectDeliveryDashboardView() {
+  const { t } = useI18n()
+  const projectChatOpen = useStore($projectChatOpen)
   const { activeProject, activeProjectKey } = useProjectWorkspace()
   const [inbox, setInbox] = useState<PmInboxPayload | null>(null)
   const [localWorkOrders, setLocalWorkOrders] = useState<WorkOrder[]>([])
@@ -100,27 +150,55 @@ export function ProjectDeliveryDashboardView() {
   }, [acquireWorkOrderLock, lockOrgId, lockWorkOrderId, releaseWorkOrderLock])
 
   const requestSeq = useRef(0)
-  const refreshDashboard = useCallback(async () => {
+  const [refreshing, setRefreshing] = useState(false)
+
+  const refreshDashboard = useCallback(async (options?: { manual?: boolean }) => {
+    const manual = options?.manual ?? false
     const seq = ++requestSeq.current
+    if (manual) {
+      setRefreshing(true)
+    }
+    const projectKey = activeProjectKey ?? parseProjectKeyFromPath(location.pathname) ?? undefined
     try {
-      const projectKey = parseProjectKeyFromPath(location.pathname) ?? undefined
-      const [payload, overview, projectConfig] = await Promise.all([
+      const [inboxResult, overviewResult, configResult] = await Promise.allSettled([
         fetchPmInbox(projectKey),
         fetchDeliveryOverview(),
-        fetchProjectConfig().catch(() => null)
+        fetchProjectConfig()
       ])
+
       if (seq !== requestSeq.current) {
         return
       }
-      setInbox(payload)
-      setLocalWorkOrders(overview.workOrders.items)
-      setVcsProvider(projectConfig?.vcs === 'github' ? 'github' : 'gitlab')
+
+      if (inboxResult.status === 'fulfilled') {
+        setInbox(inboxResult.value)
+      } else if (manual) {
+        throw inboxResult.reason
+      }
+
+      if (overviewResult.status === 'fulfilled') {
+        setLocalWorkOrders(overviewResult.value.workOrders.items)
+      } else if (manual) {
+        notifyError(overviewResult.reason, 'Could not refresh work orders')
+      }
+
+      if (configResult.status === 'fulfilled') {
+        setVcsProvider(configResult.value.vcs === 'github' ? 'github' : 'gitlab')
+      }
+
+      if (manual && inboxResult.status === 'fulfilled') {
+        notify({ kind: 'success', message: 'Dashboard refreshed.' })
+      }
     } catch (error) {
       if (seq === requestSeq.current) {
-        notifyError(error, 'Execution queue is not ready yet')
+        notifyError(error, 'Could not refresh dashboard')
+      }
+    } finally {
+      if (manual && seq === requestSeq.current) {
+        setRefreshing(false)
       }
     }
-  }, [location.pathname])
+  }, [activeProjectKey, location.pathname])
 
   const { running: analysisRunning, run: runAnalysis } = useDailyAnalysis(refreshDashboard)
 
@@ -146,27 +224,38 @@ export function ProjectDeliveryDashboardView() {
     [inbox]
   )
 
-  const promotingRef = useRef<string | null>(null)
+  const [promotingReadinessId, setPromotingReadinessId] = useState<string | null>(null)
   const handleApproveTicket = useCallback(
     async (readinessId: string, jiraKey: string) => {
-      if (promotingRef.current) {
+      if (promotingReadinessId) {
         return
       }
-      promotingRef.current = readinessId
+      setPromotingReadinessId(readinessId)
       try {
-        await promoteReadinessRecord(readinessId)
+        const result = await promoteReadinessRecord(readinessId)
+        setInbox(previous => applyPromoteResultToInbox(previous, result))
         notify({
           kind: 'success',
           message: `${jiraKey} approved for development.`
         })
         await refreshDashboard()
       } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error)
+        if (/\b409\b/.test(detail) || /Only ready tickets can be promoted/i.test(detail)) {
+          await refreshDashboard()
+          notify({
+            kind: 'info',
+            message: `${jiraKey} is already in development.`
+          })
+          return
+        }
         notifyError(error, `Could not approve ${jiraKey} for development`)
+        await refreshDashboard()
       } finally {
-        promotingRef.current = null
+        setPromotingReadinessId(null)
       }
     },
-    [refreshDashboard]
+    [promotingReadinessId, refreshDashboard]
   )
 
   const handleProposalAction = useCallback(
@@ -290,10 +379,16 @@ export function ProjectDeliveryDashboardView() {
     <DashboardPageShell>
       <DashboardPageHeader
         actions={
-          <DashboardGhostButton onClick={() => void refreshDashboard()}>
-            <RefreshCw className="mr-2 size-4" />
-            Refresh
-          </DashboardGhostButton>
+          <>
+            <DashboardGhostButton onClick={toggleProjectChatOpen} type="button">
+              <MessageCircle className={cn('mr-2 size-4', projectChatOpen && 'text-primary')} />
+              {projectChatOpen ? t.shell.projectChatClose : t.shell.projectChatOpen}
+            </DashboardGhostButton>
+            <DashboardGhostButton disabled={refreshing} onClick={() => void refreshDashboard({ manual: true })}>
+              <RefreshCw className={cn('mr-2 size-4', refreshing && 'animate-spin')} />
+              {refreshing ? 'Refreshing…' : 'Refresh'}
+            </DashboardGhostButton>
+          </>
         }
         description={`Review sprint tickets, estimations, and approve development plans, patches, ${reviewRequestLabel} drafts, and Jira comments.`}
         eyebrow={`${displayKey} · ${displayName}`}
@@ -312,8 +407,10 @@ export function ProjectDeliveryDashboardView() {
           <KanbanBoard
             columns={columns}
             onApproveTicket={(readinessId, jiraKey) => void handleApproveTicket(readinessId, jiraKey)}
+            onClarifyTicket={() => setClarificationsOpen(true)}
             onOpenCard={workOrderId => void handleReviewWorkOrder(workOrderId)}
             onReviewGate={input => void handleReviewGate(input)}
+            promotingReadinessId={promotingReadinessId}
             vcsProvider={vcsProvider}
           />
           <ClarificationsPanel

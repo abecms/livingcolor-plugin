@@ -158,3 +158,14 @@ def register_surfaces(ctx) -> None:
         handler=tool_work_order_status,
         description="Fetch a Work Order's current stage, status and metadata.",
     )
+
+    from livingcolor_pm_tools import PM_TOOL_REGISTRATIONS
+
+    for spec in PM_TOOL_REGISTRATIONS:
+        ctx.register_tool(
+            name=spec["name"],
+            toolset="livingcolor",
+            schema=spec["schema"],
+            handler=spec["handler"],
+            description=spec["description"],
+        )

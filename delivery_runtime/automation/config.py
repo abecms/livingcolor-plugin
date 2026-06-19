@@ -293,25 +293,27 @@ def save_delivery_project_config(
 
     path = delivery_config_path()
     existing: dict[str, Any] = _load_yaml_mapping(path) if path.exists() else {}
-    project_block = existing.get("project")
-    project_map = project_block if isinstance(project_block, dict) else {}
-    project_map["key"] = target_key
-    project_map.setdefault("name", current.project_name or DEFAULT_PROJECT_NAME)
-    existing["project"] = project_map
-    existing.pop("sprint", None)
-    existing.pop("communication", None)
-    existing.pop("ticket_scope", None)
-    existing.pop("ticketScope", None)
+    if not project_key:
+        project_block = existing.get("project")
+        project_map = project_block if isinstance(project_block, dict) else {}
+        project_map["key"] = target_key
+        project_map.setdefault("name", current.project_name or DEFAULT_PROJECT_NAME)
+        existing["project"] = project_map
+        existing.pop("sprint", None)
+        existing.pop("communication", None)
+        existing.pop("ticket_scope", None)
+        existing.pop("ticketScope", None)
 
-    try:
-        import yaml
-    except ImportError as exc:
-        raise RuntimeError("PyYAML is required to save delivery project settings") from exc
+        try:
+            import yaml
+        except ImportError as exc:
+            raise RuntimeError("PyYAML is required to save delivery project settings") from exc
 
-    path.write_text(
-        yaml.safe_dump(existing, sort_keys=False, allow_unicode=True),
-        encoding="utf-8",
-    )
+        path.write_text(
+            yaml.safe_dump(existing, sort_keys=False, allow_unicode=True),
+            encoding="utf-8",
+        )
+
     config = load_delivery_automation_config(project_key=target_key)
     if communication_language is not None:
         previous_language = normalize_communication_language(current.communication_language)
@@ -319,8 +321,4 @@ def save_delivery_project_config(
             from delivery_runtime.pm_inbox.daily_pipeline import refresh_project_communications
 
             refresh_project_communications(project_key=config.project_key)
-    from delivery_runtime.pm_inbox.sprint_selection import build_selected_sprint_payload, persist_selected_sprint
-
-    sprint_payload = build_selected_sprint_payload(project_key=config.project_key)
-    persist_selected_sprint(project_key=config.project_key, payload=sprint_payload)
     return config

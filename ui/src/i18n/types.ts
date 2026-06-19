@@ -1068,6 +1068,7 @@ export interface Translations {
     projectChatTitle: string
     projectChatNew: string
     projectChatReset: string
+    projectChatLoading: string
     appControls: string
     modelMenu: {
       search: string

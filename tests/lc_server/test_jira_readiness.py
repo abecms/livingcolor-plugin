@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from delivery_runtime.readiness.errors import ReadinessIntegrationError
+from delivery_runtime.readiness.ticket_scope import TicketScopeConfig
 
 
 def test_fetch_issues_for_readiness_reconnects_before_scanning(monkeypatch):
@@ -38,6 +39,10 @@ def test_fetch_issues_for_readiness_reconnects_before_scanning(monkeypatch):
         "hermes_cli.jira_dashboard._issue_jql_variants",
         lambda project: [f'project = "{project}"'],
     )
+    monkeypatch.setattr(
+        "delivery_runtime.readiness.ticket_scope.load_ticket_scope_for_project",
+        lambda _project: TicketScopeConfig(status_groups=("todo",)),
+    )
     captured: dict = {}
 
     def fake_search(*_args, **kwargs):
@@ -63,6 +68,7 @@ def test_fetch_issues_for_readiness_reconnects_before_scanning(monkeypatch):
     assert ensure_calls == ["ensure"]
     assert issues == [{"key": "BN-1", "summary": "Test", "projectKey": "BN"}]
     assert captured["jql_variants"][0].startswith('project = "BN"')
+    assert "statusCategory" in captured["jql_variants"][0]
 
 
 def test_fetch_issues_for_readiness_surfaces_reconnect_errors(monkeypatch):
