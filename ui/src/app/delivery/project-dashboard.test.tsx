@@ -117,6 +117,7 @@ const emptyInboxPayload = {
     tickets: []
   },
   needsClarification: [],
+  notReady: [],
   waitingForApproval: [],
   activeDevelopments: [],
   projectMemoryHighlights: []
@@ -247,8 +248,8 @@ describe('ProjectDeliveryDashboardView', () => {
     expect(screen.getByText('Plan · 1')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Review plan' })).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: '1 to clarify' }))
-    expect(await screen.findByText('Tickets requiring clarification')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '1 to review' }))
+    expect(await screen.findByText('Ticket readiness review')).toBeTruthy()
     expect(screen.getByText('Validate comment')).toBeTruthy()
   })
 

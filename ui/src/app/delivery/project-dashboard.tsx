@@ -401,7 +401,11 @@ export function ProjectDeliveryDashboardView() {
         <JiraBrowseProvider baseUrl={inbox?.jiraBrowseBaseUrl}>
           <SprintHeaderStrip
             analysisRunning={analysisRunning}
-            clarificationCount={(inbox?.needsClarification?.length ?? 0) + pendingProposals.length}
+            reviewCount={
+              (inbox?.needsClarification?.length ?? 0) +
+              (inbox?.notReady?.length ?? 0) +
+              pendingProposals.length
+            }
             onOpenClarifications={() => setClarificationsOpen(true)}
             onRunAnalysis={() => void runAnalysis(inbox?.projectKey)}
             sprint={inbox?.selectedSprint ?? null}
@@ -418,6 +422,7 @@ export function ProjectDeliveryDashboardView() {
           <ClarificationsPanel
             actionId={actionId}
             items={inbox?.needsClarification ?? []}
+            notReadyItems={inbox?.notReady ?? []}
             onOpenChange={setClarificationsOpen}
             onProposalAction={(proposalId, action) => void handleProposalAction(proposalId, action)}
             open={clarificationsOpen}

@@ -7,13 +7,13 @@ import { StatusPill, dashboardPrimaryButtonProps } from './dashboard-ui'
 
 export function SprintHeaderStrip({
   analysisRunning,
-  clarificationCount,
+  reviewCount,
   onOpenClarifications,
   onRunAnalysis,
   sprint
 }: {
   analysisRunning: boolean
-  clarificationCount: number
+  reviewCount: number
   onOpenClarifications: () => void
   onRunAnalysis: () => void
   sprint: PmInboxPayload['selectedSprint'] | null
@@ -45,14 +45,14 @@ export function SprintHeaderStrip({
         <span className="flex-1 text-sm text-muted-foreground">No sprint selected yet.</span>
       )}
 
-      {clarificationCount > 0 ? (
+      {reviewCount > 0 ? (
         <button
           className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/40 px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-ring/40 hover:text-foreground"
           onClick={onOpenClarifications}
           type="button"
         >
           <AlertTriangle className="size-3.5" />
-          {clarificationCount} to clarify
+          {reviewCount} to review
         </button>
       ) : null}
 

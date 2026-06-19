@@ -60,11 +60,16 @@ function sprintCtaForTicket(ticket: {
   if (status === 'ready') {
     return GATE_CTA.sprint
   }
-  if (status === 'needs_clarification' || status === 'not_ready') {
+  if (status === 'needs_clarification') {
     return 'Clarify'
+  }
+  if (status === 'not_ready') {
+    return 'View blockers'
   }
   return undefined
 }
+
+export const SPRINT_READINESS_REVIEW_CTAS = new Set(['Clarify', 'View blockers'])
 
 export function columnForGateType(gateType: string): KanbanColumnId {
   return GATE_COLUMN[gateType] ?? 'jira'

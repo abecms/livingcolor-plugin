@@ -345,6 +345,7 @@ class PmInboxResponse(BaseModel):
     executionQueue: ExecutionQueueResponse
     selectedSprint: SelectedSprintResponse
     needsClarification: list[NeedsClarificationItemResponse] = Field(default_factory=list)
+    notReady: list[NeedsClarificationItemResponse] = Field(default_factory=list)
     waitingForApproval: list[WaitingForApprovalItemResponse] = Field(default_factory=list)
     activeDevelopments: list[ActiveDevelopmentItemResponse] = Field(default_factory=list)
     projectMemoryHighlights: list[ProjectMemoryHighlightResponse] = Field(default_factory=list)

@@ -302,6 +302,16 @@ export interface PmInboxPayload {
       status: string
     } | null
   }>
+  notReady: Array<{
+    record: import('@/app/delivery/types').ReadinessRecord
+    detectedIssues: string[]
+    proposal?: {
+      id: string
+      body: string
+      proposalType: string
+      status: string
+    } | null
+  }>
   waitingForApproval: Array<{
     kind: string
     gateId?: string | null

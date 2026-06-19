@@ -22,7 +22,7 @@ describe('SprintHeaderStrip', () => {
     render(
       <SprintHeaderStrip
         analysisRunning={false}
-        clarificationCount={0}
+        reviewCount={0}
         onOpenClarifications={() => {}}
         onRunAnalysis={() => {}}
         sprint={sprint}
@@ -32,29 +32,29 @@ describe('SprintHeaderStrip', () => {
     expect(screen.getByText(/6.*10/)).toBeTruthy()
   })
 
-  it('shows the clarification chip only when count > 0 and forwards clicks', () => {
+  it('shows the review chip only when count > 0 and forwards clicks', () => {
     const onOpen = vi.fn()
     const { rerender } = render(
       <SprintHeaderStrip
         analysisRunning={false}
-        clarificationCount={0}
+        reviewCount={0}
         onOpenClarifications={onOpen}
         onRunAnalysis={() => {}}
         sprint={sprint}
       />
     )
-    expect(screen.queryByRole('button', { name: /clarif/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /review/i })).toBeNull()
 
     rerender(
       <SprintHeaderStrip
         analysisRunning={false}
-        clarificationCount={2}
+        reviewCount={2}
         onOpenClarifications={onOpen}
         onRunAnalysis={() => {}}
         sprint={sprint}
       />
     )
-    fireEvent.click(screen.getByRole('button', { name: /2 to clarify/i }))
+    fireEvent.click(screen.getByRole('button', { name: /2 to review/i }))
     expect(onOpen).toHaveBeenCalledOnce()
   })
 
@@ -62,7 +62,7 @@ describe('SprintHeaderStrip', () => {
     render(
       <SprintHeaderStrip
         analysisRunning
-        clarificationCount={0}
+        reviewCount={0}
         onOpenClarifications={() => {}}
         onRunAnalysis={() => {}}
         sprint={sprint}
@@ -76,7 +76,7 @@ describe('SprintHeaderStrip', () => {
     render(
       <SprintHeaderStrip
         analysisRunning={false}
-        clarificationCount={0}
+        reviewCount={0}
         onOpenClarifications={() => {}}
         onRunAnalysis={() => {}}
         sprint={null}

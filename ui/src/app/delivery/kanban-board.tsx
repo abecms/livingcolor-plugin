@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { TicketKeyBadge, dashboardPrimaryButtonProps } from './dashboard-ui'
 import { JiraTicketTitleLink } from './jira-ticket-link'
 import type { KanbanCard, KanbanColumn } from './kanban-routing'
+import { SPRINT_READINESS_REVIEW_CTAS } from './kanban-routing'
 import type { ReviewRequestProvider } from './review-request-labels'
 import { formatWorkOrderStage } from './stage-labels'
 
@@ -131,7 +132,7 @@ function KanbanCardView({
       onReviewGate({ workOrderId: openableWorkOrderId, gateId: card.gateId, gateType: card.gateType ?? 'unknown' })
       return
     }
-    if (card.ctaLabel === 'Clarify') {
+    if (card.ctaLabel && SPRINT_READINESS_REVIEW_CTAS.has(card.ctaLabel)) {
       onClarifyTicket?.()
       return
     }

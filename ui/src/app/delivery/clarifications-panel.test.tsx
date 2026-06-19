@@ -96,16 +96,52 @@ describe('ClarificationsPanel', () => {
     expect(onProposalAction).toHaveBeenCalledWith('P-9', 'approve')
   })
 
-  it('renders an empty state when there is nothing to clarify', () => {
+  it('renders an empty state when there is nothing to review', () => {
     render(
       <ClarificationsPanel
         actionId={null}
         items={[]}
+        notReadyItems={[]}
         onOpenChange={() => {}}
         onProposalAction={() => {}}
         open
       />
     )
-    expect(screen.getByText(/no tickets require clarification/i)).toBeTruthy()
+    expect(screen.getByText(/no sprint tickets need review right now/i)).toBeTruthy()
+  })
+
+  it('renders not-ready tickets with blockers', () => {
+    render(
+      <ClarificationsPanel
+        actionId={null}
+        items={[]}
+        notReadyItems={[
+          {
+            record: {
+              id: 'R-8',
+              jiraKey: 'BN-407',
+              projectKey: 'BN',
+              title: 'Blocked ticket',
+              readinessScore: 30,
+              readinessStatus: 'not_ready',
+              analysisSummary: '',
+              blockers: ['Description is too short'],
+              recommendedRepos: [],
+              confidence: 0.4,
+              createdAt: '2026-06-11T00:00:00Z',
+              updatedAt: '2026-06-11T00:00:00Z'
+            },
+            detectedIssues: ['Description is too short'],
+            proposal: null
+          }
+        ]}
+        onOpenChange={() => {}}
+        onProposalAction={() => {}}
+        open
+      />
+    )
+    expect(screen.getByText('Not ready for delivery')).toBeTruthy()
+    expect(screen.getByText('BN-407')).toBeTruthy()
+    expect(screen.getByText('Description is too short')).toBeTruthy()
   })
 })

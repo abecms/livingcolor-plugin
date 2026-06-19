@@ -327,6 +327,29 @@ describe('buildKanbanColumns', () => {
     })
   })
 
+  it('shows not_ready sprint tickets with a View blockers CTA', () => {
+    const inbox = makeInbox()
+    inbox.selectedSprint.tickets = [
+      {
+        readinessId: 'R-5',
+        jiraKey: 'TVP-2260',
+        title: 'Thin ticket',
+        estimatedDays: 0.5,
+        priorityRank: 2,
+        urgencyScore: 0,
+        warnings: ['Not ready for autonomous delivery'],
+        readinessStatus: 'not_ready'
+      }
+    ]
+
+    const columns = buildKanbanColumns(inbox, [])
+    expect(columns.find(column => column.id === 'sprint')!.cards[0]).toMatchObject({
+      jiraKey: 'TVP-2260',
+      ctaLabel: 'View blockers',
+      estimatedDays: 0.5
+    })
+  })
+
   it('shows analysis_failed sprint tickets without an approve CTA', () => {
     const inbox = makeInbox()
     inbox.selectedSprint.tickets = [

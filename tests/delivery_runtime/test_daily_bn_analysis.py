@@ -552,9 +552,40 @@ class TestPmInboxService:
         sprint_keys = {ticket["jiraKey"] for ticket in inbox["selectedSprint"]["tickets"]}
         assert "BN-100" in sprint_keys
         assert "BN-900" not in sprint_keys
-        clarification = next(item for item in inbox["needsClarification"] if item["record"]["jiraKey"] == "BN-900")
-        assert clarification["proposal"] is not None
+        assert not any(item["record"]["jiraKey"] == "BN-900" for item in inbox["needsClarification"])
+        assert not any(item["record"]["jiraKey"] == "BN-900" for item in inbox["notReady"])
         assert not any(item["jiraKey"] == "BN-900" for item in inbox["waitingForApproval"])
+
+    def test_inbox_includes_not_ready_sprint_tickets(self):
+        with connect() as conn:
+            sprint_record_id = next_public_id(conn, "RD")
+            now = utc_now_iso()
+            sprint_snapshot = json_dumps({"key": "BN-200", "status": "To Do", "statusCategory": "To Do"})
+            conn.execute(
+                """
+                INSERT INTO readiness_records (
+                    id, jira_key, project_key, title, readiness_score, readiness_status,
+                    analysis_summary, blockers_json, recommended_repos_json, confidence,
+                    jira_snapshot_json, analyzed_at, created_at, updated_at
+                ) VALUES (?, 'BN-200', 'BN', 'Blocked sprint ticket', 35, 'not_ready',
+                          'Blocked', '["Description is too short"]', '[]', 0.4, ?, ?, ?, ?)
+                """,
+                (sprint_record_id, sprint_snapshot, now, now, now),
+            )
+            pm_store.insert_estimation(
+                conn,
+                readiness_id=sprint_record_id,
+                jira_key="BN-200",
+                complexity="Small",
+                estimated_days=1.0,
+                confidence=0.4,
+                run_id="RUN-TEST",
+            )
+
+        inbox = build_pm_inbox(project_key="BN")
+        blocked = next(item for item in inbox["notReady"] if item["record"]["jiraKey"] == "BN-200")
+        assert blocked["detectedIssues"] == ["Description is too short"]
+        assert blocked["proposal"] is None
 
 
 class TestDailyScheduler:

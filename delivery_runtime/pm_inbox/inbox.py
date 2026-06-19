@@ -118,20 +118,31 @@ def build_pm_inbox(*, project_key: str | None = None, queue_consumer: Any | None
     proposals = pm_store.list_pending_proposals(project_key=project_key)
     proposals_by_readiness = {item["readinessId"]: item for item in proposals if item.get("readinessId")}
 
+    def _readiness_review_item(record: dict[str, Any]) -> dict[str, Any] | None:
+        if not matches_ticket_scope(record.get("jiraSnapshot") or {}, ticket_scope):
+            return None
+        if not _in_selected_sprint(record.get("jiraKey"), sprint_keys):
+            return None
+        return {
+            "record": record,
+            "detectedIssues": record["blockers"],
+            "proposal": proposals_by_readiness.get(record["id"]),
+        }
+
     needs_clarification = []
+    not_ready = []
     for row in readiness_rows:
         record = _readiness_row_to_dict(row)
-        if record["readinessStatus"] != "needs_clarification":
+        status = str(record.get("readinessStatus") or "")
+        if status == "needs_clarification":
+            item = _readiness_review_item(record)
+            if item is not None:
+                needs_clarification.append(item)
             continue
-        if not matches_ticket_scope(record.get("jiraSnapshot") or {}, ticket_scope):
-            continue
-        needs_clarification.append(
-            {
-                "record": record,
-                "detectedIssues": record["blockers"],
-                "proposal": proposals_by_readiness.get(record["id"]),
-            }
-        )
+        if status == "not_ready":
+            item = _readiness_review_item(record)
+            if item is not None:
+                not_ready.append(item)
 
     waiting_for_approval = []
     gate_labels = {
@@ -208,6 +219,7 @@ def build_pm_inbox(*, project_key: str | None = None, queue_consumer: Any | None
         },
         "selectedSprint": selected_sprint,
         "needsClarification": needs_clarification,
+        "notReady": not_ready,
         "waitingForApproval": waiting_for_approval,
         "activeDevelopments": [
             {
