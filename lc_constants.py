@@ -18,6 +18,9 @@ def _hermes_home() -> Path:
 
 
 def _default_hermes_root() -> Path:
+    override = os.environ.get("HERMES_HOME", "").strip()
+    if override:
+        return Path(override).expanduser()
     try:
         from hermes_constants import get_default_hermes_root
 
