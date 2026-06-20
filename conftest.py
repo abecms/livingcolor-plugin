@@ -1,12 +1,46 @@
 import os
 import sys
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
 _ROOT = Path(__file__).parent
 sys.path.insert(0, str(_ROOT))
 sys.path.insert(0, str(_ROOT / "tests"))
+
+
+if "hermes_cli" not in sys.modules:
+    hermes_cli = ModuleType("hermes_cli")
+    hermes_cli.__path__ = []  # Allow tests to register hermes_cli.* shims.
+    sys.modules["hermes_cli"] = hermes_cli
+else:
+    hermes_cli = sys.modules["hermes_cli"]
+
+
+if "hermes_cli.mcp_config" not in sys.modules:
+    mcp_config = ModuleType("hermes_cli.mcp_config")
+    mcp_config._get_mcp_servers = lambda: {}
+    mcp_config._save_mcp_server = lambda _name, _config: True
+    mcp_config._oauth_tokens_present = lambda _name: False
+    mcp_config._probe_single_server = lambda _name, _config: {"status": "missing"}
+    sys.modules["hermes_cli.mcp_config"] = mcp_config
+    hermes_cli.mcp_config = mcp_config
+
+
+if "hermes_cli.config" not in sys.modules:
+    config = ModuleType("hermes_cli.config")
+    config.reload_env = lambda: None
+    config.load_config = lambda: {}
+    sys.modules["hermes_cli.config"] = config
+    hermes_cli.config = config
+
+
+if "hermes_cli.mcp_runtime" not in sys.modules:
+    mcp_runtime = ModuleType("hermes_cli.mcp_runtime")
+    mcp_runtime.connect_mcp_server = lambda _name, _config: None
+    sys.modules["hermes_cli.mcp_runtime"] = mcp_runtime
+    hermes_cli.mcp_runtime = mcp_runtime
 
 
 @pytest.fixture(scope="session", autouse=True)
