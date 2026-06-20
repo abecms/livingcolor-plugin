@@ -58,6 +58,13 @@ def bootstrap_livingcolor_server() -> None:
 
     prepare_delivery_agent_environment()
 
+    try:
+        from lc_server.integrations.mcp_env_bootstrap import ensure_mcp_servers_from_env
+
+        ensure_mcp_servers_from_env()
+    except Exception as exc:
+        logger.warning("MCP env bootstrap skipped: %s", exc)
+
     from delivery_runtime.api import deps
     from delivery_runtime.persistence.db import init_db
 

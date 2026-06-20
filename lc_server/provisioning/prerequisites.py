@@ -60,6 +60,13 @@ def check_provisioning_prerequisites(project_key: str) -> list[str]:
 
     Codes: jira_mcp, gitlab_mcp, github_mcp, llm_model
     """
+    try:
+        from lc_server.integrations.mcp_env_bootstrap import ensure_mcp_servers_from_env
+
+        ensure_mcp_servers_from_env()
+    except Exception:
+        pass
+
     missing: list[str] = []
 
     if not _is_mcp_server_configured(resolve_project_mcp_server(project_key, "jira")):
