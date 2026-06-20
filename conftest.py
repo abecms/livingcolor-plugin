@@ -31,7 +31,18 @@ if "hermes_cli.mcp_config" not in sys.modules:
 if "hermes_cli.config" not in sys.modules:
     config = ModuleType("hermes_cli.config")
     config.reload_env = lambda: None
-    config.load_config = lambda: {}
+
+    def _load_hermes_config():
+        config_path = Path(os.environ.get("HERMES_HOME", str(Path.home() / ".hermes"))) / "config.yaml"
+        if not config_path.is_file():
+            return {}
+        try:
+            import yaml
+        except ImportError:
+            return {}
+        return yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+
+    config.load_config = _load_hermes_config
     sys.modules["hermes_cli.config"] = config
     hermes_cli.config = config
 
