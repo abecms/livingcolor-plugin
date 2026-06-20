@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { Textarea } from '@/components/ui/textarea'
 import { useWorkOrderLock } from '@/hooks/use-work-order-lock'
 import { approveDeliveryGate, rejectDeliveryGate } from '@/lib/delivery'
+import { formatJiraEstimateWritebackNotice } from '@/lib/jira-estimate-writeback'
 import { notify, notifyError } from '@/store/notifications'
 
 import { asAnalysisPlanPayload } from './gate-payload'
@@ -40,8 +41,18 @@ export function GateReviewPanel({
   const approve = async () => {
     setBusy(true)
     try {
-      await approveDeliveryGate(gate.id)
+      const result = await approveDeliveryGate(gate.id)
       notify({ kind: 'success', message: `Gate approved for ${workOrder.id}.` })
+      const estimateNotice = formatJiraEstimateWritebackNotice(
+        workOrder.jiraKey,
+        result.jiraEstimateWriteback
+      )
+      if (estimateNotice) {
+        notify({
+          kind: result.jiraEstimateWriteback?.written ? 'success' : 'warning',
+          message: estimateNotice
+        })
+      }
       setFeedback('')
       onOpenChange(false)
       await onDecision()

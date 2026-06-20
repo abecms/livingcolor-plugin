@@ -23,6 +23,14 @@ export interface PromoteReadinessResult {
 export interface GateDecisionResult {
   gate: DeliveryGate
   workOrderId: string
+  jiraEstimateWriteback?: {
+    jiraKey?: string
+    written?: boolean
+    estimate?: string
+    reason?: string
+    overwritten?: boolean
+    previousEstimate?: string
+  } | null
 }
 
 export interface MrDraftDecisionResult {
