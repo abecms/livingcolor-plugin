@@ -8,13 +8,20 @@ echo "Syncing LivingColor plugin to ${TARGET}"
 
 mkdir -p "${TARGET}"
 
-rsync -a --delete \
-  --exclude '.git/' \
-  --exclude 'ui/node_modules/' \
-  --exclude '**/__pycache__/' \
-  --exclude '.cursor/' \
-  --exclude 'assets/' \
-  "${ROOT}/" "${TARGET}/"
+if command -v rsync >/dev/null 2>&1; then
+  rsync -a --delete \
+    --exclude '.git/' \
+    --exclude 'ui/node_modules/' \
+    --exclude '**/__pycache__/' \
+    --exclude '.cursor/' \
+    --exclude 'assets/' \
+    "${ROOT}/" "${TARGET}/"
+else
+  echo "rsync not found; falling back to cp -a"
+  rm -rf "${TARGET:?}/"*
+  cp -a "${ROOT}/." "${TARGET}/"
+  rm -rf "${TARGET}/.git" "${TARGET}/ui/node_modules" "${TARGET}/.cursor" 2>/dev/null || true
+fi
 
 echo "Ensuring Hermes profile livingcolor-pm..."
 PYTHON_BIN="${HERMES_PYTHON:-}"

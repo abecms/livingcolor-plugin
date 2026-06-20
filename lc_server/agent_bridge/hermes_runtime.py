@@ -11,6 +11,8 @@ from delivery_runtime.context.pack_builder import ContextPackBuilder
 from delivery_runtime.readiness.analyzer import analyze_ticket_snapshot
 from delivery_runtime.readiness.analyst_prompt import AnalystParseError
 from lc_server.agent_bridge.developer_backend import get_developer_agent
+from lc_server.agent_bridge.planner_backend import get_planner_agent
+from lc_server.agent_bridge.publisher_backend import get_publisher_agent
 from lc_server.agent_bridge.hermes_analyst import HermesAnalystAgent
 from lc_server.agent_bridge.hermes_planner import HermesPlannerAgent, PlannerParseError
 from lc_server.agent_bridge.hermes_publisher import HermesPublisherAgent
@@ -29,15 +31,15 @@ class HermesRuntimeBridge:
         developer: Any | None = None,
         registry: AgentManifestRegistry | None = None,
         analyst: HermesAnalystAgent | None = None,
-        planner: HermesPlannerAgent | None = None,
-        publisher: HermesPublisherAgent | None = None,
+        planner: Any | None = None,
+        publisher: Any | None = None,
     ) -> None:
         self.pack_builder = pack_builder or ContextPackBuilder()
         self.developer = developer or get_developer_agent()
         self.registry = registry or AgentManifestRegistry()
         self.analyst = analyst or HermesAnalystAgent(registry=self.registry)
-        self.planner = planner or HermesPlannerAgent(registry=self.registry)
-        self.publisher = publisher or HermesPublisherAgent(registry=self.registry)
+        self.planner = planner or get_planner_agent()
+        self.publisher = publisher or get_publisher_agent()
 
     async def run_readiness_analysis(self, jira_key: str, context: dict[str, Any]) -> dict[str, Any]:
         snapshot = context.get("snapshot") or {}

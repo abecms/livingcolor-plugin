@@ -19,6 +19,7 @@ def prepare_development_workspace(
     *,
     jira_key: str | None = None,
     issue_type: str = "",
+    integration_branch: str | None = None,
     reuse_existing: bool = False,
     baseline_ref: str | None = None,
 ) -> tuple[Path, str | None]:
@@ -44,12 +45,21 @@ def prepare_development_workspace(
         shutil.copytree(checkout_path, root, dirs_exist_ok=True)
 
     if jira_key and (root / ".git").exists():
-        from delivery_runtime.development.git_branch import ensure_delivery_branch
+        from delivery_runtime.development.git_branch import (
+            DEFAULT_INTEGRATION_BRANCHES,
+            ensure_delivery_branch,
+        )
+
+        if integration_branch:
+            integration_branches = (integration_branch.strip(),) + DEFAULT_INTEGRATION_BRANCHES
+        else:
+            integration_branches = DEFAULT_INTEGRATION_BRANCHES
 
         ensure_delivery_branch(
             root,
             jira_key=jira_key,
             issue_type=issue_type,
+            integration_branches=integration_branches,
         )
 
     if not (root / ".git").exists():
@@ -64,12 +74,21 @@ def prepare_development_workspace(
                 text=True,
             )
         if jira_key:
-            from delivery_runtime.development.git_branch import ensure_delivery_branch
+            from delivery_runtime.development.git_branch import (
+                DEFAULT_INTEGRATION_BRANCHES,
+                ensure_delivery_branch,
+            )
 
+            integration_branches = (
+                (integration_branch.strip(),) + DEFAULT_INTEGRATION_BRANCHES
+                if integration_branch
+                else DEFAULT_INTEGRATION_BRANCHES
+            )
             ensure_delivery_branch(
                 root,
                 jira_key=jira_key,
                 issue_type=issue_type,
+                integration_branches=integration_branches,
             )
 
     baseline = _git_head(root)
