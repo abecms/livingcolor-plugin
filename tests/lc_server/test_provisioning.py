@@ -505,7 +505,7 @@ def test_upgrade_rewrites_manifest_when_template_newer(livingcolor_home):
 
 
 def test_upgrade_renders_newly_added_role_manifest(livingcolor_home):
-    from delivery_runtime.agents.paths import get_agent_manifest_path
+    from delivery_runtime.agents.paths import get_agent_manifest_path, get_automation_state_path
     from delivery_runtime.agents.schema import parse_agent_manifest
     from delivery_runtime.persistence.db import init_db
     from lc_server.provisioning.provisioner import ProjectAutomationProvisioner
@@ -525,6 +525,11 @@ def test_upgrade_renders_newly_added_role_manifest(livingcolor_home):
         ProjectAutomationProvisioner().provision("BN")
 
     # Simulate a project provisioned before the planner role existed.
+    state_path = get_automation_state_path("BN")
+    state_path.write_text(
+        state_path.read_text(encoding="utf-8").replace("templateVersion: 1.6.0", "templateVersion: 1.5.0"),
+        encoding="utf-8",
+    )
     planner_path = get_agent_manifest_path("BN", "planner")
     planner_path.unlink()
 
