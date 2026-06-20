@@ -8,7 +8,14 @@ from typing import Any, Callable
 logger = logging.getLogger(__name__)
 
 _GET_TOOL_CANDIDATES = ("jira_get_issue", "get_issue", "getJiraIssue")
-_UPDATE_TOOL_CANDIDATES = ("jira_update_issue", "update_issue", "editJiraIssue", "edit_issue")
+_UPDATE_TOOL_CANDIDATES = (
+    "jira_update_issue",
+    "update_issue",
+    "editJiraIssue",
+    "edit_issue",
+    "updateJiraIssue",
+    "jira_edit_issue",
+)
 
 
 class McpJiraEstimateInvoker:
@@ -73,15 +80,21 @@ class McpJiraEstimateInvoker:
         if not tool:
             raise RuntimeError("Connected Jira MCP server does not expose an issue update tool")
 
-        fields = {"timetracking": {"originalEstimate": estimate}}
+        timetracking_fields = {"timetracking": {"originalEstimate": estimate}}
         arg_variants: list[dict[str, Any]] = [
-            {"issue_key": issue_key, "fields": fields},
-            {"issueIdOrKey": issue_key, "fields": fields},
-            {"issueKey": issue_key, "fields": fields},
+            {"issue_key": issue_key, "fields": timetracking_fields},
+            {"issueIdOrKey": issue_key, "fields": timetracking_fields},
+            {"issueKey": issue_key, "fields": timetracking_fields},
+            {"issue_key": issue_key, "originalEstimate": estimate},
+            {"issueIdOrKey": issue_key, "originalEstimate": estimate},
+            {"issue_key": issue_key, "fields": {"originalEstimate": estimate}},
+            {"issueIdOrKey": issue_key, "fields": {"originalEstimate": estimate}},
         ]
         if cloud_id:
             arg_variants = [
-                {**args, "cloudId": cloud_id} if "issueIdOrKey" in args else args
+                {**args, "cloudId": cloud_id}
+                if any(key in args for key in ("issueIdOrKey", "issueKey"))
+                else args
                 for args in arg_variants
             ]
 
