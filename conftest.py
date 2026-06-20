@@ -79,6 +79,7 @@ if "tools.mcp_tool" not in sys.modules:
 if "tools.terminal_tool" not in sys.modules:
     terminal_tool = ModuleType("tools.terminal_tool")
     terminal_tool.register_task_env_overrides = lambda _task_id, _overrides: None
+    terminal_tool.clear_task_env_overrides = lambda _task_id: None
     sys.modules["tools.terminal_tool"] = terminal_tool
     tools.terminal_tool = terminal_tool
 
