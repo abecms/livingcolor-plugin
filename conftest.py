@@ -43,6 +43,25 @@ if "hermes_cli.mcp_runtime" not in sys.modules:
     hermes_cli.mcp_runtime = mcp_runtime
 
 
+if "tools" not in sys.modules:
+    tools = ModuleType("tools")
+    tools.__path__ = []
+    sys.modules["tools"] = tools
+else:
+    tools = sys.modules["tools"]
+
+
+if "tools.mcp_tool" not in sys.modules:
+    mcp_tool = ModuleType("tools.mcp_tool")
+    mcp_tool.get_mcp_status = lambda: []
+    mcp_tool.list_connected_mcp_tool_names = lambda _name=None: []
+    mcp_tool.list_connected_mcp_raw_tool_names = lambda _name=None: []
+    mcp_tool.invoke_mcp_tool = lambda *_args, **_kwargs: {}
+    mcp_tool.reconnect_mcp_server = lambda _name, _config: None
+    sys.modules["tools.mcp_tool"] = mcp_tool
+    tools.mcp_tool = mcp_tool
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _global_hermes_home_guard(tmp_path_factory):
     """Hard guard: no test may ever touch the real ~/.hermes data.
