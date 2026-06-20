@@ -105,11 +105,15 @@ class GateService:
             if gate["gateType"] == JIRA_UPDATE_GATE_TYPE:
                 self._complete_jira_update(conn, work_order_id, gate.get("payload") or {})
 
+        jira_estimate_writeback: dict[str, Any] | None = None
         if gate["gateType"] == GATE1_TYPE:
             from delivery_runtime.development.scope_store import create_scope_contract_for_gate_approval
 
             create_scope_contract_for_gate_approval(work_order_id, gate.get("payload") or {})
-            self._write_estimate_back_to_jira(work_order_id)
+            jira_estimate_writeback = self._write_estimate_back_to_jira(
+                work_order_id,
+                overwrite=True,
+            )
 
         if gate["gateType"] == CODE_REVIEW_GATE_TYPE:
             mr_service = self._mr_draft_service()
@@ -124,7 +128,10 @@ class GateService:
         updated_gate = self.get_gate(gate_id)
         if not updated_gate:
             raise RuntimeError("Gate approval failed")
-        return {"gate": updated_gate, "workOrderId": work_order_id}
+        result: dict[str, Any] = {"gate": updated_gate, "workOrderId": work_order_id}
+        if jira_estimate_writeback is not None:
+            result["jiraEstimateWriteback"] = jira_estimate_writeback
+        return result
 
     def reject(
         self,
@@ -253,7 +260,12 @@ class GateService:
             raise RuntimeError("Gate rejection failed")
         return {"gate": updated_gate, "workOrderId": work_order_id}
 
-    def _write_estimate_back_to_jira(self, work_order_id: str) -> None:
+    def _write_estimate_back_to_jira(
+        self,
+        work_order_id: str,
+        *,
+        overwrite: bool = False,
+    ) -> dict[str, Any]:
         """Best-effort Jira originalEstimate write-back at analysis approval.
 
         Never raises — gate approval must succeed even when Jira is down or
@@ -262,45 +274,21 @@ class GateService:
         jira_key = ""
         try:
             if self._jira_estimate_invoker_factory is None:
-                return
+                return {"written": False, "reason": "invoker_not_configured"}
 
             from delivery_runtime.jira.estimate_writeback import write_estimate_to_jira
 
-            with connect() as conn:
-                row = conn.execute(
-                    """
-                    SELECT wo.jira_key AS jira_key,
-                           rr.estimated_days AS estimated_days,
-                           rr.jira_snapshot_json AS jira_snapshot_json,
-                           rr.readiness_score AS readiness_score,
-                           rr.confidence AS confidence
-                    FROM work_orders wo
-                    LEFT JOIN readiness_records rr ON rr.id = wo.readiness_id
-                    WHERE wo.id = ?
-                    """,
-                    (work_order_id,),
-                ).fetchone()
-            if not row:
-                return
-
-            jira_key = str(row["jira_key"] or "").strip()
+            estimated_days, jira_key = self._resolve_work_order_estimate_days(work_order_id)
             if not jira_key:
-                return
-
-            estimated_days = row["estimated_days"]
-            if not estimated_days:
-                from delivery_runtime.pm_inbox.estimation import estimate_ticket_effort
-
-                snapshot = json_loads(row["jira_snapshot_json"], {})
-                estimation = estimate_ticket_effort(
-                    snapshot if isinstance(snapshot, dict) else {},
-                    readiness_score=int(row["readiness_score"] or 70),
-                    confidence=float(row["confidence"] or 0.6),
-                )
-                estimated_days = estimation.estimated_days
+                return {"written": False, "reason": "missing_jira_key"}
 
             invoker = self._jira_estimate_invoker_factory()
-            result = write_estimate_to_jira(jira_key, estimated_days, invoker=invoker)
+            result = write_estimate_to_jira(
+                jira_key,
+                estimated_days,
+                invoker=invoker,
+                overwrite=overwrite,
+            )
 
             if result.get("written"):
                 event_type = "JIRA_ESTIMATE_WRITTEN"
@@ -314,22 +302,58 @@ class GateService:
                 actor="system",
                 payload={"jiraKey": jira_key, **result},
             )
+            return {"jiraKey": jira_key, **result}
         except Exception as exc:
             logger.exception(
                 "Jira estimate write-back failed for work order %s", work_order_id
             )
+            failure = {"jiraKey": jira_key, "written": False, "reason": str(exc)}
             try:
                 self.events.append(
                     event_type="JIRA_ESTIMATE_WRITE_FAILED",
                     work_order_id=work_order_id,
                     actor="system",
-                    payload={"jiraKey": jira_key, "written": False, "reason": str(exc)},
+                    payload=failure,
                 )
             except Exception:
                 logger.exception(
                     "Could not record estimate write-back failure event for work order %s",
                     work_order_id,
                 )
+            return failure
+
+    @staticmethod
+    def _resolve_work_order_estimate_days(work_order_id: str) -> tuple[float | None, str]:
+        with connect() as conn:
+            row = conn.execute(
+                """
+                SELECT wo.jira_key AS jira_key,
+                       rr.estimated_days AS estimated_days,
+                       rr.jira_snapshot_json AS jira_snapshot_json,
+                       rr.readiness_score AS readiness_score,
+                       rr.confidence AS confidence
+                FROM work_orders wo
+                LEFT JOIN readiness_records rr ON rr.id = wo.readiness_id
+                WHERE wo.id = ?
+                """,
+                (work_order_id,),
+            ).fetchone()
+        if not row:
+            return None, ""
+
+        jira_key = str(row["jira_key"] or "").strip()
+        estimated_days = row["estimated_days"]
+        if not estimated_days:
+            from delivery_runtime.pm_inbox.estimation import estimate_ticket_effort
+
+            snapshot = json_loads(row["jira_snapshot_json"], {})
+            estimation = estimate_ticket_effort(
+                snapshot if isinstance(snapshot, dict) else {},
+                readiness_score=int(row["readiness_score"] or 70),
+                confidence=float(row["confidence"] or 0.6),
+            )
+            estimated_days = estimation.estimated_days
+        return estimated_days, jira_key
 
     @staticmethod
     def _next_state_after_approval(gate_type: str) -> tuple[str, str]:

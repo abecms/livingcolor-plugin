@@ -22,6 +22,7 @@ def write_estimate_to_jira(
     estimated_days: float | None,
     *,
     invoker: JiraEstimateInvoker,
+    overwrite: bool = False,
 ) -> dict[str, Any]:
     """Write originalEstimate to Jira. Never raises — returns a result dict."""
     if is_shadow_mode():
@@ -34,12 +35,16 @@ def write_estimate_to_jira(
         existing = (
             ((issue.get("fields") or {}).get("timetracking") or {}).get("originalEstimate") or ""
         )
-        if str(existing).strip():
-            return {"written": False, "reason": "already_set"}
+        if str(existing).strip() and not overwrite:
+            return {"written": False, "reason": "already_set", "existingEstimate": str(existing).strip()}
 
         estimate = days_to_jira_estimate(float(estimated_days))
         invoker.update_estimate(issue_key, estimate)
-        return {"written": True, "estimate": estimate}
+        result: dict[str, Any] = {"written": True, "estimate": estimate}
+        if str(existing).strip():
+            result["overwritten"] = True
+            result["previousEstimate"] = str(existing).strip()
+        return result
     except Exception as exc:
         logger.warning("Jira estimate write failed for %s: %s", issue_key, exc)
         return {"written": False, "reason": str(exc)}
