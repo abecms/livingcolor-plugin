@@ -357,6 +357,7 @@ def _require_project_key(
     *,
     body_project_key: str | None = None,
 ) -> str:
+    from delivery_runtime.automation.config import load_delivery_automation_config
     from delivery_runtime.automation.project_context import try_activate_local_project
 
     request_key = _activate_local_project_from_request(request)
@@ -364,6 +365,8 @@ def _require_project_key(
     if body_key and request_key and body_key != request_key:
         raise HTTPException(status_code=400, detail="projectKey does not match active project context")
     resolved = request_key or body_key or None
+    if not resolved:
+        resolved = load_delivery_automation_config().project_key
     if not resolved:
         raise HTTPException(status_code=400, detail="Active project key is required")
     try_activate_local_project(resolved)

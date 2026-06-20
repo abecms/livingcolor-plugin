@@ -17,6 +17,8 @@ export PATH="${HOME}/.local/bin:${PATH}"
 ./scripts/cloud-bootstrap.sh
 ```
 
+Run `scripts/cloud-preflight.sh` after bootstrap to fail fast when Automation secrets or the Hermes gateway are missing.
+
 ## Security (public repository)
 
 This repository is **public**. That is safe because:
