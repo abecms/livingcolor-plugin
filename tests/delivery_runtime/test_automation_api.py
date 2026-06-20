@@ -108,9 +108,10 @@ class TestGetAutomationApi:
 
     def test_get_automation_returns_status_when_provisioned(self, livingcolor_home):
         from delivery_runtime.agents.paths import get_agent_manifest_path, get_automation_state_path
-        from lc_server.provisioning.template_renderer import render_role_template
+        from lc_server.provisioning.template_renderer import get_template_version, render_role_template
 
         project_key = "BN"
+        current_template_version = get_template_version()
         variables = {
             "project_key": project_key,
             "project_name": "Bibliothèque Numérique",
@@ -149,7 +150,7 @@ class TestGetAutomationApi:
         roles = {agent["role"] for agent in payload["agents"]}
         assert roles == {"orchestrator", "analyst", "developer"}
         for agent in payload["agents"]:
-            assert agent["templateVersion"] == "1.0.0"
+            assert agent["templateVersion"] == current_template_version
             assert agent["runtimeType"] in {"hermes", "none"}
 
 
