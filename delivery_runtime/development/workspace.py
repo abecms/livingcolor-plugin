@@ -19,6 +19,7 @@ def prepare_development_workspace(
     *,
     jira_key: str | None = None,
     issue_type: str = "",
+    project_key: str | None = None,
     reuse_existing: bool = False,
     baseline_ref: str | None = None,
 ) -> tuple[Path, str | None]:
@@ -50,6 +51,7 @@ def prepare_development_workspace(
             root,
             jira_key=jira_key,
             issue_type=issue_type,
+            project_key=project_key,
         )
 
     if not (root / ".git").exists():

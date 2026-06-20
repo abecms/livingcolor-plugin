@@ -12,6 +12,7 @@ from delivery_runtime.development.git_branch import (
     branch_prefix_for_issue_type,
     ensure_delivery_branch,
     format_delivery_branch_name,
+    integration_branch_candidates,
     resolve_integration_branch,
     resolve_merge_target_branch,
 )
@@ -109,3 +110,13 @@ def test_resolve_integration_branch_prefers_main(tmp_path):
     workspace.mkdir()
     _git_init_main(workspace)
     assert resolve_integration_branch(workspace) == "main"
+
+
+def test_integration_branch_candidates_prefers_project_mapping(monkeypatch):
+    monkeypatch.setattr(
+        "delivery_runtime.readiness.project_mapping.resolve_configured_integration_branch",
+        lambda project_key: "preprod" if project_key == "TVP" else None,
+    )
+    candidates = integration_branch_candidates("TVP")
+    assert candidates[0] == "preprod"
+    assert "main" in candidates

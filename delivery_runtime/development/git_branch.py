@@ -10,6 +10,22 @@ from delivery_runtime.shadow.context import allow_internal_git
 DEFAULT_INTEGRATION_BRANCHES = ("main", "master", "prod")
 DEFAULT_MERGE_TARGET_BRANCHES = ("staging", "dev", "develop", "preprod", "test")
 
+
+def integration_branch_candidates(project_key: str | None = None) -> tuple[str, ...]:
+    """Build integration branch resolution order for a project checkout."""
+    ordered: list[str] = []
+    key = (project_key or "").strip().upper()
+    if key:
+        from delivery_runtime.readiness.project_mapping import resolve_configured_integration_branch
+
+        configured = resolve_configured_integration_branch(key)
+        if configured:
+            ordered.append(configured)
+    for candidate in (*DEFAULT_INTEGRATION_BRANCHES, *DEFAULT_MERGE_TARGET_BRANCHES):
+        if candidate not in ordered:
+            ordered.append(candidate)
+    return tuple(ordered)
+
 FIX_ISSUE_TYPES = frozenset({"bug", "defect", "hotfix", "incident"})
 FEATURE_ISSUE_TYPES = frozenset(
     {
@@ -92,7 +108,8 @@ def ensure_delivery_branch(
     *,
     jira_key: str,
     issue_type: str = "",
-    integration_branches: tuple[str, ...] = DEFAULT_INTEGRATION_BRANCHES,
+    integration_branches: tuple[str, ...] | None = None,
+    project_key: str | None = None,
 ) -> tuple[str, str, str | None]:
     """Create or reset the per-ticket branch from the production-linked integration branch.
 
@@ -100,7 +117,8 @@ def ensure_delivery_branch(
     ``merge_target_branch`` is ``None`` when no test-environment branch exists in the checkout.
     """
     branch_name = format_delivery_branch_name(jira_key, issue_type)
-    base_branch = resolve_integration_branch(workspace, integration_branches)
+    candidates = integration_branches or integration_branch_candidates(project_key)
+    base_branch = resolve_integration_branch(workspace, candidates)
     try:
         merge_target_branch: str | None = resolve_merge_target_branch(workspace)
     except ValueError:

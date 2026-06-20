@@ -23,7 +23,16 @@ def _env(name: str, default: str = "") -> str:
 
 
 def _github_token() -> str:
-    return _env("GITHUB_TOKEN") or _env("GITHUB_PERSONAL_ACCESS_TOKEN")
+    token = _env("GITHUB_TOKEN") or _env("GITHUB_PERSONAL_ACCESS_TOKEN")
+    if token:
+        return token
+    try:
+        from delivery_runtime.readiness.project_settings import resolve_project_mcp_server
+        from lc_server.integrations.vcs.github import github_token_from_config
+
+        return github_token_from_config(resolve_project_mcp_server("TVP", "github")) or ""
+    except Exception:
+        return ""
 
 
 def _phase_result(phase: str, status: str, **extra: Any) -> dict[str, Any]:
@@ -289,6 +298,18 @@ def main() -> int:
             raise RuntimeError(f"promote failed: {promote.status_code} {promote.text}")
         wo = promote.json().get("workOrder") or {}
         work_order_id = wo.get("id")
+
+        deadline = time.time() + 120.0
+        while time.time() < deadline:
+            if wo.get("status") == "awaiting_gate" and wo.get("gates"):
+                break
+            tick = client.post(f"/api/plugins/livingcolor/delivery/work-orders/{work_order_id}/resume")
+            if tick.status_code == 200:
+                refreshed = client.get(f"/api/plugins/livingcolor/delivery/work-orders/{work_order_id}")
+                if refreshed.status_code == 200:
+                    wo = refreshed.json()
+            time.sleep(2)
+
         gates = wo.get("gates") or []
         results["phases"]["D"] = _phase_result(
             "D_readiness_promote",

@@ -55,12 +55,19 @@ class HeuristicDeveloperAgent:
             or approved_plan.get("jiraContextUsed", {}).get("issue_type")
             or ""
         )
+        project_key = str(
+            (context.get("workOrder") or {}).get("projectKey")
+            or context_pack.get("projectKey")
+            or approved_plan.get("jiraContextUsed", {}).get("projectKey")
+            or jira_key.split("-")[0]
+        ).strip().upper()
 
         workspace, baseline = prepare_development_workspace(
             work_order_id,
             checkout_path,
             jira_key=jira_key if not reuse_workspace else None,
             issue_type=issue_type,
+            project_key=project_key,
             reuse_existing=reuse_workspace,
             baseline_ref=str(workspace_baseline) if workspace_baseline else None,
         )

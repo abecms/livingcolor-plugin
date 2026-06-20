@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -123,31 +124,43 @@ def ensure_managed_checkout(
     if target.exists() and not _is_git_checkout(target):
         return None
 
-    if not _clone_repository(clone_url, target):
+    if not _clone_repository(clone_url, target, branch=_configured_clone_branch(project_cfg, project_key)):
         return None
     return str(target) if _is_git_checkout(target) else None
+
+
+def _configured_clone_branch(project_cfg: dict[str, Any], project_key: str) -> str | None:
+    branch = str(project_cfg.get("integration_branch") or "").strip()
+    if branch:
+        return branch
+    from delivery_runtime.readiness.project_mapping import resolve_configured_integration_branch
+
+    return resolve_configured_integration_branch(project_key)
 
 
 def _is_git_checkout(path: Path) -> bool:
     return path.is_dir() and (path / ".git").exists()
 
 
-def _clone_repository(clone_url: str, target: Path) -> bool:
+def _clone_repository(clone_url: str, target: Path, branch: str | None = None) -> bool:
+    attempts: list[list[str]] = []
+    if branch:
+        attempts.append(["git", "clone", "--depth", "1", "-b", branch, clone_url, str(target)])
+    attempts.append(["git", "clone", "--depth", "1", clone_url, str(target)])
+
     with allow_internal_git():
-        result = subprocess.run(
-            ["git", "clone", "--depth", "1", clone_url, str(target)],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-    if result.returncode != 0:
-        logger.warning(
-            "git clone failed for %s: %s",
-            target,
-            (result.stderr or result.stdout or "").strip(),
-        )
-        return False
-    return True
+        for command in attempts:
+            if target.exists():
+                shutil.rmtree(target, ignore_errors=True)
+            result = subprocess.run(
+                command,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode == 0:
+                return True
+    return False
 
 
 def _refresh_checkout(path: Path) -> bool:

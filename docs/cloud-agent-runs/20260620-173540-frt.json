@@ -1,0 +1,96 @@
+{
+  "run_id": "20260620-173540",
+  "shadow_mode": false,
+  "phases": {
+    "A": {
+      "phase": "A_bootstrap",
+      "status": "pass",
+      "http": 200,
+      "mode": "FastAPI TestClient",
+      "shadow_mode_set": false
+    },
+    "B": {
+      "phase": "B_project_setup",
+      "status": "pass",
+      "setup_http": 200,
+      "setup_body": {
+        "status": "ready",
+        "projectKey": "TVP",
+        "agentsProvisioned": [
+          "analyst",
+          "developer",
+          "orchestrator",
+          "planner",
+          "publisher",
+          "reporter"
+        ],
+        "reposDiscovered": 0,
+        "defaultRepo": "github.com/abecms/tv5mondeplus-front",
+        "templateVersion": "1.6.0",
+        "warnings": [
+          "GitLab discovery failed: GitLab token is required in MCP config env (GITLAB_PERSONAL_ACCESS_TOKEN or GITLAB_TOKEN)"
+        ]
+      },
+      "settings_http": 200
+    },
+    "C": {
+      "phase": "C_integrations",
+      "status": "fail",
+      "jira": "available",
+      "github": {
+        "status": "not_configured"
+      },
+      "stripe": {
+        "status": "available",
+        "customer_count_sample": 1,
+        "first_customer_id": "cus_UjXmIWTysd2fe0"
+      },
+      "sandbox_ticket": "TVP-13"
+    },
+    "D": {
+      "phase": "D_readiness_promote",
+      "status": "fail",
+      "error": "promote failed: 409 {\"detail\":\"Only ready tickets can be promoted to a work order\"}"
+    },
+    "E": {
+      "phase": "E_gates",
+      "status": "fail",
+      "error": "missing work order",
+      "gate_log": []
+    },
+    "F": {
+      "phase": "F_delivery",
+      "status": "fail",
+      "error": "missing work order"
+    },
+    "G": {
+      "phase": "G_sprint_report",
+      "status": "fail",
+      "http": 400,
+      "body": {
+        "detail": "Active project key is required"
+      }
+    },
+    "H": {
+      "phase": "H_stripe",
+      "status": "pass",
+      "stripe": {
+        "status": "available",
+        "customer_count_sample": 1,
+        "first_customer_id": "cus_UjXmIWTysd2fe0"
+      },
+      "invoice_id": "in_1TkSo31rbdMPTLCd6V4ntzbR"
+    }
+  },
+  "sandbox_jira_ticket": "TVP-13",
+  "sandbox_pr_url": null,
+  "sandbox_branch": null,
+  "credentials": {
+    "OPENROUTER_API_KEY": true,
+    "JIRA_URL": true,
+    "JIRA_USERNAME": true,
+    "JIRA_API_TOKEN": true,
+    "GITHUB_TOKEN": true,
+    "STRIPE_SECRET_KEY": true
+  }
+}
