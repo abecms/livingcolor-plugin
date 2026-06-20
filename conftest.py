@@ -56,7 +56,16 @@ if "hermes_cli.mcp_runtime" not in sys.modules:
 
 if "hermes_cli.mcp_security" not in sys.modules:
     mcp_security = ModuleType("hermes_cli.mcp_security")
-    mcp_security.validate_mcp_server_entry = lambda _name, _config: None
+
+    def _validate_mcp_server_entry(_name, config):
+        command = str((config or {}).get("command") or "")
+        args = " ".join(str(arg) for arg in ((config or {}).get("args") or []))
+        payload = f"{command} {args}".lower()
+        if "curl" in payload or "http://evil" in payload:
+            return ["network egress is not allowed in MCP server commands"]
+        return []
+
+    mcp_security.validate_mcp_server_entry = _validate_mcp_server_entry
     sys.modules["hermes_cli.mcp_security"] = mcp_security
     hermes_cli.mcp_security = mcp_security
 
