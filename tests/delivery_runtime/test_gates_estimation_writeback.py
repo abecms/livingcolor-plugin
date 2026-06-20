@@ -38,8 +38,20 @@ def test_writes_estimate_when_field_empty():
 def test_skips_when_field_already_set():
     invoker = FakeInvoker(existing_estimate="2d")
     result = write_estimate_to_jira("TVP-1489", 1.5, invoker=invoker)
-    assert result == {"written": False, "reason": "already_set"}
+    assert result == {"written": False, "reason": "already_set", "existingEstimate": "2d"}
     assert invoker.calls == []
+
+
+def test_overwrites_when_field_already_set_and_overwrite_enabled():
+    invoker = FakeInvoker(existing_estimate="2d")
+    result = write_estimate_to_jira("TVP-1489", 1.5, invoker=invoker, overwrite=True)
+    assert result == {
+        "written": True,
+        "estimate": "1d 4h",
+        "overwritten": True,
+        "previousEstimate": "2d",
+    }
+    assert invoker.calls == [("TVP-1489", "1d 4h")]
 
 
 def test_failure_returns_error_does_not_raise():
@@ -119,6 +131,11 @@ def test_gate_approval_writes_persisted_estimate_once(_isolate_hermes_home):
 
     assert result["gate"]["status"] == "approved"
     assert invoker.calls == [("TVP-1489", "1d 4h")]
+    assert result["jiraEstimateWriteback"] == {
+        "jiraKey": "TVP-1489",
+        "written": True,
+        "estimate": "1d 4h",
+    }
 
     event_types = [event["eventType"] for event in events.list_for_work_order(result["workOrderId"], limit=20)]
     assert event_types.count("JIRA_ESTIMATE_WRITTEN") == 1
@@ -145,6 +162,23 @@ def test_gate_approval_succeeds_when_invoker_raises(_isolate_hermes_home):
     event_types = [event["eventType"] for event in events.list_for_work_order(result["workOrderId"], limit=20)]
     assert "JIRA_ESTIMATE_WRITE_FAILED" in event_types
     assert "JIRA_ESTIMATE_WRITTEN" not in event_types
+
+
+def test_gate_approval_overwrites_existing_jira_estimate(_isolate_hermes_home):
+    init_db()
+    with connect() as conn:
+        gate_id = _seed_analysis_gate(conn, estimated_days=1.5)
+
+    invoker = FakeInvoker(existing_estimate="2d")
+    events = EventStore()
+    gates = GateService(events, jira_estimate_invoker_factory=lambda: invoker)
+
+    result = gates.approve(gate_id, approved_by="human:test")
+
+    assert result["gate"]["status"] == "approved"
+    assert invoker.calls == [("TVP-1489", "1d 4h")]
+    assert result["jiraEstimateWriteback"]["written"] is True
+    assert result["jiraEstimateWriteback"]["overwritten"] is True
 
 
 def test_gate_approval_falls_back_to_heuristic_estimate(_isolate_hermes_home):
