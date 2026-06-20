@@ -127,6 +127,8 @@ def test_build_decision_trace_produces_file_reasoning():
 
 
 def test_generate_mr_draft_content_includes_decision_trace():
+    from delivery_runtime.communication.language import get_mr_labels
+
     content = generate_mr_draft_content(
         jira_key="BN-516",
         work_order_title="Fix author thumbnail",
@@ -155,8 +157,9 @@ def test_generate_mr_draft_content_includes_decision_trace():
     assert trace["reasoningSummary"]
     assert trace["overallConfidence"] >= 70
     assert trace["fileDecisions"]
-    assert "### Reasoning Summary" in content["description"]
-    assert "Overall confidence" in content["description"]
+    labels = get_mr_labels()
+    assert f"### {labels['reasoningSummary']}" in content["description"]
+    assert labels["overallConfidence"] in content["description"]
 
 
 def test_code_review_approve_to_explainable_mr_draft(_isolate_hermes_home):
