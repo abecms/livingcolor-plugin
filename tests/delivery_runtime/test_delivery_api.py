@@ -129,7 +129,9 @@ class TestDeliveryApi:
     def test_gate_approve_and_reject_via_api(self):
         record_id = _seed_ready_record("AAC-10")
         promote = self.client.post(f"/api/delivery/readiness/{record_id}/promote")
-        gate_id = promote.json()["workOrder"]["gates"][0]["id"]
+        work_order_id = promote.json()["workOrder"]["id"]
+        promoted = self.client.get(f"/api/delivery/work-orders/{work_order_id}").json()
+        gate_id = promoted["gates"][0]["id"]
 
         reject = self.client.post(
             f"/api/delivery/gates/{gate_id}/reject",
@@ -139,7 +141,7 @@ class TestDeliveryApi:
         reject_payload = reject.json()
         assert reject_payload["gate"]["status"] == "rejected"
 
-        work_order = self.client.get(f"/api/delivery/work-orders/{promote.json()['workOrder']['id']}").json()
+        work_order = self.client.get(f"/api/delivery/work-orders/{work_order_id}").json()
         pending_gate = next(gate for gate in work_order["gates"] if gate["status"] == "pending")
         approve = self.client.post(f"/api/delivery/gates/{pending_gate['id']}/approve")
         assert approve.status_code == 200
