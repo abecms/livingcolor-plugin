@@ -112,9 +112,12 @@ class TestDeliveryApi:
         assert payload["workOrder"]["id"].startswith("WO-")
         assert payload["workOrder"]["jiraKey"] == "AAC-9"
         assert payload["readiness"]["readinessStatus"] == "promoted"
-        assert payload["workOrder"]["status"] == "awaiting_gate"
-        assert payload["workOrder"]["currentStage"] == "analysis_review"
-        assert payload["workOrder"]["gates"][0]["gateType"] == "analysis_plan"
+        assert payload["workOrder"]["status"] == "intake"
+
+        promoted = self.client.get(f"/api/delivery/work-orders/{payload['workOrder']['id']}").json()
+        assert promoted["status"] == "awaiting_gate"
+        assert promoted["currentStage"] == "analysis_review"
+        assert promoted["gates"][0]["gateType"] == "analysis_plan"
 
         work_orders = self.client.get("/api/delivery/work-orders").json()["items"]
         assert len(work_orders) == 1
