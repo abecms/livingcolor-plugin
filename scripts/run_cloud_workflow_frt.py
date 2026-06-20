@@ -263,18 +263,25 @@ def main() -> int:
             "/api/plugins/livingcolor/delivery/readiness/scan",
             json={"projectKey": "TVP"},
         )
-        readiness_list = client.get("/api/plugins/livingcolor/delivery/readiness?project=TVP")
-        items = readiness_list.json().get("items") or [] if readiness_list.status_code == 200 else []
         jira_key = results.get("sandbox_jira_ticket")
-        if jira_key:
+        if not jira_key:
+            raise RuntimeError("sandbox Jira ticket missing from phase C")
+
+        record_id = None
+        for attempt in range(6):
+            readiness_list = client.get("/api/plugins/livingcolor/delivery/readiness?project=TVP")
+            items = readiness_list.json().get("items") or [] if readiness_list.status_code == 200 else []
             for item in items:
                 if item.get("jiraKey") == jira_key:
                     record_id = item["id"]
                     break
-        if not record_id and items:
-            record_id = items[0]["id"]
+            if record_id:
+                break
+            time.sleep(2)
+            client.post("/api/plugins/livingcolor/delivery/readiness/scan", json={"projectKey": "TVP"})
+
         if not record_id:
-            raise RuntimeError("No readiness record available after scan")
+            raise RuntimeError(f"No readiness record found for sandbox ticket {jira_key}")
 
         reanalyze = client.post(f"/api/plugins/livingcolor/delivery/readiness/{record_id}/reanalyze")
         if reanalyze.status_code == 200:

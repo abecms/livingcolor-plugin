@@ -734,6 +734,17 @@ class OrchestrationEngine:
                 f"mr_creation node for work order {work_order_id} has no MR draft "
                 f"(draftId={draft_id!r}); refusing to publish without approved content"
             )
+        approved_plan_ref = dev_payload.get("approvedPlanRef") or {}
+        if not isinstance(approved_plan_ref, dict):
+            approved_plan_ref = {}
+        target_repo = str(approved_plan_ref.get("targetRepo") or dev_payload.get("targetRepo") or "")
+        if not target_repo:
+            from delivery_runtime.readiness.project_mapping import load_project_mapping_entry
+
+            entry = load_project_mapping_entry(project_key)
+            target_repo = str(entry.get("default_repo") or "")
+        from delivery_runtime.readiness.project_settings import load_project_vcs_provider
+
         return {
             "draftId": draft.id,
             "mrTitle": draft.title,
@@ -743,6 +754,9 @@ class OrchestrationEngine:
             "workspacePath": str(dev_payload.get("workspacePath") or ""),
             "integrationBranch": integration_branch,
             "projectKey": project_key,
+            "targetRepo": target_repo,
+            "approvedAnalysisPlan": approved_plan_ref,
+            "vcs": load_project_vcs_provider(project_key),
         }
 
     @staticmethod

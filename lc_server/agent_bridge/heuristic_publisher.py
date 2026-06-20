@@ -64,8 +64,14 @@ class HeuristicPublisherAgent:
 
         repo_id = str(context.get("targetRepo") or context.get("repoId") or "").strip()
         if not repo_id:
-            approved_plan = context.get("approvedAnalysisPlan") or {}
-            repo_id = str(approved_plan.get("targetRepo") or "")
+            approved_plan = context.get("approvedAnalysisPlan") or context.get("approvedPlanRef") or {}
+            if isinstance(approved_plan, dict):
+                repo_id = str(approved_plan.get("targetRepo") or "").strip()
+        if not repo_id and project_key:
+            from delivery_runtime.readiness.project_mapping import load_project_mapping_entry
+
+            entry = load_project_mapping_entry(project_key)
+            repo_id = str(entry.get("default_repo") or "").strip()
         repo_path = repo_id.removeprefix("github.com/").strip("/")
         if not repo_path:
             raise PublisherCompletionError("target repository missing from publication context")
