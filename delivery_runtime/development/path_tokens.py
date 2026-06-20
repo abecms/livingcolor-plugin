@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib
 import os
 import re
 import shlex
@@ -206,8 +207,6 @@ def extract_command_path_arguments(command: str) -> list[str]:
 
 def hermes_skills_roots() -> list[Path]:
     """Roots where Hermes/LivingColor skill files may be loaded read-only."""
-    from hermes_constants import get_bundled_delivery_skills_dir
-
     hermes_home = Path(os.environ.get("HERMES_HOME", str(Path.home() / ".hermes"))).expanduser().resolve()
     roots = [hermes_home / "skills"]
     try:
@@ -216,9 +215,13 @@ def hermes_skills_roots() -> list[Path]:
         roots.append(get_livingcolor_home().resolve() / "skills")
     except Exception:
         pass
-    bundled_delivery = get_bundled_delivery_skills_dir()
-    if bundled_delivery.is_dir():
-        roots.append(bundled_delivery.resolve())
+    try:
+        hermes_constants = importlib.import_module("hermes_constants")
+        bundled_delivery = hermes_constants.get_bundled_delivery_skills_dir()
+        if bundled_delivery.is_dir():
+            roots.append(bundled_delivery.resolve())
+    except Exception:
+        pass
     return roots
 
 

@@ -10,6 +10,7 @@ from delivery_runtime.readiness.todo_filter import is_todo_ticket
 
 _STATUS_GROUP_TODO = "todo"
 _STATUS_GROUP_IN_PROGRESS = "in_progress"
+_ISSUE_VISIBILITY_FILTER = "(statusCategory != Done OR resolutiondate >= -30d)"
 
 _IN_PROGRESS_CATEGORIES = {"in progress", "indeterminate"}
 _IN_PROGRESS_STATUS_TOKENS = (
@@ -255,8 +256,6 @@ def build_ticket_scope_jql_variants(
     scope: TicketScopeConfig | None = None,
 ) -> tuple[str, ...]:
     """Build Jira JQL queries that match the configured ticket scope."""
-    from hermes_cli.jira_dashboard import _ISSUE_VISIBILITY_FILTER
-
     resolved = scope or default_ticket_scope()
     safe_key = _escape_jql_string(project_key.strip().upper())
     base = f'project = "{safe_key}" AND {_ISSUE_VISIBILITY_FILTER}'

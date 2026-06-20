@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib
 import logging
 import re
 import subprocess
@@ -313,9 +314,8 @@ def resolve_workspace_relative_path(path: str, workspace: Path, task_id: str | N
         cleaned = cleaned[2:]
     if task_id:
         try:
-            from tools.file_tools import _resolve_path_for_task
-
-            resolved = Path(_resolve_path_for_task(cleaned, task_id)).resolve()
+            file_tools = importlib.import_module("tools.file_tools")
+            resolved = Path(file_tools._resolve_path_for_task(cleaned, task_id)).resolve()
             return workspace_relative_git_path(str(resolved), workspace) or workspace_relative_git_path(cleaned, workspace)
         except Exception:
             pass
