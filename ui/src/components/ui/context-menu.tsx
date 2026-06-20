@@ -5,8 +5,8 @@ import { Codicon } from '@/components/ui/codicon'
 import { getLcPortalContainer } from '@/lib/lc-portal-host'
 import { cn } from '@/lib/utils'
 
-function ContextMenu({ ...props }: React.ComponentProps<typeof ContextMenuPrimitive.Root>) {
-  return <ContextMenuPrimitive.Root data-slot="context-menu" {...props} />
+function ContextMenu({ modal = false, ...props }: React.ComponentProps<typeof ContextMenuPrimitive.Root>) {
+  return <ContextMenuPrimitive.Root data-slot="context-menu" modal={modal} {...props} />
 }
 
 function ContextMenuPortal({ ...props }: React.ComponentProps<typeof ContextMenuPrimitive.Portal>) {

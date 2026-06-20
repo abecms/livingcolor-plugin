@@ -55,4 +55,30 @@ describe('callDesktopApi', () => {
     expect(path).toBe('/api/plugins/livingcolor/mcp/servers/Atlassian')
     expect(init.method).toBe('PUT')
   })
+
+  it('attaches the Hermes dashboard session token when present', async () => {
+    ;(window as { __HERMES_SESSION_TOKEN__?: string }).__HERMES_SESSION_TOKEN__ = 'dash-tok'
+
+    await callDesktopApi({ path: '/api/delivery/overview' })
+
+    const sdk = (window as any).__HERMES_PLUGIN_SDK__
+    const [, init] = sdk.fetchJSON.mock.calls[0]
+    expect((init.headers as Headers).get('X-Hermes-Session-Token')).toBe('dash-tok')
+  })
+
+  it('falls back to fetch when sdk.fetchJSON fails with a network error', async () => {
+    const sdk = (window as any).__HERMES_PLUGIN_SDK__
+    sdk.fetchJSON = vi.fn(async () => {
+      throw new Error('Failed to fetch')
+    })
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    )
+
+    const result = await callDesktopApi<{ ok: boolean }>({ path: '/api/delivery/overview' })
+
+    expect(result).toEqual({ ok: true })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    fetchMock.mockRestore()
+  })
 })

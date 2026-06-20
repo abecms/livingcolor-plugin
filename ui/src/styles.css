@@ -142,6 +142,7 @@
   position: absolute;
   inset: 0;
   z-index: var(--lc-z-portal-host);
+  pointer-events: none;
 }
 
 [data-slot='dropdown-menu-content'],

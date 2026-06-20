@@ -6,8 +6,8 @@ import { type ControlVariantProps, controlVariants } from '@/components/ui/contr
 import { cn } from '@/lib/utils'
 import { getLcPortalContainer } from '@/lib/lc-portal-host'
 
-function Select({ ...props }: React.ComponentProps<typeof SelectPrimitive.Root>) {
-  return <SelectPrimitive.Root data-slot="select" {...props} />
+function Select({ modal = false, ...props }: React.ComponentProps<typeof SelectPrimitive.Root>) {
+  return <SelectPrimitive.Root data-slot="select" modal={modal} {...props} />
 }
 
 function SelectTrigger({

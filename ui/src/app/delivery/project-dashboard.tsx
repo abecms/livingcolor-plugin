@@ -113,6 +113,29 @@ async function findNextReviewGate(workOrder: WorkOrder): Promise<DeliveryGate | 
   )
 }
 
+function resolveCachedWorkOrder(workOrderId: string, cache: WorkOrder[]): WorkOrder | undefined {
+  const cached = cache.find(item => item.id === workOrderId)
+  if (!cached) {
+    return undefined
+  }
+  if ((cached.gates?.length ?? 0) > 0 || (cached.graphNodes?.length ?? 0) > 0) {
+    return cached
+  }
+  return undefined
+}
+
+async function loadWorkOrder(workOrderId: string, cache: WorkOrder[]): Promise<WorkOrder> {
+  try {
+    return await fetchWorkOrder(workOrderId)
+  } catch (error) {
+    const cached = resolveCachedWorkOrder(workOrderId, cache)
+    if (cached) {
+      return cached
+    }
+    throw error
+  }
+}
+
 export function ProjectDeliveryDashboardView() {
   const { t } = useI18n()
   const projectChatOpen = useStore($projectChatOpen)
@@ -295,7 +318,7 @@ export function ProjectDeliveryDashboardView() {
   const handleReviewGate = useCallback(
     async (input: { workOrderId: string; gateId: string }) => {
       try {
-        const loadedWorkOrder = await fetchWorkOrder(input.workOrderId)
+        const loadedWorkOrder = await loadWorkOrder(input.workOrderId, visibleWorkOrders)
         const loadedGate = loadedWorkOrder.gates?.find(item => item.id === input.gateId)
         if (!loadedGate || loadedGate.status !== 'pending') {
           const nextGate = await findNextReviewGate(loadedWorkOrder)
@@ -312,13 +335,13 @@ export function ProjectDeliveryDashboardView() {
         notifyError(error, 'Could not open approval review')
       }
     },
-    [openReview, refreshDashboard]
+    [openReview, refreshDashboard, visibleWorkOrders]
   )
 
   const handleReviewWorkOrder = useCallback(
     async (workOrderId: string) => {
       try {
-        const loadedWorkOrder = await fetchWorkOrder(workOrderId)
+        const loadedWorkOrder = await loadWorkOrder(workOrderId, visibleWorkOrders)
         const pendingGate = await findNextReviewGate(loadedWorkOrder)
         if (!pendingGate) {
           openProgress(loadedWorkOrder)
@@ -329,21 +352,21 @@ export function ProjectDeliveryDashboardView() {
         notifyError(error, 'Could not open work order review')
       }
     },
-    [openProgress, openReview]
+    [openProgress, openReview, visibleWorkOrders]
   )
 
   const handleResumeWorkOrder = useCallback(
     async (workOrderId: string) => {
       try {
         await resumeWorkOrder(workOrderId)
-        const loadedWorkOrder = await fetchWorkOrder(workOrderId)
+        const loadedWorkOrder = await loadWorkOrder(workOrderId, visibleWorkOrders)
         setWorkOrder(loadedWorkOrder)
         await refreshDashboard()
       } catch (error) {
         notifyError(error, 'Could not resume delivery')
       }
     },
-    [refreshDashboard]
+    [refreshDashboard, visibleWorkOrders]
   )
 
   const handleDecision = useCallback(async () => {
@@ -356,7 +379,7 @@ export function ProjectDeliveryDashboardView() {
       return
     }
     try {
-      const loadedWorkOrder = await fetchWorkOrder(workOrderId)
+      const loadedWorkOrder = await loadWorkOrder(workOrderId, visibleWorkOrders)
       const nextGate = await findNextReviewGate(loadedWorkOrder)
       if (nextGate) {
         openReview(loadedWorkOrder, nextGate)
@@ -364,7 +387,7 @@ export function ProjectDeliveryDashboardView() {
     } catch (error) {
       notifyError(error, 'Could not load next approval step')
     }
-  }, [openReview, refreshDashboard, workOrder?.id])
+  }, [openReview, refreshDashboard, visibleWorkOrders, workOrder?.id])
 
   const gateType = gate?.gateType ?? ''
   const isAnalysisGate = gateType === 'analysis_plan'
