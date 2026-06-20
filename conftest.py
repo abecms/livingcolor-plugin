@@ -76,6 +76,13 @@ if "tools.mcp_tool" not in sys.modules:
     tools.mcp_tool = mcp_tool
 
 
+if "tools.terminal_tool" not in sys.modules:
+    terminal_tool = ModuleType("tools.terminal_tool")
+    terminal_tool.register_task_env_overrides = lambda _task_id, _overrides: None
+    sys.modules["tools.terminal_tool"] = terminal_tool
+    tools.terminal_tool = terminal_tool
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _global_hermes_home_guard(tmp_path_factory):
     """Hard guard: no test may ever touch the real ~/.hermes data.
