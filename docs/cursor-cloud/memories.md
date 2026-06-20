@@ -47,6 +47,8 @@ hermes gateway restart
 
 Dev sync from checkout: `./scripts/sync-hermes-plugin.sh && hermes plugins enable livingcolor`
 
+Cloud FRT bootstrap: `./scripts/cloud-bootstrap.sh` — see `docs/cursor-cloud/bootstrap.md`.
+
 **Do not** implement Cloud orchestrator/runner/fixer code in the plugin repo.
 
 ## TVP `project_mapping.yaml` template
