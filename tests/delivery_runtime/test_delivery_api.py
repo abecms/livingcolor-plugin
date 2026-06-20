@@ -341,10 +341,11 @@ class TestDeliveryApi:
                 run_id="RUN-1",
             )
 
-        self.client.put(
+        response = self.client.put(
             "/api/delivery/project-config",
-            json={"sprintDurationDays": 14, "sprintCapacityDays": 2},
+            json={"projectKey": "BN", "sprintDurationDays": 14, "sprintCapacityDays": 2},
         )
+        assert response.status_code == 200
         inbox = self.client.get("/api/delivery/pm-inbox?project=BN").json()
         selected = inbox["selectedSprint"]
         assert selected["capacityDays"] == 2
