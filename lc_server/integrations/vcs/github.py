@@ -29,7 +29,8 @@ def _read_mcp_env(mcp_config: dict) -> dict[str, str]:
 
 
 def github_token_from_config(mcp_config: dict) -> str | None:
-    return _read_mcp_env(mcp_config).get("GITHUB_TOKEN")
+    env = _read_mcp_env(mcp_config)
+    return env.get("GITHUB_TOKEN") or env.get("GITHUB_PERSONAL_ACCESS_TOKEN")
 
 
 def build_github_clone_url(repo_id: str, token: str) -> str:
@@ -114,6 +115,50 @@ def repo_path_and_number_from_pr_url(pr_url: str) -> tuple[str, int]:
     if parsed.netloc.lower() != "github.com" or len(parts) != 4 or parts[2] != "pull":
         raise ValueError(f"not a GitHub PR url: {pr_url}")
     return f"{parts[0]}/{parts[1]}", int(parts[3])
+
+
+def create_pull_request(
+    *,
+    mcp_config: dict,
+    repo_path: str,
+    title: str,
+    body: str,
+    head: str,
+    base: str,
+) -> dict[str, Any]:
+    """Create a GitHub pull request via REST API (cloud-runner fallback)."""
+    token = github_token_from_config(mcp_config)
+    if not token:
+        raise ValueError("GitHub token is required in MCP config env (GITHUB_TOKEN)")
+    repo = repo_path.strip().strip("/")
+    payload = {
+        "title": title,
+        "body": body,
+        "head": head,
+        "base": base,
+    }
+    url = f"{_GITHUB_API_URL}/repos/{repo}/pulls"
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=_FETCH_TIMEOUT_SECONDS) as response:
+            result = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        body_text = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"GitHub PR creation failed ({exc.code}): {body_text}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"GitHub PR creation failed: {exc.reason}") from exc
+    if not isinstance(result, dict):
+        raise RuntimeError("GitHub API returned an unexpected pull request payload")
+    return result
 
 
 def verify_pull_request_exists(*, mcp_config: dict, repo_path: str, pr_number: int) -> dict[str, Any] | None:

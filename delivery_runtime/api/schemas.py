@@ -120,6 +120,7 @@ class PromoteReadinessResponse(BaseModel):
 class GateDecisionRequest(BaseModel):
     feedback: str = Field(default="", max_length=4000)
     reviewerFeedback: list[dict[str, Any]] | None = None
+    approvedBy: str | None = None
 
 
 class GateDecisionResponse(BaseModel):

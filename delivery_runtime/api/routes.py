@@ -260,10 +260,11 @@ def get_gate(gate_id: str) -> GateResponse:
 
 
 @router.post("/gates/{gate_id}/approve", response_model=GateDecisionResponse)
-def approve_gate(gate_id: str) -> GateDecisionResponse:
+def approve_gate(gate_id: str, body: GateDecisionRequest | None = None) -> GateDecisionResponse:
     services = get_services()
+    approved_by = (body.approvedBy if body and body.approvedBy else None) or "human"
     try:
-        result = services.gates.approve(gate_id)
+        result = services.gates.approve(gate_id, approved_by=approved_by)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:

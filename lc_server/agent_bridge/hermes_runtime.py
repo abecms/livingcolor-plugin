@@ -10,10 +10,12 @@ from delivery_runtime.agents.registry import AgentManifestRegistry
 from delivery_runtime.context.pack_builder import ContextPackBuilder
 from delivery_runtime.readiness.analyzer import analyze_ticket_snapshot
 from delivery_runtime.readiness.analyst_prompt import AnalystParseError
+from lc_server.agent_bridge.agent_backend import is_heuristic_backend
 from lc_server.agent_bridge.developer_backend import get_developer_agent
 from lc_server.agent_bridge.hermes_analyst import HermesAnalystAgent
-from lc_server.agent_bridge.hermes_planner import HermesPlannerAgent, PlannerParseError
-from lc_server.agent_bridge.hermes_publisher import HermesPublisherAgent
+from lc_server.agent_bridge.hermes_planner import PlannerParseError
+from lc_server.agent_bridge.planner_backend import get_planner_agent
+from lc_server.agent_bridge.publisher_backend import get_publisher_agent
 from lc_server.integrations.jira_attachment_extract import enrich_snapshot_with_attachment_extracts
 
 logger = logging.getLogger(__name__)
@@ -36,8 +38,8 @@ class HermesRuntimeBridge:
         self.developer = developer or get_developer_agent()
         self.registry = registry or AgentManifestRegistry()
         self.analyst = analyst or HermesAnalystAgent(registry=self.registry)
-        self.planner = planner or HermesPlannerAgent(registry=self.registry)
-        self.publisher = publisher or HermesPublisherAgent(registry=self.registry)
+        self.planner = planner or get_planner_agent()
+        self.publisher = publisher or get_publisher_agent()
 
     async def run_readiness_analysis(self, jira_key: str, context: dict[str, Any]) -> dict[str, Any]:
         snapshot = context.get("snapshot") or {}
@@ -45,26 +47,26 @@ class HermesRuntimeBridge:
             snapshot = {}
         snapshot = enrich_snapshot_with_attachment_extracts(snapshot)
         project_key = str(context.get("projectKey") or jira_key.split("-")[0]).strip().upper()
-        if self.registry.is_automation_ready(project_key):
-            try:
-                return self.analyst.analyze(snapshot, project_key)
-            except AnalystParseError as exc:
-                logger.warning(
-                    "Analyst run failed for %s (%s); returning analysis_failed",
-                    jira_key,
-                    exc,
-                )
-                return {
-                    "readinessScore": 0,
-                    "readinessStatus": "analysis_failed",
-                    "analysisSummary": f"LLM readiness analysis output could not be parsed: {exc}",
-                    "blockers": [str(exc)],
-                    "recommendedRepos": [],
-                    "confidence": 0.0,
-                    "estimatedDays": 0,
-                    "jiraSnapshot": snapshot,
-                }
-        return analyze_ticket_snapshot(snapshot)
+        if is_heuristic_backend("analyst") or not self.registry.is_automation_ready(project_key):
+            return analyze_ticket_snapshot(snapshot)
+        try:
+            return self.analyst.analyze(snapshot, project_key)
+        except AnalystParseError as exc:
+            logger.warning(
+                "Analyst run failed for %s (%s); returning analysis_failed",
+                jira_key,
+                exc,
+            )
+            return {
+                "readinessScore": 0,
+                "readinessStatus": "analysis_failed",
+                "analysisSummary": f"LLM readiness analysis output could not be parsed: {exc}",
+                "blockers": [str(exc)],
+                "recommendedRepos": [],
+                "confidence": 0.0,
+                "estimatedDays": 0,
+                "jiraSnapshot": snapshot,
+            }
 
     async def run_node(
         self,

@@ -13,9 +13,11 @@ from delivery_runtime.mr_drafts.service import MrDraftService
 from delivery_runtime.pm_inbox.queue_consumer import ExecutionQueueConsumer
 from delivery_runtime.pm_inbox.service import PmInboxService
 from delivery_runtime.readiness.analyst_backend import AnalystBackend, SynchronousAnalystBackend
+from delivery_runtime.readiness.analyzer import analyze_ticket_snapshot
 from delivery_runtime.readiness.scanner import ReadinessScanner
 from delivery_runtime.readiness.service import ReadinessService
 from delivery_runtime.work_orders.service import WorkOrderService
+from lc_server.agent_bridge.agent_backend import is_heuristic_backend
 from lc_server.agent_bridge.hermes_analyst_subagent import (
     HermesSubagentAnalystBackend,
     default_subagent_launcher_available,
@@ -29,6 +31,8 @@ from lc_server.integrations.jira_readiness import (
 
 
 def _analysis_runner(snapshot: dict[str, Any], project_key: str) -> dict[str, Any]:
+    if is_heuristic_backend("analyst"):
+        return analyze_ticket_snapshot(snapshot)
     bridge = get_agent_runtime_bridge()
     jira_key = str(snapshot.get("key") or "")
     return asyncio.run(
@@ -40,6 +44,8 @@ def _analysis_runner(snapshot: dict[str, Any], project_key: str) -> dict[str, An
 
 
 def _build_readiness_analysis_backend() -> AnalystBackend:
+    if is_heuristic_backend("analyst"):
+        return SynchronousAnalystBackend(analyze_ticket_snapshot)
     if default_subagent_launcher_available():
         return HermesSubagentAnalystBackend(fallback_runner=_analysis_runner)
     return SynchronousAnalystBackend(_analysis_runner)
