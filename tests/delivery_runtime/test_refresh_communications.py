@@ -16,6 +16,11 @@ def test_refresh_project_communications_rewrites_pending_proposals_in_french(tmp
     monkeypatch.setattr(automation_config, "get_livingcolor_home", lambda: home)
     install_phase25_project_mapping()
     init_db()
+    save_delivery_project_config(
+        capacity_days=15,
+        duration_days=14,
+        communication_language="en",
+    )
 
     snapshot = json_dumps(
         {
