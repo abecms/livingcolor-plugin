@@ -1,6 +1,8 @@
 # LivingColor — Hermes Agent Plugin
 
-<video src="docs/livingcolor-demo.mp4" controls width="100%"></video>
+[![LivingColor demo](docs/livingcolor-demo-poster.png)](https://github.com/abecms/livingcolor-plugin/raw/main/docs/livingcolor-demo.mp4)
+
+**[▶ Watch demo](https://github.com/abecms/livingcolor-plugin/raw/main/docs/livingcolor-demo.mp4)** — human-gated delivery walkthrough (MP4)
 
 Autonomous delivery platform (Work Orders, readiness queue, human-approved
 gates) plus a Jira PM dashboard, packaged as a [Hermes Agent](https://github.com/NousResearch/hermes-agent) plugin.
