@@ -15,6 +15,7 @@ import { AppNotifications } from '@/components/app-notifications'
 import { OfflineBanner } from '@/components/offline-banner'
 import { FirebaseAuthProvider } from '@/contexts/firebase-auth-provider'
 import { I18nProvider } from '@/i18n'
+import { LcPortalHost } from '@/lib/lc-portal-host'
 
 function DeliveryApp() {
   return (
@@ -66,6 +67,7 @@ export default function App() {
     <FirebaseAuthProvider>
       <FirebaseAuthGate>
         <div className="lc-app">
+          <LcPortalHost />
           <OfflineBanner />
           <AppNotifications />
           <div className="lc-app-body">

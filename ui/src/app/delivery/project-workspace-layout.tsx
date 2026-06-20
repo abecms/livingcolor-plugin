@@ -149,7 +149,7 @@ function ProjectWorkspaceSidebar() {
   return (
     <aside
       className={cn(
-        'flex h-full flex-col border-r border-border bg-card transition-[width] duration-300 ease-in-out',
+        'relative z-[var(--lc-z-sidebar)] flex h-full shrink-0 flex-col border-r border-border bg-card transition-[width] duration-300 ease-in-out',
         collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED
       )}
     >
@@ -166,7 +166,7 @@ function ProjectWorkspaceShell({
   return (
     <div className="flex h-full min-w-0 overflow-hidden">
       <ProjectWorkspaceSidebar />
-      <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
+      <div className="relative z-[var(--lc-z-main)] min-h-0 min-w-0 flex-1 overflow-hidden">
         <ProjectWorkspaceSplit>
           <ProjectWorkspaceMain targetTab={targetTab} />
         </ProjectWorkspaceSplit>

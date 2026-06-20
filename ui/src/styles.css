@@ -45,10 +45,22 @@
   /* No Electron titlebar in the Hermes dashboard tab */
   --titlebar-height: 0px;
 
+  /* Layering inside the Hermes plugin panel (see lc-portal-host). */
+  --lc-z-main: 0;
+  --lc-z-sidebar: 20;
+  --lc-z-portal-host: 100;
+  --lc-z-sheet-overlay: 110;
+  --lc-z-sheet-content: 120;
+  --lc-z-dropdown: 130;
+  --lc-z-dialog-overlay: 140;
+  --lc-z-dialog-content: 150;
+  --lc-z-tooltip: 160;
+
   display: flex;
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
+  isolation: isolate;
 
   /* Legacy LivingColor --ui-* → Hermes/Nous tokens */
   --ui-base: var(--midground);
@@ -87,6 +99,7 @@
 }
 
 .lc-root .lc-app {
+  position: relative;
   display: flex;
   min-height: 0;
   flex: 1 1 auto;
@@ -123,4 +136,49 @@
 
 .hermes-chat-xterm-host .xterm-viewport {
   overflow-y: auto !important;
+}
+
+.lc-portal-host {
+  position: absolute;
+  inset: 0;
+  z-index: var(--lc-z-portal-host);
+}
+
+[data-slot='dropdown-menu-content'],
+[data-slot='dropdown-menu-sub-content'],
+[data-slot='popover-content'],
+[data-slot='select-content'] {
+  z-index: var(--lc-z-dropdown);
+  pointer-events: auto;
+}
+
+[data-slot='sheet-overlay'] {
+  z-index: var(--lc-z-sheet-overlay);
+  pointer-events: auto;
+}
+
+[data-slot='sheet-content'] {
+  z-index: var(--lc-z-sheet-content);
+  pointer-events: auto;
+}
+
+[data-slot='dialog-overlay'] {
+  z-index: var(--lc-z-dialog-overlay);
+  pointer-events: auto;
+}
+
+[data-slot='dialog-content'] {
+  z-index: var(--lc-z-dialog-content);
+  pointer-events: auto;
+}
+
+[data-slot='context-menu-content'],
+[data-slot='context-menu-sub-content'] {
+  z-index: var(--lc-z-dropdown);
+  pointer-events: auto;
+}
+
+[data-slot='tooltip-content'] {
+  z-index: var(--lc-z-tooltip);
+  pointer-events: auto;
 }

@@ -2,6 +2,7 @@ import { DropdownMenu as DropdownMenuPrimitive } from 'radix-ui'
 import * as React from 'react'
 
 import { Codicon } from '@/components/ui/codicon'
+import { getLcPortalContainer } from '@/lib/lc-portal-host'
 import { cn } from '@/lib/utils'
 
 // Shared class tokens for edge-to-edge menus (use with `p-0` content): rows go
@@ -20,7 +21,13 @@ function DropdownMenu({ ...props }: React.ComponentProps<typeof DropdownMenuPrim
 }
 
 function DropdownMenuPortal({ ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Portal>) {
-  return <DropdownMenuPrimitive.Portal data-slot="dropdown-menu-portal" {...props} />
+  return (
+    <DropdownMenuPrimitive.Portal
+      container={getLcPortalContainer()}
+      data-slot="dropdown-menu-portal"
+      {...props}
+    />
+  )
 }
 
 function DropdownMenuTrigger({ ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Trigger>) {
@@ -74,13 +81,13 @@ function DropdownMenuContent({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Content>) {
   return (
-    <DropdownMenuPrimitive.Portal>
+    <DropdownMenuPrimitive.Portal container={getLcPortalContainer()}>
       <DropdownMenuPrimitive.Content
         // `dt-portal-scrollbar` reproduces the thin themed scrollbar from
         // `.scrollbar-dt` for portaled overlays (Radix renders this under
-        // document.body, outside #root's scope). See styles.css.
+        // the plugin portal host). See styles.css.
         className={cn(
-          'dt-portal-scrollbar z-50 max-h-(--radix-dropdown-menu-content-available-height) min-w-36 origin-(--radix-dropdown-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-lg border border-(--ui-stroke-secondary) bg-[color-mix(in_srgb,var(--ui-bg-elevated)_96%,transparent)] p-1 text-[length:var(--conversation-text-font-size)] text-popover-foreground shadow-md backdrop-blur-md data-[side=bottom]:slide-in-from-top-1 data-[side=left]:slide-in-from-right-1 data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
+          'dt-portal-scrollbar pointer-events-auto max-h-(--radix-dropdown-menu-content-available-height) min-w-36 origin-(--radix-dropdown-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-lg border border-(--ui-stroke-secondary) bg-[color-mix(in_srgb,var(--ui-bg-elevated)_96%,transparent)] p-1 text-[length:var(--conversation-text-font-size)] text-popover-foreground shadow-md backdrop-blur-md data-[side=bottom]:slide-in-from-top-1 data-[side=left]:slide-in-from-right-1 data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
           className
         )}
         // Keep the menu inside the viewport: Radix flips/shifts away from edges
@@ -249,7 +256,7 @@ function DropdownMenuSubContent({
     // `overflow` clip. Without this, a submenu opening from a scrollable menu
     // gets visually cut off at the parent's edges. Radix Popper still anchors
     // it to the SubTrigger and handles collision/flip, so portaling is safe.
-    <DropdownMenuPrimitive.Portal>
+    <DropdownMenuPrimitive.Portal container={getLcPortalContainer()}>
       <DropdownMenuPrimitive.SubContent
         // `dt-portal-scrollbar` reproduces the themed scrollbar for portaled
         // overlays (rendered under document.body). Use a fixed `max-h-80`
@@ -257,7 +264,7 @@ function DropdownMenuSubContent({
         // only published on Content, NOT SubContent — using it here collapses
         // the submenu to 0px height.
         className={cn(
-          'dt-portal-scrollbar z-50 max-h-80 min-w-36 origin-(--radix-dropdown-menu-content-transform-origin) overflow-y-auto rounded-lg border border-(--ui-stroke-secondary) bg-[color-mix(in_srgb,var(--ui-bg-elevated)_96%,transparent)] p-1 text-[length:var(--conversation-text-font-size)] text-popover-foreground shadow-md backdrop-blur-md data-[side=bottom]:slide-in-from-top-1 data-[side=left]:slide-in-from-right-1 data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
+          'dt-portal-scrollbar pointer-events-auto max-h-80 min-w-36 origin-(--radix-dropdown-menu-content-transform-origin) overflow-y-auto rounded-lg border border-(--ui-stroke-secondary) bg-[color-mix(in_srgb,var(--ui-bg-elevated)_96%,transparent)] p-1 text-[length:var(--conversation-text-font-size)] text-popover-foreground shadow-md backdrop-blur-md data-[side=bottom]:slide-in-from-top-1 data-[side=left]:slide-in-from-right-1 data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
           className
         )}
         // Flip to the other side / shift vertically when near a viewport edge

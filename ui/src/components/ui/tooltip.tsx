@@ -2,6 +2,7 @@ import { Tooltip as TooltipPrimitive } from 'radix-ui'
 import * as React from 'react'
 
 import { cn } from '@/lib/utils'
+import { getLcPortalContainer } from '@/lib/lc-portal-host'
 
 function TooltipProvider({ delayDuration = 0, ...props }: React.ComponentProps<typeof TooltipPrimitive.Provider>) {
   return <TooltipPrimitive.Provider data-slot="tooltip-provider" delayDuration={delayDuration} {...props} />
@@ -22,13 +23,10 @@ function TooltipContent({
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Content>) {
   return (
-    <TooltipPrimitive.Portal>
+    <TooltipPrimitive.Portal container={getLcPortalContainer()}>
       <TooltipPrimitive.Content
-        // Instant, no transition (the Provider's delayDuration=0 + no animate-*
-        // classes). bg-foreground/text-background auto-inverts per theme: white
-        // on near-black in light mode, black on white in dark.
         className={cn(
-          'z-[200] w-fit bg-foreground px-1.5 py-1 text-[11px] font-bold leading-none text-background select-none [font-family:Arial,sans-serif]',
+          'pointer-events-auto w-fit bg-foreground px-1.5 py-1 text-[11px] font-bold leading-none text-background select-none [font-family:Arial,sans-serif]',
           className
         )}
         data-slot="tooltip-content"
