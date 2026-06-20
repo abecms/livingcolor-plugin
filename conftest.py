@@ -43,6 +43,20 @@ if "hermes_cli.mcp_runtime" not in sys.modules:
     hermes_cli.mcp_runtime = mcp_runtime
 
 
+if "hermes_cli.web_server" not in sys.modules:
+    try:
+        from fastapi import FastAPI
+    except ImportError:
+        pass
+    else:
+        web_server = ModuleType("hermes_cli.web_server")
+        web_server._SESSION_HEADER_NAME = "x-hermes-session"
+        web_server._SESSION_TOKEN = "test-session"
+        web_server.app = FastAPI()
+        sys.modules["hermes_cli.web_server"] = web_server
+        hermes_cli.web_server = web_server
+
+
 if "tools" not in sys.modules:
     tools = ModuleType("tools")
     tools.__path__ = []
