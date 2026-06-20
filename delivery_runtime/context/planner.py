@@ -25,7 +25,7 @@ def validate_plan_payload(payload: dict[str, Any]) -> None:
 class RepoAwarePlanner:
     """Produce Gate 1 payloads from a Context Pack."""
 
-    def plan(self, pack: ContextPack) -> dict[str, Any]:
+    def plan(self, pack: ContextPack, *, project_key: str = "") -> dict[str, Any]:
         if not pack.repo_resolved:
             return {
                 "needsClarification": True,

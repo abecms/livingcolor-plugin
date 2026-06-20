@@ -668,6 +668,14 @@ class OrchestrationEngine:
             if scope_contract:
                 context["scopeContract"] = scope_contract.to_dict()
 
+            jira_key = str(wo_row["jira_key"] or "")
+            project_key = jira_key.split("-")[0] if "-" in jira_key else jira_key
+            from delivery_runtime.readiness.project_mapping import resolve_configured_integration_branch
+
+            integration_branch = resolve_configured_integration_branch(project_key)
+            if integration_branch:
+                context["integrationBranch"] = integration_branch
+
             dev_payload = self._load_latest_development_payload(conn, work_order_id)
             if dev_payload.get("workspacePath"):
                 context["workspacePath"] = dev_payload["workspacePath"]

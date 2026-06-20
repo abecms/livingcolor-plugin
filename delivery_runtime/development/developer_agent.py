@@ -61,9 +61,15 @@ class HeuristicDeveloperAgent:
             checkout_path,
             jira_key=jira_key if not reuse_workspace else None,
             issue_type=issue_type,
+            integration_branch=str(context.get("integrationBranch") or "").strip() or None,
             reuse_existing=reuse_workspace,
             baseline_ref=str(workspace_baseline) if workspace_baseline else None,
         )
+        delivery_branch = ""
+        if jira_key and (workspace / ".git").exists():
+            from delivery_runtime.development.git_branch import format_delivery_branch_name
+
+            delivery_branch = format_delivery_branch_name(jira_key, issue_type)
         primary_files = [str(item) for item in approved_plan.get("likelyImpactedFiles") or []]
         if not primary_files:
             primary_files = [str(item) for item in context_pack.get("candidate_files") or []][:3]
@@ -176,6 +182,7 @@ class HeuristicDeveloperAgent:
             "reportArtifactPath": str(artifact_paths.report_path),
             "workspacePath": str(workspace),
             "workspaceBaseline": baseline,
+            "deliveryBranch": delivery_branch,
             "developerPhase": developer_phase,
             "reviewerFeedbackApplied": reviewer_feedback,
             "approvedPlanRef": {

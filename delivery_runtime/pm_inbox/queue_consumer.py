@@ -214,6 +214,7 @@ class ExecutionQueueConsumer:
             readiness_id=readiness_id,
             actor="system",
             payload={"projectKey": project_key, "jiraKey": jira_key, "reason": reason},
+            conn=conn,
         )
 
     def get_active_development(self, project_key: str) -> dict[str, Any] | None:

@@ -29,7 +29,8 @@ def _read_mcp_env(mcp_config: dict) -> dict[str, str]:
 
 
 def github_token_from_config(mcp_config: dict) -> str | None:
-    return _read_mcp_env(mcp_config).get("GITHUB_TOKEN")
+    env = _read_mcp_env(mcp_config)
+    return env.get("GITHUB_TOKEN") or env.get("GITHUB_PERSONAL_ACCESS_TOKEN")
 
 
 def build_github_clone_url(repo_id: str, token: str) -> str:
@@ -73,9 +74,11 @@ def discover_github_repos(project_key: str, repos: list[dict]) -> GitHubDiscover
 
 
 def _fetch_github_repositories(mcp_config: dict) -> list[dict]:
-    token = _read_mcp_env(mcp_config).get("GITHUB_TOKEN")
+    token = github_token_from_config(mcp_config)
     if not token:
-        raise ValueError("GitHub token is required in MCP config env (GITHUB_TOKEN)")
+        raise ValueError(
+            "GitHub token is required in MCP config env (GITHUB_TOKEN or GITHUB_PERSONAL_ACCESS_TOKEN)"
+        )
     repos: list[dict] = []
     page = 1
     while page <= 50:
@@ -119,7 +122,9 @@ def repo_path_and_number_from_pr_url(pr_url: str) -> tuple[str, int]:
 def verify_pull_request_exists(*, mcp_config: dict, repo_path: str, pr_number: int) -> dict[str, Any] | None:
     token = github_token_from_config(mcp_config)
     if not token:
-        raise ValueError("GitHub token is required in MCP config env (GITHUB_TOKEN)")
+        raise ValueError(
+            "GitHub token is required in MCP config env (GITHUB_TOKEN or GITHUB_PERSONAL_ACCESS_TOKEN)"
+        )
     url = f"{_GITHUB_API_URL}/repos/{repo_path.strip('/')}/pulls/{int(pr_number)}"
     request = urllib.request.Request(
         url,

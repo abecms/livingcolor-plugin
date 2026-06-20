@@ -39,7 +39,21 @@ def _analysis_runner(snapshot: dict[str, Any], project_key: str) -> dict[str, An
     )
 
 
+def _heuristic_analysis_runner(snapshot: dict[str, Any], project_key: str) -> dict[str, Any]:
+    from delivery_runtime.readiness.analyzer import analyze_ticket_snapshot
+
+    enriched = dict(snapshot)
+    enriched.setdefault("projectKey", project_key)
+    return analyze_ticket_snapshot(enriched)
+
+
 def _build_readiness_analysis_backend() -> AnalystBackend:
+    import os
+
+    backend = os.getenv("LIVINGCOLOR_ANALYST_BACKEND", "hermes").strip().lower()
+    if backend in {"heuristic", "stub", "deterministic"}:
+        return SynchronousAnalystBackend(_heuristic_analysis_runner)
+
     if default_subagent_launcher_available():
         return HermesSubagentAnalystBackend(fallback_runner=_analysis_runner)
     return SynchronousAnalystBackend(_analysis_runner)
