@@ -75,3 +75,37 @@ def test_prepare_work_order_resume_keeps_recent_running_node():
 
     assert reset_ids == []
     assert row["status"] == "running"
+
+
+def test_prepare_work_order_resume_resets_failed_development_node():
+    init_db()
+    with connect() as conn:
+        work_order_id = next_public_id(conn, "WO")
+        node_id = next_public_id(conn, "GN")
+        now = utc_now_iso()
+        conn.execute(
+            """
+            INSERT INTO work_orders (
+                id, jira_key, title, description, priority, status, current_stage,
+                confidence, created_at, updated_at
+            ) VALUES (?, 'TVP-3', 'Demo', '', 'Medium', 'failed', 'development', 0.5, ?, ?)
+            """,
+            (work_order_id, now, now),
+        )
+        conn.execute(
+            """
+            INSERT INTO graph_nodes (
+                id, work_order_id, node_type, status, depends_on_json, payload_json, started_at
+            ) VALUES (?, ?, 'development', 'failed', '[]', '{"error":"boom"}', NULL)
+            """,
+            (node_id, work_order_id),
+        )
+
+        reset_ids = prepare_work_order_resume(conn, work_order_id)
+        row = conn.execute("SELECT status, payload_json FROM graph_nodes WHERE id = ?", (node_id,)).fetchone()
+        wo = conn.execute("SELECT status FROM work_orders WHERE id = ?", (work_order_id,)).fetchone()
+
+    assert reset_ids == [node_id]
+    assert row["status"] == "ready"
+    assert "error" not in (row["payload_json"] or "")
+    assert wo["status"] == "in_progress"

@@ -81,9 +81,41 @@ def _resolve_first_existing_branch(
             if _ref_exists(workspace, remote_ref):
                 _run_git(["git", "checkout", "-B", branch, remote_ref], workspace)
                 return branch
+        for branch in candidates:
+            fetched = _fetch_remote_branch(workspace, branch)
+            if fetched and _ref_exists(workspace, branch):
+                return branch
+            remote_ref = f"origin/{branch}"
+            if fetched and _ref_exists(workspace, remote_ref):
+                _run_git(["git", "checkout", "-B", branch, remote_ref], workspace)
+                return branch
     raise ValueError(
         f"No {purpose} branch found in {workspace}; expected one of: {', '.join(candidates)}"
     )
+
+
+def _fetch_remote_branch(workspace: Path, branch: str) -> bool:
+    """Best-effort fetch for a single branch (shallow clones often miss integration branches)."""
+    branch = (branch or "").strip()
+    if not branch:
+        return False
+    result = subprocess.run(
+        ["git", "fetch", "--depth", "1", "origin", f"{branch}:refs/remotes/origin/{branch}"],
+        cwd=workspace,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        return True
+    fallback = subprocess.run(
+        ["git", "fetch", "--depth", "1", "origin", branch],
+        cwd=workspace,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    return fallback.returncode == 0
 
 
 

@@ -477,6 +477,14 @@ def maybe_publish_sprint_report_before_reset(
 
 
 def _default_compose(snapshot: dict[str, Any], project_key: str) -> str:
+    import os
+
+    backend = os.getenv("LIVINGCOLOR_SPRINT_REPORTER_BACKEND", "hermes").strip().lower()
+    if backend in {"heuristic", "stub", "deterministic"}:
+        from lc_server.agent_bridge.heuristic_sprint_reporter import compose_heuristic_sprint_report
+
+        return compose_heuristic_sprint_report(snapshot, project_key=project_key)
+
     from lc_server.agent_bridge.hermes_sprint_reporter import HermesSprintReporterAgent
 
     return HermesSprintReporterAgent().compose(snapshot, project_key=project_key)
