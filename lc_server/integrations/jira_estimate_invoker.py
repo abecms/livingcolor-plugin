@@ -37,16 +37,22 @@ class McpJiraEstimateInvoker:
         if not tool:
             raise RuntimeError("Connected Jira MCP server does not expose an issue read tool")
 
-        # Mirror _issue_detail_arg_variants: snake_case servers (mcp-atlassian)
-        # take issue_key + CSV fields; the official Atlassian server takes
-        # issueIdOrKey (+ cloudId when resolved) with a fields list.
-        arg_variants: list[dict[str, Any]] = [
-            {"issue_key": issue_key, "fields": "timetracking"},
-            {"issue_key": issue_key},
-            {"issueIdOrKey": issue_key, "fields": ["timetracking"]},
-            {"issueIdOrKey": issue_key},
-            {"issueKey": issue_key},
-        ]
+        # mcp-atlassian exposes snake_case tools (`get_issue`, `jira_get_issue`) that
+        # require `issue_key`. Atlassian's official server uses `issueIdOrKey`.
+        snake_case_tool = tool in {"get_issue", "jira_get_issue"} or tool.endswith("_get_issue")
+        if snake_case_tool:
+            arg_variants = [
+                {"issue_key": issue_key, "fields": "timetracking"},
+                {"issue_key": issue_key},
+            ]
+        else:
+            arg_variants = [
+                {"issue_key": issue_key, "fields": "timetracking"},
+                {"issue_key": issue_key},
+                {"issueIdOrKey": issue_key, "fields": ["timetracking"]},
+                {"issueIdOrKey": issue_key},
+                {"issueKey": issue_key},
+            ]
         if cloud_id:
             arg_variants = [
                 {**args, "cloudId": cloud_id} if "issueIdOrKey" in args else args
@@ -81,15 +87,28 @@ class McpJiraEstimateInvoker:
             raise RuntimeError("Connected Jira MCP server does not expose an issue update tool")
 
         timetracking_fields = {"timetracking": {"originalEstimate": estimate}}
-        arg_variants: list[dict[str, Any]] = [
-            {"issue_key": issue_key, "fields": timetracking_fields},
-            {"issueIdOrKey": issue_key, "fields": timetracking_fields},
-            {"issueKey": issue_key, "fields": timetracking_fields},
-            {"issue_key": issue_key, "originalEstimate": estimate},
-            {"issueIdOrKey": issue_key, "originalEstimate": estimate},
-            {"issue_key": issue_key, "fields": {"originalEstimate": estimate}},
-            {"issueIdOrKey": issue_key, "fields": {"originalEstimate": estimate}},
-        ]
+        snake_case_tool = tool in {
+            "update_issue",
+            "jira_update_issue",
+            "edit_issue",
+            "jira_edit_issue",
+        } or tool.endswith("_update_issue") or tool.endswith("_edit_issue")
+        if snake_case_tool:
+            arg_variants = [
+                {"issue_key": issue_key, "fields": timetracking_fields},
+                {"issue_key": issue_key, "originalEstimate": estimate},
+                {"issue_key": issue_key, "fields": {"originalEstimate": estimate}},
+            ]
+        else:
+            arg_variants = [
+                {"issue_key": issue_key, "fields": timetracking_fields},
+                {"issueIdOrKey": issue_key, "fields": timetracking_fields},
+                {"issueKey": issue_key, "fields": timetracking_fields},
+                {"issue_key": issue_key, "originalEstimate": estimate},
+                {"issueIdOrKey": issue_key, "originalEstimate": estimate},
+                {"issue_key": issue_key, "fields": {"originalEstimate": estimate}},
+                {"issueIdOrKey": issue_key, "fields": {"originalEstimate": estimate}},
+            ]
         if cloud_id:
             arg_variants = [
                 {**args, "cloudId": cloud_id}

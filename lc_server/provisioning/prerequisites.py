@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from delivery_runtime.readiness.project_settings import (
@@ -40,6 +41,20 @@ def _is_mcp_server_configured(config: dict[str, Any] | None) -> bool:
     return False
 
 
+def _heuristic_delivery_backends_active() -> bool:
+    """Cloud FRT runs with heuristic analyst/planner/developer/publisher backends."""
+    heuristic = {"heuristic", "stub", "deterministic"}
+    for env_name in (
+        "LIVINGCOLOR_ANALYST_BACKEND",
+        "LIVINGCOLOR_PLANNER_BACKEND",
+        "LIVINGCOLOR_DEVELOPER_BACKEND",
+        "LIVINGCOLOR_PUBLISHER_BACKEND",
+    ):
+        if os.getenv(env_name, "").strip().lower() not in heuristic:
+            return False
+    return True
+
+
 def check_provisioning_prerequisites(project_key: str) -> list[str]:
     """Return list of missing prerequisite codes. Empty = OK.
 
@@ -55,7 +70,7 @@ def check_provisioning_prerequisites(project_key: str) -> list[str]:
     if not _is_mcp_server_configured(resolve_project_mcp_server(project_key, provider_server)):
         missing.append(provider_code)
 
-    if not is_delivery_llm_available():
+    if not is_delivery_llm_available() and not _heuristic_delivery_backends_active():
         missing.append(_LLM_MODEL_CODE)
 
     return missing
