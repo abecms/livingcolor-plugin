@@ -54,6 +54,13 @@ if "hermes_cli.mcp_runtime" not in sys.modules:
     hermes_cli.mcp_runtime = mcp_runtime
 
 
+if "hermes_cli.mcp_security" not in sys.modules:
+    mcp_security = ModuleType("hermes_cli.mcp_security")
+    mcp_security.validate_mcp_server_entry = lambda _name, _config: None
+    sys.modules["hermes_cli.mcp_security"] = mcp_security
+    hermes_cli.mcp_security = mcp_security
+
+
 if "hermes_cli.web_server" not in sys.modules:
     try:
         from fastapi import FastAPI
