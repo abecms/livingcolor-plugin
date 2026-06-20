@@ -6,3 +6,4 @@ node_modules/
 ui/dist/
 .DS_Store
 .worktrees/
+docs/cursor-cloud/.env
