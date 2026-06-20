@@ -125,6 +125,7 @@ class GateDecisionRequest(BaseModel):
 class GateDecisionResponse(BaseModel):
     gate: GateResponse
     workOrderId: str
+    jiraEstimateWriteback: dict[str, Any] | None = None
 
 
 class MrDraftResponse(BaseModel):
