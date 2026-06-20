@@ -199,6 +199,7 @@ class TestDeliveryApi:
         put_response = self.client.put(
             "/api/delivery/project-config",
             json={
+                "projectKey": "BN",
                 "sprintDurationDays": 21,
                 "sprintCapacityDays": 18.5,
                 "communicationLanguage": "en",
