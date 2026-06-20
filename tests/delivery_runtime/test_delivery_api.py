@@ -193,7 +193,9 @@ class TestDeliveryApi:
 
         put_response = self.client.put(
             "/api/delivery/project-config",
+            headers={"X-LC-Project-Key": "BN"},
             json={
+                "projectKey": "BN",
                 "sprintDurationDays": 21,
                 "sprintCapacityDays": 18.5,
                 "communicationLanguage": "en",
@@ -337,7 +339,8 @@ class TestDeliveryApi:
 
         self.client.put(
             "/api/delivery/project-config",
-            json={"sprintDurationDays": 14, "sprintCapacityDays": 2},
+            headers={"X-LC-Project-Key": "BN"},
+            json={"projectKey": "BN", "sprintDurationDays": 14, "sprintCapacityDays": 2},
         )
         inbox = self.client.get("/api/delivery/pm-inbox?project=BN").json()
         selected = inbox["selectedSprint"]

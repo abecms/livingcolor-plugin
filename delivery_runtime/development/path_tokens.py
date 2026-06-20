@@ -206,7 +206,7 @@ def extract_command_path_arguments(command: str) -> list[str]:
 
 def hermes_skills_roots() -> list[Path]:
     """Roots where Hermes/LivingColor skill files may be loaded read-only."""
-    from hermes_constants import get_bundled_delivery_skills_dir
+    from hermes_constants import get_bundled_skills_dir
 
     hermes_home = Path(os.environ.get("HERMES_HOME", str(Path.home() / ".hermes"))).expanduser().resolve()
     roots = [hermes_home / "skills"]
@@ -216,9 +216,10 @@ def hermes_skills_roots() -> list[Path]:
         roots.append(get_livingcolor_home().resolve() / "skills")
     except Exception:
         pass
-    bundled_delivery = get_bundled_delivery_skills_dir()
-    if bundled_delivery.is_dir():
-        roots.append(bundled_delivery.resolve())
+    plugin_root = Path(__file__).resolve().parents[2]
+    bundled = get_bundled_skills_dir(plugin_root / "skills")
+    if bundled.is_dir():
+        roots.append(bundled.resolve())
     return roots
 
 

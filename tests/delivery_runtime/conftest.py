@@ -25,5 +25,10 @@ def _heuristic_developer_backend(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _heuristic_planner_backend(monkeypatch):
+    monkeypatch.setenv("LIVINGCOLOR_PLANNER_BACKEND", "heuristic")
+
+
+@pytest.fixture(autouse=True)
 def _sync_orchestrator_in_tests(monkeypatch):
     monkeypatch.setenv("LIVINGCOLOR_SYNC_ORCHESTRATOR", "1")

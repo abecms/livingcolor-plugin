@@ -149,7 +149,7 @@ class TestGetAutomationApi:
         roles = {agent["role"] for agent in payload["agents"]}
         assert roles == {"orchestrator", "analyst", "developer"}
         for agent in payload["agents"]:
-            assert agent["templateVersion"] == "1.0.0"
+            assert agent["templateVersion"] == "1.6.0"
             assert agent["runtimeType"] in {"hermes", "none"}
 
 

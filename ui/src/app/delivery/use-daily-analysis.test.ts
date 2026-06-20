@@ -19,16 +19,22 @@ describe('buildDailyAnalysisLastRunCaption', () => {
   })
 
   it('describes a failed run with the error message', () => {
+    const completedAt = '2026-06-11T12:00:00.000Z'
+    const expectedTime = new Intl.DateTimeFormat(undefined, {
+      hour: 'numeric',
+      minute: '2-digit'
+    }).format(new Date(completedAt))
+
     expect(
       buildDailyAnalysisLastRunCaption(
         {
           status: 'failed',
-          completedAt: '2026-06-11T12:00:00.000Z',
+          completedAt,
           errorMessage: 'Jira MCP is not connected'
         },
         now
       )
-    ).toBe('Analysis failed today at 2:00 PM: Jira MCP is not connected')
+    ).toBe(`Analysis failed today at ${expectedTime}: Jira MCP is not connected`)
   })
 
   it('uses the calendar date when the run happened on another day', () => {

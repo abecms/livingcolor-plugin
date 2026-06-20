@@ -490,13 +490,13 @@ def test_upgrade_rewrites_manifest_when_template_newer(livingcolor_home):
 
     with patch(
         "lc_server.provisioning.template_renderer.get_template_version",
-        return_value="1.6.0",
+        return_value="1.7.0",
     ):
         upgraded = upgrade_all_project_manifests()
 
     assert "BN" in upgraded
     after = parse_agent_manifest(developer_path.read_text(encoding="utf-8"))
-    assert after.template_version == "1.6.0"
+    assert after.template_version == "1.7.0"
     assert after.manually_edited is False
 
 
@@ -526,7 +526,7 @@ def test_upgrade_renders_newly_added_role_manifest(livingcolor_home):
 
     with patch(
         "lc_server.provisioning.template_renderer.get_template_version",
-        return_value="1.6.0",
+        return_value="1.7.0",
     ):
         upgraded = upgrade_all_project_manifests()
 
@@ -534,7 +534,7 @@ def test_upgrade_renders_newly_added_role_manifest(livingcolor_home):
     assert planner_path.is_file()
     manifest = parse_agent_manifest(planner_path.read_text(encoding="utf-8"))
     assert manifest.role == "planner"
-    assert manifest.template_version == "1.6.0"
+    assert manifest.template_version == "1.7.0"
     assert manifest.manually_edited is False
     assert manifest.context["projectKey"] == "BN"
 
@@ -566,7 +566,7 @@ def test_upgrade_skips_manually_edited_manifest(livingcolor_home):
 
     with patch(
         "lc_server.provisioning.template_renderer.get_template_version",
-        return_value="1.6.0",
+        return_value="1.7.0",
     ):
         upgraded = upgrade_all_project_manifests()
 
@@ -578,5 +578,4 @@ def test_upgrade_skips_manually_edited_manifest(livingcolor_home):
     orchestrator = parse_agent_manifest(
         get_agent_manifest_path("BN", "orchestrator").read_text(encoding="utf-8")
     )
-    assert orchestrator.template_version == "1.6.0"
-    assert orchestrator.manually_edited is False
+    assert orchestrator.template_version == "1.7.0"

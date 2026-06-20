@@ -151,7 +151,14 @@ def promote_readiness(
     except sqlite3.OperationalError as exc:
         raise HTTPException(status_code=503, detail=_delivery_db_unavailable_detail(exc)) from exc
 
-    if background_tasks is not None:
+    from delivery_runtime.orchestration.background import orchestrator_ticks_sync
+
+    if orchestrator_ticks_sync():
+        _run_promote_orchestrator_tick(services, work_order["id"])
+        refreshed = services.work_orders.get_work_order(work_order["id"])
+        if refreshed:
+            work_order = refreshed
+    elif background_tasks is not None:
         background_tasks.add_task(_run_promote_orchestrator_tick, services, work_order["id"])
     else:
         _run_promote_orchestrator_tick(services, work_order["id"])
