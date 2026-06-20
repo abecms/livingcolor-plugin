@@ -6,5 +6,12 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   plugins: [react()],
   resolve: { alias: { '@': path.resolve(__dirname, 'src') } },
-  test: { environment: 'jsdom', setupFiles: ['./vitest.setup.ts'] }
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./vitest.setup.ts'],
+    env: {
+      TZ: 'UTC',
+      VITE_LC_ENABLE_TEAM_AUTH: 'true'
+    }
+  }
 })

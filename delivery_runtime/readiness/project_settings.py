@@ -433,9 +433,9 @@ def resolve_project_mcp_server(project_key: str, server_name: str) -> dict[str, 
         return dict(stored)
 
     try:
-        from hermes_cli.mcp_config import _get_mcp_servers
+        from lc_server.integrations.mcp_config_bridge import load_effective_mcp_servers
 
-        servers = _get_mcp_servers()
+        servers = load_effective_mcp_servers()
         resolved_name = _resolve_global_mcp_server_name(server_name, servers)
         global_cfg = servers.get(resolved_name)
         if isinstance(global_cfg, dict) and global_cfg:
@@ -452,10 +452,10 @@ def resolve_jira_browse_base_url(project_key: str) -> str | None:
     jira_cfg = servers.get("jira")
     if not isinstance(jira_cfg, dict):
         try:
-            from hermes_cli.mcp_config import _get_mcp_servers
+            from lc_server.integrations.mcp_config_bridge import load_effective_mcp_servers
             from lc_server.integrations.mcp_server_resolver import active_jira_mcp_name
 
-            global_servers = _get_mcp_servers()
+            global_servers = load_effective_mcp_servers()
             jira_cfg = global_servers.get(active_jira_mcp_name(global_servers))
         except ImportError:
             jira_cfg = None

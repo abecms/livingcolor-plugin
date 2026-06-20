@@ -54,3 +54,24 @@ def display_livingcolor_home() -> str:
         return "~/" + str(home.relative_to(Path.home()))
     except ValueError:
         return str(home)
+
+
+def readonly_skill_roots() -> list[Path]:
+    """Roots where Hermes/LivingColor skill files may be loaded read-only."""
+    hermes_home = Path(os.environ.get("HERMES_HOME", str(Path.home() / ".hermes"))).expanduser().resolve()
+    roots = [hermes_home / "skills", get_livingcolor_home().resolve() / "skills"]
+    bundled: Path | None = None
+    try:
+        from hermes_constants import get_bundled_delivery_skills_dir
+
+        bundled = Path(get_bundled_delivery_skills_dir())
+    except (ImportError, AttributeError, TypeError, ValueError, OSError):
+        try:
+            from hermes_constants import get_bundled_skills_dir
+
+            bundled = Path(get_bundled_skills_dir())
+        except (ImportError, AttributeError, TypeError, ValueError, OSError):
+            bundled = None
+    if bundled is not None and bundled.is_dir():
+        roots.append(bundled.resolve())
+    return roots

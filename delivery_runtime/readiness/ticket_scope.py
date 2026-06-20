@@ -250,13 +250,14 @@ def _assignee_jql_clause(scope: TicketScopeConfig) -> str | None:
     return f"assignee in ({joined})"
 
 
+_ISSUE_VISIBILITY_FILTER = "(statusCategory != Done OR resolutiondate >= -30d)"
+
+
 def build_ticket_scope_jql_variants(
     project_key: str,
     scope: TicketScopeConfig | None = None,
 ) -> tuple[str, ...]:
     """Build Jira JQL queries that match the configured ticket scope."""
-    from hermes_cli.jira_dashboard import _ISSUE_VISIBILITY_FILTER
-
     resolved = scope or default_ticket_scope()
     safe_key = _escape_jql_string(project_key.strip().upper())
     base = f'project = "{safe_key}" AND {_ISSUE_VISIBILITY_FILTER}'
