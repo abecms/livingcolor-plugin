@@ -9,6 +9,7 @@ from typing import Any, Callable
 from delivery_runtime.agents.registry import AgentManifestRegistry
 from delivery_runtime.agents.schema import AgentManifest
 from delivery_runtime.context.models import ContextPack
+from delivery_runtime.context.planner import RepoAwarePlanner
 from delivery_runtime.context.planner_prompt import (
     PlannerParseError,
     build_planner_user_prompt,
@@ -68,14 +69,20 @@ class HermesPlannerAgent:
         task_id = f"delivery-planner-{jira_key or key}"
         prompt = build_planner_user_prompt(pack)
 
-        agent = self._agent_factory(
-            task_id=task_id,
-            jira_key=jira_key,
-            project_key=key,
-            manifest=manifest,
-            repo_checkout_path=pack.repo_checkout_path,
-        )
-        result = agent.run_conversation(prompt, task_id=task_id)
+        try:
+            agent = self._agent_factory(
+                task_id=task_id,
+                jira_key=jira_key,
+                project_key=key,
+                manifest=manifest,
+                repo_checkout_path=pack.repo_checkout_path,
+            )
+            result = agent.run_conversation(prompt, task_id=task_id)
+        except ModuleNotFoundError as exc:
+            if str(exc.name or "").split(".", 1)[0] not in {"hermes_cli", "run_agent"}:
+                raise
+            logger.warning("Hermes planner runtime unavailable; using deterministic planner fallback")
+            return RepoAwarePlanner().plan(pack)
         final_response = str(result.get("final_response") or "")
         return parse_planner_completion(final_response, pack)
 
