@@ -572,6 +572,14 @@ def test_upgrade_skips_manually_edited_manifest(livingcolor_home):
     original = developer_path.read_text(encoding="utf-8")
     edited = original.replace("manuallyEdited: false", "manuallyEdited: true", 1)
     developer_path.write_text(edited, encoding="utf-8")
+    orchestrator_path = get_agent_manifest_path("BN", "orchestrator")
+    orchestrator_path.write_text(
+        orchestrator_path.read_text(encoding="utf-8").replace(
+            'templateVersion: "1.6.0"',
+            'templateVersion: "1.5.0"',
+        ),
+        encoding="utf-8",
+    )
 
     with patch(
         "lc_server.provisioning.template_renderer.get_template_version",
@@ -584,8 +592,6 @@ def test_upgrade_skips_manually_edited_manifest(livingcolor_home):
     assert developer.manually_edited is True
     assert developer.template_version == "1.6.0"
 
-    orchestrator = parse_agent_manifest(
-        get_agent_manifest_path("BN", "orchestrator").read_text(encoding="utf-8")
-    )
+    orchestrator = parse_agent_manifest(orchestrator_path.read_text(encoding="utf-8"))
     assert orchestrator.template_version == "1.6.0"
     assert orchestrator.manually_edited is False
