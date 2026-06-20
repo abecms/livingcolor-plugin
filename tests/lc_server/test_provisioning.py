@@ -487,6 +487,10 @@ def test_upgrade_rewrites_manifest_when_template_newer(livingcolor_home):
     developer_path = get_agent_manifest_path("BN", "developer")
     before = parse_agent_manifest(developer_path.read_text(encoding="utf-8"))
     assert before.template_version == "1.6.0"
+    developer_path.write_text(
+        developer_path.read_text(encoding="utf-8").replace('templateVersion: "1.6.0"', 'templateVersion: "1.5.0"'),
+        encoding="utf-8",
+    )
 
     with patch(
         "lc_server.provisioning.template_renderer.get_template_version",
