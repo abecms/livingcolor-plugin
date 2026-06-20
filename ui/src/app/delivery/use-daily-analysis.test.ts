@@ -28,7 +28,7 @@ describe('buildDailyAnalysisLastRunCaption', () => {
         },
         now
       )
-    ).toBe('Analysis failed today at 2:00 PM: Jira MCP is not connected')
+    ).toBe('Analysis failed today at 12:00 PM: Jira MCP is not connected')
   })
 
   it('uses the calendar date when the run happened on another day', () => {

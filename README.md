@@ -407,7 +407,7 @@ alongside your usual toolsets.
 
 ```bash
 uv venv .venv && source .venv/bin/activate
-uv pip install -e /path/to/hermes-agent pytest httpx
+uv pip install -e /path/to/hermes-agent pytest pytest-asyncio httpx
 pytest tests -x -q
 cd ui && npm install && npx vite build   # rebuilds dashboard/dist — commit dist/ after UI changes
 ```
