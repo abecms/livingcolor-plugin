@@ -10,7 +10,6 @@ mkdir -p "${TARGET}"
 
 rsync -a --delete \
   --exclude '.git/' \
-  --exclude 'manim-video/' \
   --exclude 'ui/node_modules/' \
   --exclude '**/__pycache__/' \
   --exclude '.cursor/' \

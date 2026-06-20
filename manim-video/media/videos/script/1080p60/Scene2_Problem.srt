@@ -1,8 +1,0 @@
-1
-00:00:00,000 --> 00:00:04,000
-Vos tickets Jira s'accumulent...
-
-2
-00:00:04,700 --> 00:00:07,700
-Qui va les traiter ?
-

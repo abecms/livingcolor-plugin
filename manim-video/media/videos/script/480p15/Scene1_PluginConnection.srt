@@ -1,4 +1,0 @@
-1
-00:00:02,266 --> 00:00:04,266
-LivingColor plugin runs inside Hermes
-

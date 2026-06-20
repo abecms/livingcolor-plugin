@@ -1,8 +1,0 @@
-file 'media/videos/script_remake/1080p60/Scene1_Promise.mp4'
-file 'media/videos/script_remake/1080p60/Scene2_Ecosystem.mp4'
-file 'media/videos/script_remake/1080p60/Scene3_Readiness.mp4'
-file 'media/videos/script_remake/1080p60/Scene4_AnalysisPlan.mp4'
-file 'media/videos/script_remake/1080p60/Scene5_Development.mp4'
-file 'media/videos/script_remake/1080p60/Scene6_QA.mp4'
-file 'media/videos/script_remake/1080p60/Scene7_Publisher.mp4'
-file 'media/videos/script_remake/1080p60/Scene8_Recap.mp4'

@@ -1,5 +1,7 @@
 # LivingColor — Hermes Agent Plugin
 
+<video src="docs/livingcolor-demo.mp4" controls width="100%"></video>
+
 Autonomous delivery platform (Work Orders, readiness queue, human-approved
 gates) plus a Jira PM dashboard, packaged as a [Hermes Agent](https://github.com/NousResearch/hermes-agent) plugin.
 

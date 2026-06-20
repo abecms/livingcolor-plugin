@@ -1,8 +1,0 @@
-file 'media/videos/script/1080p60/Scene1_Title.mp4'
-file 'media/videos/script/1080p60/Scene2_Intake.mp4'
-file 'media/videos/script/1080p60/Scene3_Planner.mp4'
-file 'media/videos/script/1080p60/Scene4_Developer.mp4'
-file 'media/videos/script/1080p60/Scene5_Publisher.mp4'
-file 'media/videos/script/1080p60/Scene6_Completion.mp4'
-file 'media/videos/script/1080p60/Scene7_Recap.mp4'
-file 'media/videos/script/1080p60/Scene8_Confidence.mp4'

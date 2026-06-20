@@ -1,9 +1,0 @@
-# This file is used internally by FFMPEG.
-file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script_remake/1080p60/partial_movie_files/Scene1_Promise/2873985843_716471175_223132457.mp4'
-file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script_remake/1080p60/partial_movie_files/Scene1_Promise/3496312638_2671039288_951829884.mp4'
-file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script_remake/1080p60/partial_movie_files/Scene1_Promise/3496312638_2536175139_1759288501.mp4'
-file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script_remake/1080p60/partial_movie_files/Scene1_Promise/3496312638_3712904457_960654142.mp4'
-file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script_remake/1080p60/partial_movie_files/Scene1_Promise/3496312638_720012844_3424360156.mp4'
-file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script_remake/1080p60/partial_movie_files/Scene1_Promise/3496312638_2536175139_185565485.mp4'
-file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script_remake/1080p60/partial_movie_files/Scene1_Promise/3496312638_2449924366_2358810818.mp4'
-file 'file:/Users/tamsibesson/programmation/side-projects/livingcolor-plugin/manim-video/media/videos/script_remake/1080p60/partial_movie_files/Scene1_Promise/3496312638_2318836581_631829896.mp4'

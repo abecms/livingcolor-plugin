@@ -1,8 +1,0 @@
-1
-00:00:00,000 --> 00:00:05,000
-The Developer executes the approved plan inside an isolated workspace.
-
-2
-00:00:03,333 --> 00:00:07,333
-Code changes, tests, and developer confidence are captured.
-

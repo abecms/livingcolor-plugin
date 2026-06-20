@@ -1,4 +1,0 @@
-file 'media/videos/script/480p15/Scene1_PluginConnection.mp4'
-file 'media/videos/script/480p15/Scene2_AgentHierarchy.mp4'
-file 'media/videos/script/480p15/Scene3_ExternalAgents.mp4'
-file 'media/videos/script/480p15/Scene4_FullPipeline.mp4'

@@ -1,8 +1,0 @@
-1
-00:00:00,000 --> 00:00:05,000
-LivingColor is an ecosystem: plugin, skills, and evolution.
-
-2
-00:00:05,000 --> 00:00:09,000
-External guidance. Native Hermes orchestration.
-
