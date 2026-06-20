@@ -380,8 +380,16 @@ def main() -> int:
             raise RuntimeError("missing work order")
         wo_state = _resume_until_stable(client, work_order_id, max_ticks=40)
         publication = (wo_state.get("publication") or {}) if isinstance(wo_state, dict) else {}
+        if not publication:
+            nodes = wo_state.get("graphNodes") or []
+            for node in nodes:
+                if node.get("nodeType") == "mr_creation" and node.get("status") == "completed":
+                    payload = node.get("payload") or {}
+                    if isinstance(payload, dict):
+                        publication = payload
+                        break
         pr_url = publication.get("reviewRequestUrl") or publication.get("mrUrl")
-        branch = publication.get("branchName") or publication.get("sourceBranch")
+        branch = publication.get("branchName") or publication.get("sourceBranch") or publication.get("deliveryBranch")
         shadow_reason = publication.get("reason") or wo_state.get("shadowSkipReason")
         jira_writeback = wo_state.get("jiraWriteback") or {}
         status = "pass"
