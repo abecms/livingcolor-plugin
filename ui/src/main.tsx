@@ -8,6 +8,7 @@
 import { createRoot } from 'react-dom/client'
 import { createElement } from 'react'
 import App from './App'
+import { ensureLcPortalHost } from '@/lib/lc-portal-host'
 import { installHermesNavBrand } from '@/lib/hermes-nav-brand'
 import { findHermesPluginShell, syncLcRootToHermesHost } from '@/lib/hermes-host-layout'
 import { isHermesPluginProjectDashboardPath } from '@/lib/hermes-plugin-routes'
@@ -116,6 +117,8 @@ if (SDK && REGISTRY) {
     HostReact.useEffect(() => {
       const root = ref.current
       if (!root) return
+
+      ensureLcPortalHost(root)
 
       const update = () => syncLcRootToHermesHost(root)
       update()

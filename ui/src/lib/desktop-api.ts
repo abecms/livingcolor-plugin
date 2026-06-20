@@ -26,6 +26,16 @@ function rewrite(path: string): string {
     .replace(/^\/api\/settings$/, '/api/plugins/livingcolor/delivery/plugin-settings')
 }
 
+function attachHermesDashboardSessionHeader(headers: Headers): void {
+  const token = (window as { __HERMES_SESSION_TOKEN__?: string }).__HERMES_SESSION_TOKEN__
+  if (!token) {
+    return
+  }
+  if (!headers.has('X-Hermes-Session-Token') && !headers.has('X-LivingColor-Session-Token')) {
+    headers.set('X-Hermes-Session-Token', token)
+  }
+}
+
 function buildHeaders(init: RequestInit): Headers {
   const headers = new Headers(init.headers)
   const token = $firebaseIdToken.get()
@@ -40,6 +50,7 @@ function buildHeaders(init: RequestInit): Headers {
   if (projectKey) {
     headers.set('x-lc-project-key', projectKey)
   }
+  attachHermesDashboardSessionHeader(headers)
   return headers
 }
 
@@ -56,6 +67,14 @@ function isFirebaseTokenApiError(error: unknown): boolean {
     lower.includes('missing firebase id token') ||
     lower.includes('email not verified')
   )
+}
+
+function isNetworkFetchError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false
+  }
+  const message = error.message.toLowerCase()
+  return message === 'failed to fetch' || message.includes('networkerror') || message.includes('load failed')
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs?: number): Promise<T> {
@@ -79,22 +98,39 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs?: number): Promise<T> {
   })
 }
 
-export async function callDesktopApi<T>(request: LivingColorApiRequest): Promise<T> {
-  const sdk = (window as any).__HERMES_PLUGIN_SDK__
-  if (!sdk) {
-    throw new Error('Hermes plugin SDK unavailable')
-  }
+async function fetchPluginJson<T>(path: string, init: RequestInit): Promise<T> {
+  const headers = buildHeaders(init)
+  const finalInit: RequestInit = { ...init, headers }
+  const sdk = (window as { __HERMES_PLUGIN_SDK__?: { fetchJSON?: (url: string, init?: RequestInit) => Promise<unknown> } })
+    .__HERMES_PLUGIN_SDK__
 
-  const execute = async () => {
-    const init: RequestInit = { method: request.method ?? 'GET' }
-    if (request.body !== undefined) {
-      init.headers = { 'Content-Type': 'application/json' }
-      init.body = JSON.stringify(request.body)
+  if (sdk?.fetchJSON) {
+    try {
+      return (await sdk.fetchJSON(path, finalInit)) as T
+    } catch (error) {
+      if (!isNetworkFetchError(error)) {
+        throw error
+      }
     }
-    init.headers = buildHeaders(init)
-    return sdk.fetchJSON(rewrite(request.path), init) as Promise<T>
   }
 
+  const response = await fetch(path, { ...finalInit, credentials: 'include' })
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`${response.status}: ${text}`)
+  }
+  return response.json() as Promise<T>
+}
+
+export async function callDesktopApi<T>(request: LivingColorApiRequest): Promise<T> {
+  const path = rewrite(request.path)
+  const init: RequestInit = { method: request.method ?? 'GET' }
+  if (request.body !== undefined) {
+    init.headers = { 'Content-Type': 'application/json' }
+    init.body = JSON.stringify(request.body)
+  }
+
+  const execute = async () => fetchPluginJson<T>(path, init)
   const run = async () => withTimeout(execute(), request.timeoutMs)
 
   try {
