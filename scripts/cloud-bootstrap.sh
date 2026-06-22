@@ -42,6 +42,15 @@ install_uvx() {
   pip install --user uv
 }
 
+install_stripe() {
+  if python3 -c "import stripe" 2>/dev/null; then
+    log "stripe Python package already installed"
+    return 0
+  fi
+  log "Installing stripe (user site) for sprint invoice path..."
+  pip install --user stripe
+}
+
 sync_plugin() {
   log "Syncing LivingColor plugin from ${ROOT}"
   "${ROOT}/scripts/sync-hermes-plugin.sh"
@@ -224,6 +233,7 @@ main() {
   require_cmd python3
   install_hermes
   install_uvx
+  install_stripe
   sync_plugin
   write_project_mapping
   configure_mcp_from_env

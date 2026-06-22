@@ -120,14 +120,6 @@ def main() -> int:
     summary["phases"]["setup"] = code == 200
     log(f"setup-automation HTTP {code}")
 
-    log("Phase B2: sprint reset (activate sprint for report/invoice)")
-    rcode, reset = request("POST", "/sprint/reset", {})
-    sprint_number = 0
-    if isinstance(reset, dict):
-        sprint_number = int(reset.get("sprintNumber") or 0)
-    log(f"sprint reset HTTP {rcode} sprintNumber={sprint_number}")
-    summary["phases"]["settings"] = rcode == 200 and sprint_number > 0
-
     log("Phase C: integration probes")
     jcode, jconn = request("POST", "/connect", {}, prefix="/jira")
     log(f"jira connect HTTP {jcode}")
@@ -157,12 +149,15 @@ def main() -> int:
         stripe_live = str(json.loads(stripe_body).get("livemode", "unknown"))
     except Exception:
         pass
+    stripe_test_mode = stripe_http == 200 and stripe_live in ("False", "false", "0")
     log(f"Jira={jira_http} GitHub={gh_http} Stripe={stripe_http} livemode={stripe_live}")
     summary["phases"]["integrations"] = jira_http == 200 and gh_http == 200 and jcode == 200
 
-    log("Phase D: readiness scan + promote")
+    log("Phase D: readiness scan")
     code, scan = request("POST", "/readiness/scan", {"projectKey": "TVP"})
     log(f"readiness scan HTTP {code}")
+
+    log("Phase D3: promote readiness ticket")
     _, ready_list = request("GET", "/readiness?projectKey=TVP&status=ready")
     items = ready_list.get("items") or []
     ready = [x for x in items if x.get("readinessStatus") == "ready" and not x.get("promotedWorkOrderId")]
@@ -178,6 +173,20 @@ def main() -> int:
     jira_key = record_row.get("jiraKey", "")
     summary["jira_key"] = jira_key
     log(f"selected {record_id} jira={jira_key}")
+
+    ecode, _ = request(
+        "PATCH",
+        f"/tickets/{jira_key}/estimation",
+        {"estimatedDays": 1.0, "complexity": "Medium", "confidence": 0.8},
+    )
+    log(f"ticket estimation HTTP {ecode}")
+
+    log("Phase D4: sprint reset (after estimation, before promote)")
+    rcode, reset = request("POST", "/sprint/reset", {})
+    sprint_name = str((reset or {}).get("sprintName") or "")
+    ticket_count = len((reset or {}).get("tickets") or [])
+    log(f"sprint reset HTTP {rcode} sprint={sprint_name} tickets={ticket_count}")
+    summary["phases"]["settings"] = rcode == 200 and bool(sprint_name)
 
     pcode, promote = request("POST", f"/readiness/{record_id}/promote", {"actor": APPROVER})
     wo = promote.get("workOrder") or {}
@@ -232,10 +241,11 @@ def main() -> int:
     summary["final_status"] = final_status
     pr_url = ""
     branch = ""
-    for node in final.get("nodes") or []:
-        out = node.get("output") or {}
-        pr_url = pr_url or out.get("prUrl") or out.get("pullRequestUrl") or ""
-        branch = branch or out.get("branch") or ""
+    nodes = final.get("graphNodes") or final.get("nodes") or []
+    for node in nodes:
+        out = node.get("output") or node.get("payload") or {}
+        pr_url = pr_url or out.get("prUrl") or out.get("pullRequestUrl") or out.get("mrUrl") or out.get("reviewRequestUrl") or ""
+        branch = branch or out.get("branch") or out.get("deliveryBranch") or ""
     summary["sandbox_pr_url"] = pr_url
     summary["branch"] = branch
     log(f"final status={final_status} pr={pr_url} branch={branch}")
@@ -263,13 +273,12 @@ def main() -> int:
     log("Phase H: stripe billing via sprint report")
     invoice_id = sr.get("invoiceId")
     billing_status = str(sr.get("billingStatus") or "")
-    stripe_ok = stripe_http == 200 and stripe_live == "False"
     summary["stripe"] = {
-        "balance_probe": stripe_ok,
+        "balance_probe": stripe_test_mode,
         "invoiceId": invoice_id,
         "billingStatus": billing_status,
     }
-    summary["phases"]["stripe"] = stripe_ok and bool(
+    summary["phases"]["stripe"] = stripe_test_mode and bool(
         invoice_id or billing_status in ("draft_created", "created", "pending_approval", "skipped")
     )
 
