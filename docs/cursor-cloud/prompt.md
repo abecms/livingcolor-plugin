@@ -21,7 +21,29 @@ If any step fails, classify the failure, attempt safe self-healing on `livingcol
 
 **Hermes is mandatory.** LivingColor is a Hermes Agent plugin — without a running Hermes gateway with the plugin mounted, there is nothing meaningful to test. Do not substitute pytest `TestClient`, standalone FastAPI, or direct Python imports as a workflow FRT replacement.
 
-**Stable context is in Automation Memories** (repos, TVP config, API map, test commands, boundaries). Do not spend a run phase or todo on "explore repo / learn architecture / read all docs". Only read per-run delta: trigger commit, latest `docs/cloud-agent-runs/*-result.md`, and credential presence.
+**Stable context is in Automation Memories** (repos, TVP config, API map, test commands, boundaries). Do not spend a run phase or todo on "explore repo / learn architecture / read all docs". Only read per-run delta: trigger commit, latest `docs/cloud-agent-runs/*-result.md`.
+
+## FIRST ACTION — credentials + Hermes (before any todo)
+
+Cursor does **not** inject credential lines from this prompt into `os.environ`. You **must** materialize them before bootstrap:
+
+```bash
+./scripts/cloud-start.sh <<'CREDS'
+JIRA_URL=...
+JIRA_USERNAME=...
+JIRA_API_TOKEN=...
+GITHUB_TOKEN=...
+GH_TOKEN=...
+STRIPE_SECRET_KEY=sk_test_...
+OPENROUTER_API_KEY=...
+CREDS
+```
+
+Copy every `KEY=VALUE` line from the **Credential discovery** section below into the heredoc (never log values elsewhere). `cloud-start.sh` writes `~/.hermes/livingcolor/.env`, provisions Jira/GitHub MCP, installs Hermes, syncs the plugin, and starts the dashboard.
+
+If Automation Secrets are already in `os.environ`, run `./scripts/cloud-start.sh` without stdin.
+
+**Do not proceed** to workflow FRT until `cloud-start.sh` exits 0 and `GET .../delivery/overview` returns HTTP 200.
 
 ## Repository boundaries
 
@@ -60,6 +82,8 @@ Jira and GitHub are already isolated sandboxes. Shadow mode would block the inte
 
 ## Credential discovery
 
+**Important:** Credential values in this prompt are **not** automatically available as shell environment variables. The agent must provision them before bootstrap (see below).
+
 Before integration steps, inspect the Cloud Agent environment.
 
 Expected variables:
@@ -79,12 +103,29 @@ Expected variables:
 
 Also inspect connected MCP servers for Jira/Atlassian, GitHub, and Stripe.
 
+### Step 0 — Provision credentials (mandatory first action)
+
+**Use the single entrypoint** (see also FIRST ACTION at top of this prompt):
+
+```bash
+./scripts/cloud-start.sh <<'CREDS'
+# Paste every KEY=VALUE from Expected variables below with real values from this prompt
+CREDS
+```
+
+If Automation Secrets are already in `os.environ`:
+
+```bash
+./scripts/cloud-start.sh
+```
+
+Priority: (1) Automation Secrets in `os.environ`, (2) prompt values via `cloud-start.sh` stdin, (3) mark `blocked` only if `cloud-start.sh` exits non-zero.
+
 Rules:
 
-- Use only credentials already available in the environment
-- Never ask the user for credentials during the run
-- Never print secret values
-- If a credential is missing, mark the integration `blocked` or `not_configured` and continue all other checks that can still run
+- Use credentials from `os.environ` **or** from this prompt via step 0 — never ask the user during the run
+- Never print secret values in logs, commits, or `result.md`
+- If a credential is still missing after step 0, mark the integration `blocked` or `not_configured` and continue other checks
 - Always produce `result.md`
 
 ## Required runtime mode (live sandbox)
@@ -174,13 +215,13 @@ If gateway fails to start, diagnose (logs, port conflicts, missing deps), attemp
 
 Create exactly these todos. **Do not add** a "Context / explore repo" todo — that knowledge is in Memories.
 
-1. **Hermes Bootstrap** — install Hermes, sync/install plugin, enable, gateway restart, verify `/api/plugins/livingcolor/delivery/overview` (hard gate)
+1. **Credentials + Hermes Bootstrap** — `./scripts/cloud-start.sh` with prompt credentials on stdin; verify `/api/plugins/livingcolor/delivery/overview` → 200 (hard gate)
 2. **Project setup + integration audit** — `project_mapping.yaml`, `setup-automation`, Jira/GitHub/Stripe live checks
 3. **Workflow FRT A–H** — full delivery workflow via Hermes-mounted API
 4. **Secondary tests** — pytest, vitest, build (supporting evidence)
 5. **Self-healing + deliverables** — fixes on `livingcolor-plugin`, `result.md`, plugin heal PR if needed
 
-Before todo 1 only: note trigger commit SHA, skim latest `docs/cloud-agent-runs/*-result.md`, scan credential env vars (no subagent).
+Before todo 1 only: note trigger commit SHA, skim latest `docs/cloud-agent-runs/*-result.md`.
 
 ## Required subagents (optional dispatch — same 5 phases)
 

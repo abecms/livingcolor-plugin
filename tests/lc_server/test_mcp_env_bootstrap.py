@@ -73,6 +73,31 @@ def test_credential_env_status_never_returns_values(monkeypatch):
     assert "ghp_" not in str(status.values())
 
 
+def test_hydrate_cloud_credentials_loads_dotenv_file(monkeypatch, tmp_path):
+    from lc_server.integrations.mcp_env_bootstrap import hydrate_cloud_credentials
+
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "JIRA_URL=https://livingcolor.atlassian.net\nJIRA_API_TOKEN=from-file\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.delenv("JIRA_URL", raising=False)
+    monkeypatch.delenv("JIRA_API_TOKEN", raising=False)
+
+    def _fake_load(*, override: bool = True):
+        os.environ["JIRA_URL"] = "https://livingcolor.atlassian.net"
+        os.environ["JIRA_API_TOKEN"] = "from-file"
+        return env_file
+
+    with patch("lc_server.env_loader.load_livingcolor_dotenv", side_effect=_fake_load) as load_mock:
+        hydrate_cloud_credentials()
+
+    load_mock.assert_called_once_with(override=False)
+    assert os.environ.get("JIRA_URL") == "https://livingcolor.atlassian.net"
+    assert os.environ.get("JIRA_API_TOKEN") == "from-file"
+
+
 def test_prerequisites_auto_provisions_mcp_from_env(monkeypatch, tmp_path):
     from lc_server.provisioning.prerequisites import check_provisioning_prerequisites
 

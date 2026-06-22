@@ -6,16 +6,23 @@ Guide for Cursor Cloud agents running the TVP workflow FRT against live sandbox 
 
 ```bash
 unset LIVINGCOLOR_SHADOW_MODE
-export LIVINGCOLOR_SYNC_ORCHESTRATOR=1
-export LIVINGCOLOR_DEVELOPER_BACKEND=heuristic
-export LIVINGCOLOR_PLANNER_BACKEND=heuristic
-export LIVINGCOLOR_ANALYST_BACKEND=heuristic
-export LIVINGCOLOR_PUBLISHER_BACKEND=heuristic
-export LIVINGCOLOR_SPRINT_REPORTER_BACKEND=heuristic
 export PATH="${HOME}/.local/bin:${PATH}"
 
-./scripts/cloud-bootstrap.sh
+# Option A — credentials in Automation Secrets (already in os.environ):
+./scripts/cloud-start.sh
+
+# Option B — credentials in the automation prompt (pipe KEY=VALUE lines):
+./scripts/cloud-start.sh <<'CREDS'
+JIRA_URL=https://livingcolor.atlassian.net
+JIRA_USERNAME=you@example.com
+JIRA_API_TOKEN=...
+GITHUB_TOKEN=...
+GH_TOKEN=...
+STRIPE_SECRET_KEY=sk_test_...
+CREDS
 ```
+
+`cloud-start.sh` writes `~/.hermes/livingcolor/.env`, loads it, provisions Jira/GitHub MCP, then runs `cloud-bootstrap.sh` (Hermes + plugin + dashboard).
 
 ## Security (public repository)
 
@@ -46,7 +53,34 @@ Optional: `STRIPE_TEST_CUSTOMER_ID`, `GITLAB_PERSONAL_ACCESS_TOKEN`, `GITLAB_API
 
 **IDE MCP connections are not enough.** Cursor chat MCP servers do not populate the Cloud Agent process environment or Hermes `config.yaml`. The automation must inject the variables above.
 
-If secrets are missing, Hermes bootstrap may still pass but workflow phases C–H will fail with `not_configured` / `blocked`.
+### Prompt credentials are not environment variables
+
+Cursor does **not** copy credential lines from the automation prompt into `os.environ`. If values appear in the prompt text, the agent must provision them **before** bootstrap:
+
+```bash
+# Step 0 — mandatory when credentials are in the prompt (never echo values in logs)
+python3 scripts/cloud_write_credentials.py <<'CREDS'
+JIRA_URL=https://livingcolor.atlassian.net
+JIRA_USERNAME=you@example.com
+JIRA_API_TOKEN=...
+GITHUB_TOKEN=...
+GH_TOKEN=...
+STRIPE_SECRET_KEY=sk_test_...
+CREDS
+
+set -a && source scripts/cloud-load-credentials.sh && set +a
+./scripts/cloud-preflight.sh
+```
+
+Priority:
+
+1. Variables already in `os.environ` (Automation Secrets UI) — use as-is
+2. Values in the automation prompt — write with `cloud_write_credentials.py`, then `source cloud-load-credentials.sh`
+3. Missing — mark integration `blocked` in `result.md`
+
+The `.env` file lives at `~/.hermes/livingcolor/.env` (chmod 600, never committed). `cloud-bootstrap.sh` loads it automatically.
+
+If secrets are missing after step 0, Hermes bootstrap may still pass but workflow phases C–H will fail with `not_configured` / `blocked`.
 
 ## Hermes gate (mandatory)
 

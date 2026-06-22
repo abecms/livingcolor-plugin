@@ -7,6 +7,10 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 export PATH="${HOME}/.local/bin:${PATH}"
 export PYTHONPATH="${ROOT}${PYTHONPATH:+:${PYTHONPATH}}"
 
+# Credentials from Automation Secrets or agent-written ~/.hermes/livingcolor/.env
+# shellcheck disable=SC1091
+source "${ROOT}/scripts/cloud-load-credentials.sh"
+
 HERMES_PORT="${HERMES_PORT:-9119}"
 SESSION_TOKEN="${HERMES_DASHBOARD_SESSION_TOKEN:-cloud-agent-session-token}"
 LOG_FILE="${HERMES_DASHBOARD_LOG:-/tmp/hermes-dashboard.log}"
@@ -60,12 +64,20 @@ configure_mcp_from_env() {
 write_livingcolor_env() {
   local env_path="${HOME}/.hermes/livingcolor/.env"
   mkdir -p "$(dirname "${env_path}")"
-  if [ -n "${STRIPE_SECRET_KEY:-}" ]; then
-    if ! grep -q '^STRIPE_SECRET_KEY=' "${env_path}" 2>/dev/null; then
-      printf 'STRIPE_SECRET_KEY=%s\n' "${STRIPE_SECRET_KEY}" >> "${env_path}"
-      chmod 600 "${env_path}" 2>/dev/null || true
-      log "Wrote STRIPE_SECRET_KEY to ${env_path}"
+  local tmp
+  tmp="$(mktemp)"
+  trap 'rm -f "${tmp}"' RETURN
+  : >"${tmp}"
+  for key in JIRA_URL JIRA_USERNAME JIRA_API_TOKEN GITHUB_TOKEN GH_TOKEN STRIPE_SECRET_KEY \
+    STRIPE_TEST_CUSTOMER_ID OPENROUTER_API_KEY GITLAB_PERSONAL_ACCESS_TOKEN GITLAB_API_URL \
+    LIVINGCOLOR_TEST_PROJECT_KEY LIVINGCOLOR_TEST_GITHUB_REPO; do
+    if [ -n "${!key:-}" ]; then
+      printf '%s=%s\n' "${key}" "${!key}" >>"${tmp}"
     fi
+  done
+  if [ -s "${tmp}" ]; then
+    python3 "${ROOT}/scripts/cloud_write_credentials.py" <"${tmp}" >/dev/null
+    log "Synced in-process credentials to ${env_path}"
   fi
 }
 
