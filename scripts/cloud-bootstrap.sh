@@ -42,6 +42,15 @@ install_uvx() {
   pip install --user uv
 }
 
+install_stripe() {
+  if python3 -c "import stripe" 2>/dev/null; then
+    log "stripe Python package already installed"
+    return 0
+  fi
+  log "Installing stripe (user site) for sprint invoice path..."
+  pip install --user stripe
+}
+
 sync_plugin() {
   log "Syncing LivingColor plugin from ${ROOT}"
   "${ROOT}/scripts/sync-hermes-plugin.sh"
@@ -71,17 +80,46 @@ configure_mcp_from_env() {
 }
 
 configure_billing_from_env() {
-  if [ -z "${STRIPE_TEST_CUSTOMER_ID:-}" ]; then
-    return 0
-  fi
-  log "Applying Stripe billing settings from STRIPE_TEST_CUSTOMER_ID"
+  log "Configuring Stripe billing for cloud FRT"
   python3 - <<'PY'
+import json
 import os
+import urllib.error
+import urllib.parse
+import urllib.request
+
 from lc_server.integrations.plugin_billing import load_plugin_billing_settings, persist_plugin_billing_settings
 
 customer = (os.environ.get("STRIPE_TEST_CUSTOMER_ID") or "").strip()
+stripe_key = (os.environ.get("STRIPE_SECRET_KEY") or "").strip()
+
+if not customer and stripe_key.startswith("sk_test_"):
+    body = urllib.parse.urlencode(
+        {
+            "email": "cloud-frt@livingcolor.test",
+            "name": "LivingColor Cloud FRT",
+            "metadata[source]": "livingcolor-cloud-bootstrap",
+        }
+    ).encode()
+    req = urllib.request.Request(
+        "https://api.stripe.com/v1/customers",
+        data=body,
+        headers={"Authorization": f"Bearer {stripe_key}"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+        customer = str(payload.get("id") or "").strip()
+        if customer:
+            os.environ["STRIPE_TEST_CUSTOMER_ID"] = customer
+            print(f"stripe_customer_created id={customer}")
+    except urllib.error.HTTPError as exc:
+        print(f"stripe_customer_create_failed http={exc.code}", flush=True)
+
 if not customer:
     raise SystemExit(0)
+
 existing = load_plugin_billing_settings()
 persist_plugin_billing_settings(
     stripe_customer_id=customer,
@@ -136,6 +174,7 @@ start_dashboard() {
   export LIVINGCOLOR_ANALYST_BACKEND=heuristic
   export LIVINGCOLOR_PUBLISHER_BACKEND=heuristic
   export LIVINGCOLOR_SPRINT_REPORTER_BACKEND=heuristic
+  export LIVINGCOLOR_SPRINT_BILLING_BACKEND=heuristic
 
   nohup hermes dashboard --skip-build --no-open --port "${HERMES_PORT}" >"${LOG_FILE}" 2>&1 &
   for _ in $(seq 1 30); do
@@ -195,9 +234,11 @@ main() {
   require_cmd python3
   install_hermes
   install_uvx
+  install_stripe
   sync_plugin
   write_project_mapping
   configure_mcp_from_env
+  configure_billing_from_env
   write_livingcolor_env
   start_dashboard
   verify_mount

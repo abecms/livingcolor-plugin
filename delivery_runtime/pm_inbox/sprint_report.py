@@ -220,6 +220,14 @@ def _billing_skip(reason: str) -> dict[str, Any]:
 
 
 def _default_billing_agent(snapshot: dict[str, Any], project_key: str) -> dict[str, Any]:
+    import os
+
+    backend = os.getenv("LIVINGCOLOR_SPRINT_BILLING_BACKEND", "hermes").strip().lower()
+    if backend == "heuristic":
+        from lc_server.agent_bridge.heuristic_sprint_billing import propose_heuristic_sprint_billing
+
+        return propose_heuristic_sprint_billing(snapshot, project_key=project_key)
+
     from lc_server.agent_bridge.hermes_sprint_billing import HermesSprintBillingAgent
 
     return HermesSprintBillingAgent().propose(snapshot, project_key=project_key)
@@ -406,7 +414,19 @@ def publish_sprint_report(
             actor=actor,
             payload={"projectKey": project_key, "dedupKey": dedup_key, "error": error},
         )
-        return {"status": "failed", "error": error, "dedupKey": dedup_key, "messagePreview": message[:240]}
+        return {
+            "status": "failed",
+            "error": error,
+            "dedupKey": dedup_key,
+            "messagePreview": message[:240],
+            "billingStatus": billing_result.get("status"),
+            "billingWarning": billing_result.get("warning"),
+            "invoiceId": billing_result.get("invoiceId"),
+            "invoiceUrl": billing_result.get("invoiceUrl"),
+            "invoiceStatus": billing_result.get("invoiceStatus"),
+            "invoiceTotalCents": billing_result.get("invoiceTotalCents"),
+            "invoiceCurrency": billing_result.get("invoiceCurrency"),
+        }
 
     published_at = utc_now_iso()
     _patch_sprint_memory(

@@ -705,7 +705,11 @@ def reset_sprint_selection(
     )
     services = get_services()
     try:
-        payload = services.pm_inbox.reset_sprint(project_key=project_key)
+        repopulate = body.repopulate_tickets if body and body.repopulate_tickets is not None else None
+        payload = services.pm_inbox.reset_sprint(
+            project_key=project_key,
+            repopulate_tickets=repopulate,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except sqlite3.OperationalError as exc:
