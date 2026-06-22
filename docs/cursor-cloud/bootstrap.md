@@ -17,6 +17,10 @@ export PATH="${HOME}/.local/bin:${PATH}"
 ./scripts/cloud-bootstrap.sh
 ```
 
+Run `./scripts/cloud-preflight.sh` after bootstrap to fail fast when Automation secrets or the Hermes gateway are missing.
+
+For a scripted API smoke through phases A–D, use `./scripts/cloud-workflow-frt.sh`.
+
 ## Security (public repository)
 
 This repository is **public**. That is safe because:
