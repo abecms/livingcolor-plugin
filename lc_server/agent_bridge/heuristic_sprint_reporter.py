@@ -16,7 +16,7 @@ def compose_heuristic_sprint_report(snapshot: dict[str, Any], *, project_key: st
     capacity = snapshot.get("capacityDays") or sprint.get("capacityDays") or "?"
     used = snapshot.get("usedDays") or sprint.get("usedDays") or 0
 
-    tickets = snapshot.get("tickets") or []
+    tickets = snapshot.get("ticketsPlanned") or snapshot.get("tickets") or []
     work_orders = snapshot.get("workOrders") or []
     delivered = [wo for wo in work_orders if str(wo.get("status") or "").lower() == "completed"]
     lang = str(snapshot.get("communicationLanguage") or "fr").lower()

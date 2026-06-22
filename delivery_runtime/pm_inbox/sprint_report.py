@@ -414,7 +414,19 @@ def publish_sprint_report(
             actor=actor,
             payload={"projectKey": project_key, "dedupKey": dedup_key, "error": error},
         )
-        return {"status": "failed", "error": error, "dedupKey": dedup_key, "messagePreview": message[:240]}
+        return {
+            "status": "failed",
+            "error": error,
+            "dedupKey": dedup_key,
+            "messagePreview": message[:240],
+            "billingStatus": billing_result.get("status"),
+            "billingWarning": billing_result.get("warning"),
+            "invoiceId": billing_result.get("invoiceId"),
+            "invoiceUrl": billing_result.get("invoiceUrl"),
+            "invoiceStatus": billing_result.get("invoiceStatus"),
+            "invoiceTotalCents": billing_result.get("invoiceTotalCents"),
+            "invoiceCurrency": billing_result.get("invoiceCurrency"),
+        }
 
     published_at = utc_now_iso()
     _patch_sprint_memory(

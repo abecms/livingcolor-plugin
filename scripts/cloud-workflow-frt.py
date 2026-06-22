@@ -283,7 +283,8 @@ def main() -> int:
         "billingStatus": billing_status,
     }
     summary["phases"]["stripe"] = stripe_test_mode and bool(
-        invoice_id or billing_status in ("draft_created", "created", "pending_approval", "skipped")
+        invoice_id
+        or billing_status in ("draft_created", "created", "pending_approval", "already_exists", "skipped")
     )
 
     SUMMARY.write_text(json.dumps(summary, indent=2), encoding="utf-8")
