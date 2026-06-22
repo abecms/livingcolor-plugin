@@ -74,12 +74,12 @@ def request(
     return code, parsed
 
 
-def curl_probe(url: str, headers: dict[str, str] | None = None) -> tuple[int, str]:
+def curl_probe(url: str, headers: dict[str, str] | None = None, *, max_bytes: int = 500) -> tuple[int, str]:
     hdrs = headers or {}
     req = urllib.request.Request(url, headers=hdrs)
     try:
         with urllib.request.urlopen(req, timeout=60) as resp:
-            return resp.status, resp.read(500).decode("utf-8", errors="replace")
+            return resp.status, resp.read(max_bytes).decode("utf-8", errors="replace")
     except urllib.error.HTTPError as exc:
         return exc.code, exc.read(200).decode("utf-8", errors="replace")
 
@@ -143,6 +143,7 @@ def main() -> int:
     stripe_http, stripe_body = curl_probe(
         "https://api.stripe.com/v1/balance",
         {"Authorization": f"Bearer {stripe_key}"},
+        max_bytes=4096,
     )
     stripe_live = "unknown"
     try:
@@ -181,8 +182,11 @@ def main() -> int:
     )
     log(f"ticket estimation HTTP {ecode}")
 
-    log("Phase D4: sprint reset (after estimation, before promote)")
-    rcode, reset = request("POST", "/sprint/reset", {})
+    acode, sel = request("PUT", "/sprint/selection", {"append": [jira_key]})
+    log(f"sprint selection append HTTP {acode} tickets={len((sel or {}).get('tickets') or [])}")
+
+    log("Phase D4: sprint reset (repopulate tickets, before promote)")
+    rcode, reset = request("POST", "/sprint/reset", {"repopulateTickets": True})
     sprint_name = str((reset or {}).get("sprintName") or "")
     ticket_count = len((reset or {}).get("tickets") or [])
     log(f"sprint reset HTTP {rcode} sprint={sprint_name} tickets={ticket_count}")

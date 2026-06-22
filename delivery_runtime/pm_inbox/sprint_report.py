@@ -220,6 +220,14 @@ def _billing_skip(reason: str) -> dict[str, Any]:
 
 
 def _default_billing_agent(snapshot: dict[str, Any], project_key: str) -> dict[str, Any]:
+    import os
+
+    backend = os.getenv("LIVINGCOLOR_SPRINT_BILLING_BACKEND", "hermes").strip().lower()
+    if backend == "heuristic":
+        from lc_server.agent_bridge.heuristic_sprint_billing import propose_heuristic_sprint_billing
+
+        return propose_heuristic_sprint_billing(snapshot, project_key=project_key)
+
     from lc_server.agent_bridge.hermes_sprint_billing import HermesSprintBillingAgent
 
     return HermesSprintBillingAgent().propose(snapshot, project_key=project_key)

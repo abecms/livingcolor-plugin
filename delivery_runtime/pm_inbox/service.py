@@ -223,10 +223,16 @@ class PmInboxService:
         )
         return payload
 
-    def reset_sprint(self, *, project_key: str, actor: str = "human") -> dict[str, Any]:
+    def reset_sprint(
+        self,
+        *,
+        project_key: str,
+        actor: str = "human",
+        repopulate_tickets: bool | None = None,
+    ) -> dict[str, Any]:
         from delivery_runtime.pm_inbox.sprint_reset import reset_sprint
 
-        repopulate = actor != "human"
+        repopulate = repopulate_tickets if repopulate_tickets is not None else actor != "human"
         payload = reset_sprint(
             project_key=project_key,
             repopulate_tickets=repopulate,

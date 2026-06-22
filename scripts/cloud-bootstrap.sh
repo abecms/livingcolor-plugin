@@ -174,6 +174,7 @@ start_dashboard() {
   export LIVINGCOLOR_ANALYST_BACKEND=heuristic
   export LIVINGCOLOR_PUBLISHER_BACKEND=heuristic
   export LIVINGCOLOR_SPRINT_REPORTER_BACKEND=heuristic
+  export LIVINGCOLOR_SPRINT_BILLING_BACKEND=heuristic
 
   nohup hermes dashboard --skip-build --no-open --port "${HERMES_PORT}" >"${LOG_FILE}" 2>&1 &
   for _ in $(seq 1 30); do
