@@ -70,6 +70,31 @@ configure_mcp_from_env() {
   python3 -m lc_server.integrations.mcp_env_bootstrap
 }
 
+configure_billing_from_env() {
+  if [ -z "${STRIPE_TEST_CUSTOMER_ID:-}" ]; then
+    return 0
+  fi
+  log "Applying Stripe billing settings from STRIPE_TEST_CUSTOMER_ID"
+  python3 - <<'PY'
+import os
+from lc_server.integrations.plugin_billing import load_plugin_billing_settings, persist_plugin_billing_settings
+
+customer = (os.environ.get("STRIPE_TEST_CUSTOMER_ID") or "").strip()
+if not customer:
+    raise SystemExit(0)
+existing = load_plugin_billing_settings()
+persist_plugin_billing_settings(
+    stripe_customer_id=customer,
+    daily_rate_cents=existing.daily_rate_cents or 80000,
+    currency=existing.currency or "eur",
+    invoice_mode=existing.invoice_mode or "draft",
+    approval_required=existing.approval_required,
+    max_invoice_cents=existing.max_invoice_cents or 500000,
+)
+print("billing_configured")
+PY
+}
+
 write_livingcolor_env() {
   local env_path="${HOME}/.hermes/livingcolor/.env"
   mkdir -p "$(dirname "${env_path}")"
