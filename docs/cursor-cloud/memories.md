@@ -14,13 +14,23 @@ Hermes install → plugin install/enable → gateway up → setup TVP → workfl
 
 ## Run checklist (per execution only)
 
-1. Hermes Bootstrap — install, plugin sync, gateway verify
-2. Project setup + integration audit — Jira, GitHub, Stripe
-3. Workflow FRT phases A–H via Hermes API
-4. Secondary tests — pytest, vitest, build
-5. Self-healing + `result.md` + PR (if fixes)
+0. **Credentials + Hermes** — `./scripts/cloud-start.sh` with prompt credentials on stdin (see below); hard gate
+1. **Project setup + integration audit** — Jira, GitHub, Stripe
+2. **Workflow FRT phases A–H** via Hermes API
+3. **Secondary tests** — pytest, vitest, build
+4. **Self-healing + `result.md` + PR** (if fixes)
 
-Per-run delta only (not a checklist step): trigger commit SHA, latest `docs/cloud-agent-runs/*-result.md`, credential presence scan.
+**First command every run** (before any other todo):
+
+```bash
+./scripts/cloud-start.sh <<'CREDS'
+# paste KEY=VALUE lines from the automation prompt Credential discovery section
+CREDS
+```
+
+Cursor does not inject prompt text into `os.environ`. `cloud-start.sh` materializes credentials into `~/.hermes/livingcolor/.env` and provisions MCP automatically.
+
+Per-run delta only: trigger commit SHA, latest `docs/cloud-agent-runs/*-result.md`.
 
 ## Product context (stable — do not re-discover each run)
 

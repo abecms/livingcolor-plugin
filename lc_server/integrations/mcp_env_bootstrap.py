@@ -43,6 +43,27 @@ def _github_token_from_env() -> str:
     return _strip_env("GITHUB_TOKEN") or _strip_env("GH_TOKEN")
 
 
+def hydrate_cloud_credentials() -> Path | None:
+    """Load ~/.hermes/livingcolor/.env into os.environ before MCP bootstrap.
+
+    Cloud agents often write credentials via ``cloud_write_credentials.py`` without
+    exporting them to the shell. Hermes API handlers must still see those values.
+    """
+    loaded: Path | None = None
+    try:
+        from lc_server.env_loader import load_livingcolor_dotenv
+
+        loaded = load_livingcolor_dotenv(override=False)
+    except Exception as exc:
+        logger.debug("LivingColor dotenv load skipped: %s", exc)
+
+    gh_token = _strip_env("GH_TOKEN")
+    if gh_token and not _strip_env("GITHUB_TOKEN"):
+        os.environ["GITHUB_TOKEN"] = gh_token
+
+    return loaded
+
+
 def _jira_mcp_config_from_env() -> dict[str, Any] | None:
     jira_url = _strip_env("JIRA_URL")
     jira_token = _strip_env("JIRA_API_TOKEN")
@@ -111,6 +132,7 @@ def ensure_mcp_servers_from_env() -> list[str]:
     Returns canonical server names that were provisioned (``jira``, ``github``).
     Idempotent: re-running refreshes env blocks from the current process environment.
     """
+    hydrate_cloud_credentials()
     provisioned: list[str] = []
     pending: dict[str, dict[str, Any]] = {}
 
@@ -142,6 +164,7 @@ def ensure_mcp_servers_from_env() -> list[str]:
 
 def credential_env_status() -> dict[str, str]:
     """Return configured/missing status for known credential env vars (no values)."""
+    hydrate_cloud_credentials()
     status: dict[str, str] = {}
     for name in _CREDENTIAL_ENV_NAMES:
         status[name] = "configured" if _strip_env(name) else "missing"
