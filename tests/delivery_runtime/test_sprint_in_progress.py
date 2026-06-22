@@ -197,6 +197,54 @@ def test_pm_inbox_response_preserves_sprint_work_order_fields(_isolate_hermes_ho
     assert approved["inDevelopment"] is True
 
 
+def test_merge_sprint_used_days_excludes_non_ready_backlog(_isolate_hermes_home):
+    payload = {
+        "sprintName": "LivingColor Sprint",
+        "capacityDays": 2.0,
+        "usedDays": 1.0,
+        "durationDays": 14,
+        "overflowRisk": False,
+        "warnings": [],
+        "tickets": [
+            {
+                "readinessId": "RD-1",
+                "jiraKey": "BN-100",
+                "title": "Ready ticket",
+                "estimatedDays": 1.0,
+                "priorityRank": 1,
+                "urgencyScore": 1.0,
+                "warnings": [],
+                "readinessStatus": "ready",
+            },
+            {
+                "readinessId": "RD-2",
+                "jiraKey": "BN-200",
+                "title": "Needs clarification",
+                "estimatedDays": 5.0,
+                "priorityRank": 2,
+                "urgencyScore": 0.0,
+                "warnings": ["Needs clarification before development"],
+                "readinessStatus": "needs_clarification",
+            },
+            {
+                "readinessId": "RD-3",
+                "jiraKey": "BN-300",
+                "title": "Not ready",
+                "estimatedDays": 3.0,
+                "priorityRank": 3,
+                "urgencyScore": 0.0,
+                "warnings": ["Not ready for autonomous delivery"],
+                "readinessStatus": "not_ready",
+            },
+        ],
+    }
+
+    merged = merge_active_work_orders_into_sprint(payload, project_key="BN")
+
+    assert merged["usedDays"] == 1.0
+    assert merged["overflowRisk"] is False
+
+
 def test_sprint_backlog_includes_needs_clarification_tickets(_isolate_hermes_home):
     from delivery_runtime.validation.mapping_setup import install_phase25_project_mapping
 

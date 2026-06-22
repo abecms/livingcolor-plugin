@@ -290,11 +290,18 @@ def merge_active_work_orders_into_sprint(
     return merged
 
 
+def _ticket_counts_toward_sprint_capacity(item: dict[str, Any]) -> bool:
+    if item.get("inDevelopment"):
+        return False
+    status = str(item.get("readinessStatus") or item.get("readiness_status") or "ready").strip().lower()
+    return status == "ready"
+
+
 def sprint_capacity_used_days(tickets: list[dict[str, Any]]) -> float:
-    """Sum estimates for sprint backlog tickets; in-flight carry-over work is excluded."""
+    """Sum estimates for sprint-ready backlog tickets; in-flight carry-over work is excluded."""
     total = 0.0
     for item in tickets:
-        if item.get("inDevelopment"):
+        if not _ticket_counts_toward_sprint_capacity(item):
             continue
         total += float(item.get("estimatedDays") or item.get("estimated_days") or 0)
     return round(total, 2)
