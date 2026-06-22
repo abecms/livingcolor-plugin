@@ -182,15 +182,15 @@ def main() -> int:
     )
     log(f"ticket estimation HTTP {ecode}")
 
-    acode, sel = request("PUT", "/sprint/selection", {"append": [jira_key]})
-    log(f"sprint selection append HTTP {acode} tickets={len((sel or {}).get('tickets') or [])}")
-
     log("Phase D4: sprint reset (repopulate tickets, before promote)")
     rcode, reset = request("POST", "/sprint/reset", {"repopulateTickets": True})
     sprint_name = str((reset or {}).get("sprintName") or "")
-    ticket_count = len((reset or {}).get("tickets") or [])
-    log(f"sprint reset HTTP {rcode} sprint={sprint_name} tickets={ticket_count}")
-    summary["phases"]["settings"] = rcode == 200 and bool(sprint_name)
+    log(f"sprint reset HTTP {rcode} sprint={sprint_name}")
+
+    scode, sel = request("PUT", "/sprint/selection", {"tickets": [jira_key]})
+    ticket_count = len((sel or {}).get("tickets") or [])
+    log(f"sprint selection HTTP {scode} tickets={ticket_count}")
+    summary["phases"]["settings"] = rcode == 200 and scode == 200 and ticket_count >= 1
 
     pcode, promote = request("POST", f"/readiness/{record_id}/promote", {"actor": APPROVER})
     wo = promote.get("workOrder") or {}
