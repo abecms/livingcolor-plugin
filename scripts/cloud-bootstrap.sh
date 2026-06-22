@@ -71,17 +71,46 @@ configure_mcp_from_env() {
 }
 
 configure_billing_from_env() {
-  if [ -z "${STRIPE_TEST_CUSTOMER_ID:-}" ]; then
-    return 0
-  fi
-  log "Applying Stripe billing settings from STRIPE_TEST_CUSTOMER_ID"
+  log "Configuring Stripe billing for cloud FRT"
   python3 - <<'PY'
+import json
 import os
+import urllib.error
+import urllib.parse
+import urllib.request
+
 from lc_server.integrations.plugin_billing import load_plugin_billing_settings, persist_plugin_billing_settings
 
 customer = (os.environ.get("STRIPE_TEST_CUSTOMER_ID") or "").strip()
+stripe_key = (os.environ.get("STRIPE_SECRET_KEY") or "").strip()
+
+if not customer and stripe_key.startswith("sk_test_"):
+    body = urllib.parse.urlencode(
+        {
+            "email": "cloud-frt@livingcolor.test",
+            "name": "LivingColor Cloud FRT",
+            "metadata[source]": "livingcolor-cloud-bootstrap",
+        }
+    ).encode()
+    req = urllib.request.Request(
+        "https://api.stripe.com/v1/customers",
+        data=body,
+        headers={"Authorization": f"Bearer {stripe_key}"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+        customer = str(payload.get("id") or "").strip()
+        if customer:
+            os.environ["STRIPE_TEST_CUSTOMER_ID"] = customer
+            print(f"stripe_customer_created id={customer}")
+    except urllib.error.HTTPError as exc:
+        print(f"stripe_customer_create_failed http={exc.code}", flush=True)
+
 if not customer:
     raise SystemExit(0)
+
 existing = load_plugin_billing_settings()
 persist_plugin_billing_settings(
     stripe_customer_id=customer,
@@ -198,6 +227,7 @@ main() {
   sync_plugin
   write_project_mapping
   configure_mcp_from_env
+  configure_billing_from_env
   write_livingcolor_env
   start_dashboard
   verify_mount

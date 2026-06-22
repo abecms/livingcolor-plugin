@@ -120,6 +120,14 @@ def main() -> int:
     summary["phases"]["setup"] = code == 200
     log(f"setup-automation HTTP {code}")
 
+    log("Phase B2: sprint reset (activate sprint for report/invoice)")
+    rcode, reset = request("POST", "/sprint/reset", {})
+    sprint_number = 0
+    if isinstance(reset, dict):
+        sprint_number = int(reset.get("sprintNumber") or 0)
+    log(f"sprint reset HTTP {rcode} sprintNumber={sprint_number}")
+    summary["phases"]["settings"] = rcode == 200 and sprint_number > 0
+
     log("Phase C: integration probes")
     jcode, jconn = request("POST", "/connect", {}, prefix="/jira")
     log(f"jira connect HTTP {jcode}")
@@ -235,16 +243,40 @@ def main() -> int:
     summary["phases"]["delivery"] = final_status == "completed" and bool(pr_url)
 
     log("Phase G: sprint report")
-    srcode, sr = request("POST", "/sprint/report", {})
-    log(f"sprint report HTTP {srcode}")
-    summary["phases"]["sprint_report"] = srcode == 200
+    srcode, sr = request("POST", "/sprint/report?force=true", {})
+    sr_status = str(sr.get("status") or "")
+    sr_reason = str(sr.get("reason") or sr.get("error") or "")
+    log(f"sprint report HTTP {srcode} status={sr_status} reason={sr_reason[:120]}")
+    summary["sprint_report"] = {
+        "http": srcode,
+        "status": sr_status,
+        "reason": sr_reason,
+        "invoiceId": sr.get("invoiceId"),
+        "billingStatus": sr.get("billingStatus"),
+    }
+    summary["phases"]["sprint_report"] = (
+        srcode == 200
+        and sr_status not in ("skipped",)
+        and sr_reason != "no_active_sprint"
+    )
 
-    log("Phase H: stripe (probe only — invoice needs customer)")
-    summary["phases"]["stripe"] = stripe_http == 200 and stripe_live == "False"
+    log("Phase H: stripe billing via sprint report")
+    invoice_id = sr.get("invoiceId")
+    billing_status = str(sr.get("billingStatus") or "")
+    stripe_ok = stripe_http == 200 and stripe_live == "False"
+    summary["stripe"] = {
+        "balance_probe": stripe_ok,
+        "invoiceId": invoice_id,
+        "billingStatus": billing_status,
+    }
+    summary["phases"]["stripe"] = stripe_ok and bool(
+        invoice_id or billing_status in ("draft_created", "created", "pending_approval", "skipped")
+    )
 
     SUMMARY.write_text(json.dumps(summary, indent=2), encoding="utf-8")
     log(f"FRT complete — summary at {SUMMARY}")
-    return 0 if summary["phases"].get("delivery") else 1
+    core_ok = summary["phases"].get("delivery") and summary["phases"].get("readiness")
+    return 0 if core_ok else 1
 
 
 if __name__ == "__main__":
