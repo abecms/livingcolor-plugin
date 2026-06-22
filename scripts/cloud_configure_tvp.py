@@ -10,6 +10,11 @@ from __future__ import annotations
 import logging
 import os
 import sys
+from pathlib import Path
+
+_ROOT = Path(__file__).resolve().parents[1]
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
 
 _DEFAULT_DAILY_RATE_CENTS = 80_000
 _DEFAULT_PROJECT_KEY = "TVP"
