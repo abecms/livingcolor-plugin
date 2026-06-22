@@ -8,6 +8,7 @@ from typing import Any
 
 from delivery_runtime.events.store import EventStore
 from delivery_runtime.persistence.db import connect, json_dumps, json_loads, utc_now_iso
+from delivery_runtime.readiness.analyst_prompt import persistable_estimated_days
 from delivery_runtime.readiness.analyzer import analyze_ticket_snapshot
 from delivery_runtime.readiness.errors import ReadinessIntegrationError
 from delivery_runtime.readiness.scanner import ReadinessScanner
@@ -220,7 +221,7 @@ class ReadinessService:
                     json_dumps(analysis["blockers"]),
                     json_dumps(analysis["recommendedRepos"]),
                     analysis["confidence"],
-                    analysis.get("estimatedDays"),
+                    persistable_estimated_days(analysis),
                     json_dumps(persist_snapshot),
                     now,
                     now,

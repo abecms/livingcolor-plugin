@@ -110,14 +110,16 @@ def build_selected_sprint_payload(*, project_key: str, sprint_number: int | None
         if not matches_ticket_scope(snapshot, ticket_scope):
             continue
 
+        status = str(row["readiness_status"] or "")
         estimated_days = None
-        if estimation:
-            estimated_days = estimation.get("estimatedDays") or estimation.get("estimated_days")
-        if estimated_days is None and row["estimated_days"] is not None:
-            estimated_days = float(row["estimated_days"])
-        if estimated_days is None and row["readiness_status"] == "analysis_failed":
+        if status != "needs_clarification":
+            if estimation:
+                estimated_days = estimation.get("estimatedDays") or estimation.get("estimated_days")
+            if estimated_days is None and row["estimated_days"] is not None:
+                estimated_days = float(row["estimated_days"])
+        if estimated_days is None and status == "analysis_failed":
             estimated_days = 0.0
-        if estimated_days is None:
+        if estimated_days is None and status != "needs_clarification":
             continue
 
         candidates.append(
@@ -125,8 +127,8 @@ def build_selected_sprint_payload(*, project_key: str, sprint_number: int | None
                 "readinessId": row["id"],
                 "jiraKey": row["jira_key"],
                 "title": row["title"],
-                "estimatedDays": float(estimated_days),
-                "readinessStatus": str(row["readiness_status"] or ""),
+                "estimatedDays": float(estimated_days) if estimated_days is not None else None,
+                "readinessStatus": status,
                 "lastAnalysisError": row["last_analysis_error"],
                 "lastAnalysisFailedAt": row["last_analysis_failed_at"],
                 "jiraSnapshot": snapshot,

@@ -270,18 +270,9 @@ def test_sprint_backlog_includes_needs_clarification_tickets(_isolate_hermes_hom
                 analysis_summary, blockers_json, recommended_repos_json, confidence,
                 estimated_days, jira_snapshot_json, analyzed_at, created_at, updated_at
             ) VALUES (?, 'TVP-900', 'TVP', 'Thin ticket', 40, 'needs_clarification',
-                      'Needs info', '[]', '[]', 0.4, 1.0, ?, ?, ?, ?)
+                      'Needs info', '[]', '[]', 0.4, NULL, ?, ?, ?, ?)
             """,
             (record_id, snapshot, now, now, now),
-        )
-        pm_store.insert_estimation(
-            conn,
-            readiness_id=record_id,
-            jira_key="TVP-900",
-            complexity="Medium",
-            estimated_days=1.0,
-            confidence=0.4,
-            run_id="RUN-TEST",
         )
 
     payload = build_selected_sprint_payload(project_key="TVP")
@@ -289,5 +280,5 @@ def test_sprint_backlog_includes_needs_clarification_tickets(_isolate_hermes_hom
     assert "TVP-900" in keys
     ticket = next(item for item in payload["tickets"] if item["jiraKey"] == "TVP-900")
     assert ticket["readinessStatus"] == "needs_clarification"
-    assert ticket["estimatedDays"] == 1.0
+    assert ticket["estimatedDays"] is None
     assert payload["usedDays"] == 0.0

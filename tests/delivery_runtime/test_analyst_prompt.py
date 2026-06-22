@@ -34,9 +34,22 @@ def _fenced(payload: dict) -> str:
     ["needs_clarification", "not_development"],
 )
 def test_parse_analyst_completion_accepts_llm_statuses(status):
-    result = parse_analyst_completion(_fenced(_payload(readinessStatus=status)), {"key": "TVP-1"})
+    payload = _payload(readinessStatus=status)
+    payload.pop("estimatedDays", None)
+    result = parse_analyst_completion(_fenced(payload), {"key": "TVP-1"})
 
     assert result["readinessStatus"] == status
+    assert result["estimatedDays"] is None
+
+
+def test_parse_analyst_completion_omits_estimated_days_for_needs_clarification():
+    payload = _payload(readinessStatus="needs_clarification")
+    payload.pop("estimatedDays", None)
+
+    result = parse_analyst_completion(_fenced(payload), {"key": "TVP-7"})
+
+    assert result["readinessStatus"] == "needs_clarification"
+    assert result["estimatedDays"] is None
 
 
 def test_parse_analyst_completion_rejects_analysis_failed_by_default():

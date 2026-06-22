@@ -167,7 +167,7 @@ class TestDailyPipeline:
 
         assert result["scan"]["scanned"] == 3
         assert result["qualification"]["analyzed"] == 3
-        assert result["qualification"]["estimated"] == 2
+        assert result["qualification"]["estimated"] == 1
         assert result["executionQueue"]["items"]
         assert result["executionQueue"]["executableCount"] >= 1
         assert result["selectedSprint"]["capacityDays"] > 0
@@ -185,7 +185,7 @@ class TestDailyPipeline:
         assert clarification["proposal"] is not None
         assert clarification["proposal"]["proposalType"] == "needs_clarification"
         estimations = pm_store.latest_estimations_by_readiness(project_key="AAC")
-        assert clarification["record"]["id"] in estimations
+        assert clarification["record"]["id"] not in estimations
         assert inbox["executionQueue"]["items"]
         assert all(item["jiraKey"] in sprint_keys for item in inbox["executionQueue"]["items"])
         assert inbox["selectedSprint"]["tickets"]
@@ -523,8 +523,8 @@ class TestPmInboxService:
                     id, jira_key, project_key, title, readiness_score, readiness_status,
                     analysis_summary, blockers_json, recommended_repos_json, confidence,
                     jira_snapshot_json, analyzed_at, created_at, updated_at
-                ) VALUES (?, 'BN-900', 'BN', 'Out of sprint', 40, 'needs_clarification',
-                          'Needs info', '[]', '[]', 0.4, ?, ?, ?, ?)
+                ) VALUES (?, 'BN-900', 'BN', 'Out of sprint', 10, 'not_development',
+                          'Support request', '[]', '[]', 0.9, ?, ?, ?, ?)
                 """,
                 (out_of_sprint_record_id, out_of_sprint_snapshot, now, now, now),
             )
@@ -543,7 +543,7 @@ class TestPmInboxService:
                 INSERT INTO jira_comment_proposals (
                     id, readiness_id, work_order_id, jira_key, proposal_type, status,
                     body, created_at, updated_at
-                ) VALUES (?, ?, NULL, 'BN-900', 'needs_clarification', 'pending', 'Please clarify', ?, ?)
+                ) VALUES (?, ?, NULL, 'BN-900', 'not_development', 'pending', 'Please clarify', ?, ?)
                 """,
                 (proposal_id, out_of_sprint_record_id, now, now),
             )

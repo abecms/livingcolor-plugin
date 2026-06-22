@@ -13,6 +13,17 @@ class AnalystParseError(ValueError):
     """Raised when an analyst agent completion cannot be parsed into readiness JSON."""
 
 
+def persistable_estimated_days(analysis: dict[str, Any]) -> float | None:
+    """Return analyst effort only when the ticket is estimable."""
+    status = str(analysis.get("readinessStatus") or "")
+    if status in {"needs_clarification", "not_development"}:
+        return None
+    value = analysis.get("estimatedDays")
+    if value is None:
+        return None
+    return float(value)
+
+
 _REQUIRED_FIELDS = (
     "readinessScore",
     "readinessStatus",
@@ -20,7 +31,6 @@ _REQUIRED_FIELDS = (
     "blockers",
     "recommendedRepos",
     "confidence",
-    "estimatedDays",
 )
 
 
@@ -89,8 +99,10 @@ def build_analyst_user_prompt(snapshot: dict[str, Any]) -> str:
             "recommendedRepos, confidence, estimatedDays.",
             "readinessStatus must be one of: ready, not_ready, needs_clarification, not_development.",
             "Do not use analysis_failed; it is only for runtime/parser failures outside this analysis.",
-            "blockers and recommendedRepos must be arrays. estimatedDays is your effort estimate in",
-            "workdays (8h) as a number, e.g. 1.5.",
+            "blockers and recommendedRepos must be arrays.",
+            "estimatedDays is your effort estimate in workdays (8h) as a positive number, e.g. 1.5.",
+            "Omit estimatedDays or set it to null for needs_clarification and not_development —",
+            "effort cannot be estimated until the ticket is understandable and testable.",
         ]
     )
     return "\n".join(sections)
@@ -226,12 +238,14 @@ def parse_analyst_completion(
         positive=False,
     )
 
-    estimated_days = payload.get("estimatedDays")
-    estimated_days = _require_finite_number(
-        estimated_days,
-        field_name="estimatedDays",
-        positive=True,
-    )
+    estimated_days: float | None = None
+    if readiness_status not in {"needs_clarification", "not_development"}:
+        estimated_days = _require_finite_number(
+            payload.get("estimatedDays"),
+            field_name="estimatedDays",
+            positive=True,
+        )
+        estimated_days = float(estimated_days)
 
     return {
         "readinessScore": int(readiness_score),
@@ -240,7 +254,7 @@ def parse_analyst_completion(
         "blockers": [str(item) for item in blockers],
         "recommendedRepos": [str(item) for item in recommended_repos if str(item).strip()],
         "confidence": float(confidence),
-        "estimatedDays": float(estimated_days),
+        "estimatedDays": estimated_days,
         "jiraSnapshot": snapshot,
     }
 

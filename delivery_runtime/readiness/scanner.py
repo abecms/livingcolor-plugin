@@ -17,6 +17,7 @@ from delivery_runtime.readiness.analysis_dispatcher import (
 from delivery_runtime.readiness.analyzer import analyze_ticket_snapshot
 from delivery_runtime.readiness.analyst_backend import AnalystBackend, SynchronousAnalystBackend
 from delivery_runtime.readiness.errors import ReadinessIntegrationError
+from delivery_runtime.readiness.analyst_prompt import persistable_estimated_days
 from delivery_runtime.readiness.ticket_scope import load_ticket_scope_for_project, matches_ticket_scope
 
 
@@ -394,7 +395,7 @@ class ReadinessScanner:
                     json_dumps(analysis["blockers"]),
                     json_dumps(analysis["recommendedRepos"]),
                     analysis["confidence"],
-                    analysis.get("estimatedDays"),
+                    persistable_estimated_days(analysis),
                     analysis_input_hash,
                     analysis_backend,
                     json_dumps(snapshot),
@@ -427,7 +428,7 @@ class ReadinessScanner:
                 json_dumps(analysis["blockers"]),
                 json_dumps(analysis["recommendedRepos"]),
                 analysis["confidence"],
-                analysis.get("estimatedDays"),
+                persistable_estimated_days(analysis),
                 analysis_input_hash,
                 analysis_backend,
                 None,

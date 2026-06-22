@@ -25,8 +25,8 @@ from delivery_runtime.readiness.ticket_scope import load_ticket_scope_for_projec
 
 
 def _should_persist_ticket_estimation(*, readiness_status: str) -> bool:
-    """Estimate dev tickets we may schedule, even when clarification is still pending."""
-    return readiness_status in {"ready", "needs_clarification", "not_ready"}
+    """Estimate only tickets we can scope and test; skip ambiguous clarification tickets."""
+    return readiness_status in {"ready", "not_ready"}
 
 
 def _comment_proposal_for_status(readiness_status: str, *, language: str) -> tuple[str, str] | tuple[None, None]:
