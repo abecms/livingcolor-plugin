@@ -67,3 +67,4 @@ fi
 "${ROOT}/scripts/cloud-bootstrap.sh"
 
 log "Cloud start complete — proceed with workflow FRT phases B–H"
+log "Run: python3 scripts/cloud-workflow-frt.py  (preferred) or ./scripts/cloud-workflow-frt.sh"
