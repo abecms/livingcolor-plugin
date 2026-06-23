@@ -53,11 +53,21 @@ api() {
   printf '%s\n%s' "${code}" "${resp}"
 }
 
+# curl -w appends HTTP code on its own line; split into API_HTTP + API_BODY globals.
+api_call() {
+  local raw
+  raw=$(api "$@")
+  API_HTTP=$(printf '%s' "${raw}" | head -1)
+  API_BODY=$(printf '%s' "${raw}" | tail -n +2)
+}
+
 wait_wo_status() {
   local wo_id="$1" want="$2" tries="${3:-60}"
   local i code resp status
   for i in $(seq 1 "${tries}"); do
-    read -r code resp < <(api GET "/work-orders/${wo_id}" | { read -r c; echo "${c}"; cat; })
+    api_call GET "/work-orders/${wo_id}"
+    code="${API_HTTP}"
+    resp="${API_BODY}"
     status=$(python3 -c "import json,sys; print(json.load(sys.stdin).get('status',''))" <<<"${resp}")
     if [ "${status}" = "${want}" ]; then
       echo "${status}"
@@ -73,9 +83,13 @@ tick_orchestrator() {
   local wo_id="$1" tries="${2:-90}"
   local i code resp
   for i in $(seq 1 "${tries}"); do
-    read -r code resp < <(api POST "/work-orders/${wo_id}/resume" '{}' | { read -r c; echo "${c}"; cat; })
+    api_call POST "/work-orders/${wo_id}/resume" '{}'
+    code="${API_HTTP}"
+    resp="${API_BODY}"
     sleep 2
-    read -r code resp < <(api GET "/work-orders/${wo_id}" | { read -r c; echo "${c}"; cat; })
+    api_call GET "/work-orders/${wo_id}"
+    code="${API_HTTP}"
+    resp="${API_BODY}"
     local status
     status=$(python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('status',''), d.get('currentStage',''))" <<<"${resp}")
     log "tick ${i}: ${status}"
@@ -88,7 +102,9 @@ tick_orchestrator() {
 : >"${EVIDENCE}"
 
 log "Phase B: setup-automation"
-read -r setup_code setup_resp < <(api POST "/projects/TVP/setup-automation" '{}' | { read -r c; echo "${c}"; cat; })
+api_call POST "/projects/TVP/setup-automation" '{}'
+setup_code="${API_HTTP}"
+setup_resp="${API_BODY}"
 log "setup-automation HTTP ${setup_code}"
 
 log "Phase C: integration probes"
@@ -117,10 +133,14 @@ stripe_live=$(python3 -c "import json; print(json.load(open('/tmp/stripe-probe.j
 log "Stripe balance HTTP ${stripe_code} livemode=${stripe_live}"
 
 log "Phase D: readiness scan"
-read -r scan_code scan_resp < <(api POST "/readiness/scan" '{"projectKey":"TVP"}' | { read -r c; echo "${c}"; cat; })
+api_call POST "/readiness/scan" '{"projectKey":"TVP"}'
+scan_code="${API_HTTP}"
+scan_resp="${API_BODY}"
 log "readiness scan HTTP ${scan_code}"
 
-read -r list_code list_resp < <(api GET "/readiness?projectKey=TVP&status=ready" | { read -r c; echo "${c}"; cat; })
+api_call GET "/readiness?projectKey=TVP&status=ready"
+list_code="${API_HTTP}"
+list_resp="${API_BODY}"
 record_id=$(python3 -c "
 import json,sys
 d=json.load(sys.stdin)
@@ -144,14 +164,18 @@ if [ -z "${record_id}" ]; then
   exit 1
 fi
 
-read -r prom_code prom_resp < <(api POST "/readiness/${record_id}/promote" '{"actor":"cloud-agent:test"}' | { read -r c; echo "${c}"; cat; })
+api_call POST "/readiness/${record_id}/promote" '{"actor":"cloud-agent:test"}'
+prom_code="${API_HTTP}"
+prom_resp="${API_BODY}"
 wo_id=$(python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('workOrderId') or d.get('work_order_id') or d.get('id',''))" <<<"${prom_resp}")
 log "promote HTTP ${prom_code} wo=${wo_id}"
 
 log "Phase E: gate approvals"
 gate_ids=()
 while true; do
-  read -r wo_code wo_resp < <(api GET "/work-orders/${wo_id}" | { read -r c; echo "${c}"; cat; })
+  api_call GET "/work-orders/${wo_id}"
+  wo_code="${API_HTTP}"
+  wo_resp="${API_BODY}"
   status=$(python3 -c "import json,sys; print(json.load(sys.stdin).get('status',''))" <<<"${wo_resp}")
   pending=$(python3 -c "
 import json,sys
@@ -164,7 +188,9 @@ for g in d.get('gates') or []:
   if [ -z "${pending}" ]; then
     if [ "${status}" = "completed" ]; then break; fi
     tick_orchestrator "${wo_id}" 30 || true
-    read -r wo_code wo_resp < <(api GET "/work-orders/${wo_id}" | { read -r c; echo "${c}"; cat; })
+    api_call GET "/work-orders/${wo_id}"
+  wo_code="${API_HTTP}"
+  wo_resp="${API_BODY}"
     pending=$(python3 -c "
 import json,sys
 d=json.load(sys.stdin)
@@ -176,13 +202,17 @@ for g in d.get('gates') or []:
     [ -n "${pending}" ] || { log "no pending gate, status=${status}"; break; }
   fi
   log "approving gate ${pending}"
-  read -r appr_code appr_resp < <(api POST "/gates/${pending}/approve" '{"approvedBy":"cloud-agent:test"}' | { read -r c; echo "${c}"; cat; })
+  api_call POST "/gates/${pending}/approve" '{"approvedBy":"cloud-agent:test"}'
+  appr_code="${API_HTTP}"
+  appr_resp="${API_BODY}"
   gate_ids+=("${pending}")
   tick_orchestrator "${wo_id}" 60 || true
 done
 
 log "Phase F: delivery verification"
-read -r final_code final_resp < <(api GET "/work-orders/${wo_id}" | { read -r c; echo "${c}"; cat; })
+api_call GET "/work-orders/${wo_id}"
+final_code="${API_HTTP}"
+final_resp="${API_BODY}"
 final_status=$(python3 -c "import json,sys; print(json.load(sys.stdin).get('status',''))" <<<"${final_resp}")
 pr_url=$(python3 -c "
 import json,sys
@@ -209,11 +239,19 @@ else:
 log "final WO status=${final_status} pr=${pr_url} branch=${branch}"
 
 log "Phase G: sprint report"
-read -r sr_code sr_resp < <(api POST "/sprint/report" '{}' | { read -r c; echo "${c}"; cat; })
+api_call POST "/sprint/report" '{}'
+sr_code="${API_HTTP}"
+sr_resp="${API_BODY}"
 log "sprint report HTTP ${sr_code}"
 
 log "Phase H: stripe invoice (if configured)"
-read -r inv_code inv_resp < <(api POST "/sprint/reset" '{}' 2>/dev/null | { read -r c; echo "${c}"; cat; } || echo "000 {}")
+if api_call POST "/sprint/reset" '{}' 2>/dev/null; then
+  inv_code="${API_HTTP}"
+  inv_resp="${API_BODY}"
+else
+  inv_code="000"
+  inv_resp="{}"
+fi
 
 python3 - <<'PY' "${SUMMARY}" "${jira_key}" "${wo_id}" "${final_status}" "${pr_url}" "${branch}" "${jira_code}" "${gh_code}" "${stripe_code}" "${stripe_live}" "${setup_code}" "${scan_code}" "${prom_code}" "${sr_code}"
 import json, sys
