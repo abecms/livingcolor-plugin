@@ -274,7 +274,7 @@ class SelectedSprintTicketResponse(BaseModel):
     readinessId: str
     jiraKey: str
     title: str
-    estimatedDays: float
+    estimatedDays: float | None = None
     priorityRank: int = 0
     urgencyScore: float = 0
     warnings: list[str] = Field(default_factory=list)
