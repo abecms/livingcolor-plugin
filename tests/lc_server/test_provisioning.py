@@ -23,13 +23,13 @@ def test_render_developer_template_produces_valid_manifest():
     manifest = parse_agent_manifest(rendered)
     assert manifest.role == "developer"
     assert manifest.context["projectKey"] == "BN"
-    assert manifest.template_version == "1.7.0"
+    assert manifest.template_version == "1.8.0"
     assert manifest.template_checksum.startswith("sha256:")
     assert manifest.runtime.type == "hermes"
     assert manifest.runtime.max_iterations == 60
     assert manifest.runtime.toolsets == ("file", "terminal", "skills")
-    assert manifest.runtime.model == "deepseek/deepseek-v4-pro"
-    assert manifest.runtime.provider == "openrouter"
+    assert manifest.runtime.model == "lc-developer"
+    assert manifest.runtime.provider == "moa"
     assert "LivingColor Developer Agent" in manifest.prompt.system
     assert len(manifest.prompt.rules) >= 1
     skill_paths = {skill.path for skill in manifest.skills}
@@ -48,7 +48,7 @@ def test_render_orchestrator_template_runtime_none():
     manifest = parse_agent_manifest(rendered)
     assert manifest.role == "orchestrator"
     assert manifest.runtime.type == "none"
-    assert manifest.template_version == "1.7.0"
+    assert manifest.template_version == "1.8.0"
     assert manifest.template_checksum.startswith("sha256:")
     assert any(skill.path == "skills/delivery/agent-delivery-standards/SKILL.md" for skill in manifest.skills)
 
@@ -63,13 +63,13 @@ def test_render_analyst_template_runtime_hermes():
     assert manifest.runtime.type == "hermes"
     assert manifest.runtime.max_iterations == 15
     assert manifest.runtime.toolsets == ()
-    assert manifest.template_version == "1.7.0"
+    assert manifest.template_version == "1.8.0"
     assert manifest.template_checksum.startswith("sha256:")
     assert "LivingColor Analyst Agent" in manifest.prompt.system
     assert "readinessScore" in manifest.prompt.system
     assert any(skill.path == "skills/delivery/analyst-readiness/SKILL.md" for skill in manifest.skills)
-    assert manifest.runtime.model == "openrouter/owl-alpha"
-    assert manifest.runtime.provider == "openrouter"
+    assert manifest.runtime.model == "lc-analyst"
+    assert manifest.runtime.provider == "moa"
     from lc_server.provisioning.template_renderer import render_role_template
 
     rendered = render_role_template("developer", variables=VARIABLES)
@@ -79,6 +79,19 @@ def test_render_analyst_template_runtime_hermes():
     content_for_hash = rendered.replace(checksum_line, 'templateChecksum: ""')
     expected = "sha256:" + hashlib.sha256(content_for_hash.encode("utf-8")).hexdigest()
     assert stored_checksum == expected
+
+
+def test_templates_use_moa_provider():
+    from lc_server.provisioning.template_renderer import render_role_template
+
+    for role, model in (
+        ("analyst", "lc-analyst"),
+        ("planner", "lc-planner"),
+        ("developer", "lc-developer"),
+    ):
+        rendered = render_role_template(role, variables=VARIABLES)
+        assert "provider: moa" in rendered
+        assert f"model: {model}" in rendered
 
 
 def test_render_rejects_unknown_role():
@@ -372,7 +385,7 @@ def test_provision_writes_manifests_and_mapping(livingcolor_home):
     assert result.agents_provisioned == ["analyst", "developer", "orchestrator", "planner", "publisher", "reporter"]
     assert result.repos_discovered == 2
     assert result.default_repo == "group/bn-frontend"
-    assert result.template_version == "1.7.0"
+    assert result.template_version == "1.8.0"
     assert result.warnings == []
 
     for role in ("orchestrator", "analyst", "planner", "developer", "publisher", "reporter"):
@@ -380,7 +393,7 @@ def test_provision_writes_manifests_and_mapping(livingcolor_home):
 
     automation = yaml.safe_load(get_automation_state_path("BN").read_text(encoding="utf-8"))
     assert automation["status"] == "ready"
-    assert automation["templateVersion"] == "1.7.0"
+    assert automation["templateVersion"] == "1.8.0"
     assert automation["reposDiscovered"] == 2
     assert automation["defaultRepo"] == "group/bn-frontend"
     assert automation["provisionedAt"]
@@ -484,17 +497,17 @@ def test_upgrade_rewrites_manifest_when_template_newer(livingcolor_home):
 
     developer_path = get_agent_manifest_path("BN", "developer")
     before = parse_agent_manifest(developer_path.read_text(encoding="utf-8"))
-    assert before.template_version == "1.7.0"
+    assert before.template_version == "1.8.0"
 
     with patch(
         "lc_server.provisioning.template_renderer.get_template_version",
-        return_value="1.8.0",
+        return_value="1.9.0",
     ):
         upgraded = upgrade_all_project_manifests()
 
     assert "BN" in upgraded
     after = parse_agent_manifest(developer_path.read_text(encoding="utf-8"))
-    assert after.template_version == "1.8.0"
+    assert after.template_version == "1.9.0"
     assert after.manually_edited is False
 
 
@@ -524,7 +537,7 @@ def test_upgrade_renders_newly_added_role_manifest(livingcolor_home):
 
     with patch(
         "lc_server.provisioning.template_renderer.get_template_version",
-        return_value="1.8.0",
+        return_value="1.9.0",
     ):
         upgraded = upgrade_all_project_manifests()
 
@@ -532,7 +545,7 @@ def test_upgrade_renders_newly_added_role_manifest(livingcolor_home):
     assert planner_path.is_file()
     manifest = parse_agent_manifest(planner_path.read_text(encoding="utf-8"))
     assert manifest.role == "planner"
-    assert manifest.template_version == "1.8.0"
+    assert manifest.template_version == "1.9.0"
     assert manifest.manually_edited is False
     assert manifest.context["projectKey"] == "BN"
 
@@ -564,17 +577,17 @@ def test_upgrade_skips_manually_edited_manifest(livingcolor_home):
 
     with patch(
         "lc_server.provisioning.template_renderer.get_template_version",
-        return_value="1.8.0",
+        return_value="1.9.0",
     ):
         upgraded = upgrade_all_project_manifests()
 
     assert "BN" in upgraded
     developer = parse_agent_manifest(developer_path.read_text(encoding="utf-8"))
     assert developer.manually_edited is True
-    assert developer.template_version == "1.7.0"
+    assert developer.template_version == "1.8.0"
 
     orchestrator = parse_agent_manifest(
         get_agent_manifest_path("BN", "orchestrator").read_text(encoding="utf-8")
     )
-    assert orchestrator.template_version == "1.8.0"
+    assert orchestrator.template_version == "1.9.0"
     assert orchestrator.manually_edited is False
