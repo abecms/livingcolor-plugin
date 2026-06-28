@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 
-def test_role_defaults_match_openrouter_split():
+def test_role_defaults_use_moa_presets():
     from lc_server.model_defaults import (
         LIVINGCOLOR_ANALYST_MODEL,
         LIVINGCOLOR_ANALYST_PROVIDER,
@@ -12,17 +12,35 @@ def test_role_defaults_match_openrouter_split():
         LIVINGCOLOR_PLANNER_MODEL,
         LIVINGCOLOR_PLANNER_PROVIDER,
         LIVINGCOLOR_PUBLISHER_MODEL,
+        LIVINGCOLOR_PUBLISHER_PROVIDER,
         LIVINGCOLOR_REPORTER_MODEL,
+        LIVINGCOLOR_REPORTER_PROVIDER,
     )
 
-    assert LIVINGCOLOR_ANALYST_PROVIDER == "openrouter"
-    assert LIVINGCOLOR_PLANNER_PROVIDER == "openrouter"
-    assert LIVINGCOLOR_DEVELOPER_PROVIDER == "openrouter"
-    assert LIVINGCOLOR_ANALYST_MODEL == "openrouter/owl-alpha"
-    assert LIVINGCOLOR_PLANNER_MODEL == "openrouter/owl-alpha"
+    assert LIVINGCOLOR_ANALYST_PROVIDER == "moa"
+    assert LIVINGCOLOR_PLANNER_PROVIDER == "moa"
+    assert LIVINGCOLOR_DEVELOPER_PROVIDER == "moa"
+    assert LIVINGCOLOR_ANALYST_MODEL == "lc-analyst"
+    assert LIVINGCOLOR_PLANNER_MODEL == "lc-planner"
+    assert LIVINGCOLOR_DEVELOPER_MODEL == "lc-developer"
+    assert LIVINGCOLOR_REPORTER_PROVIDER == "openrouter"
     assert LIVINGCOLOR_REPORTER_MODEL == "openrouter/owl-alpha"
-    assert LIVINGCOLOR_DEVELOPER_MODEL == "deepseek/deepseek-v4-pro"
+    assert LIVINGCOLOR_PUBLISHER_PROVIDER == "openrouter"
     assert LIVINGCOLOR_PUBLISHER_MODEL == "deepseek/deepseek-v4-pro"
+
+
+def test_moa_tier_premium(monkeypatch):
+    monkeypatch.setenv("LIVINGCOLOR_MOA_TIER", "premium")
+    from importlib import reload
+
+    import lc_server.model_defaults as md
+
+    reload(md)
+    assert md.LIVINGCOLOR_DEVELOPER_MODEL == "lc-developer-premium"
+    assert md.LIVINGCOLOR_DEVELOPER_PROVIDER == "moa"
+
+    monkeypatch.delenv("LIVINGCOLOR_MOA_TIER", raising=False)
+    reload(md)
 
 
 def test_developer_inference_uses_role_defaults_without_env_override(monkeypatch, tmp_path):
@@ -66,8 +84,8 @@ def test_planner_inference_uses_owl_role_defaults(monkeypatch, tmp_path):
         allow_env_override=False,
     )
 
-    assert model == "openrouter/owl-alpha"
-    assert provider == "openrouter"
+    assert model == "lc-planner"
+    assert provider == "moa"
 
 
 def test_developer_inference_honors_env_override(monkeypatch, tmp_path):
