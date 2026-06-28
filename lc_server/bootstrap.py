@@ -65,6 +65,13 @@ def bootstrap_livingcolor_server() -> None:
     except Exception as exc:
         logger.warning("MCP env bootstrap skipped: %s", exc)
 
+    try:
+        from lc_server.integrations.moa_bootstrap import ensure_moa_presets_from_bundle
+
+        ensure_moa_presets_from_bundle()
+    except Exception as exc:
+        logger.warning("MoA preset bootstrap skipped: %s", exc)
+
     from delivery_runtime.api import deps
     from delivery_runtime.persistence.db import init_db
 
