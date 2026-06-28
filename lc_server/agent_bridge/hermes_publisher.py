@@ -372,14 +372,14 @@ def _default_publisher_agent_factory(
 
     from lc_server.agent_bridge.inference_config import resolve_delivery_inference
     from lc_server.model_defaults import (
-        LIVINGCOLOR_DEVELOPER_MODEL,
-        LIVINGCOLOR_DEVELOPER_PROVIDER,
+        LIVINGCOLOR_PUBLISHER_MODEL,
+        LIVINGCOLOR_PUBLISHER_PROVIDER,
     )
 
     effective_model, effective_provider = resolve_delivery_inference(
         manifest=manifest,
-        role_default_model=LIVINGCOLOR_DEVELOPER_MODEL,
-        role_default_provider=LIVINGCOLOR_DEVELOPER_PROVIDER,
+        role_default_model=LIVINGCOLOR_PUBLISHER_MODEL,
+        role_default_provider=LIVINGCOLOR_PUBLISHER_PROVIDER,
         allow_env_override=True,
     )
 

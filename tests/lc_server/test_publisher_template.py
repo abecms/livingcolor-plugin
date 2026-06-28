@@ -26,11 +26,11 @@ def test_publisher_template_renders_valid_manifest():
     assert manifest.role == "publisher"
     assert manifest.template_checksum.startswith("sha256:")
     assert manifest.runtime.type == "hermes"
-    assert manifest.runtime.max_iterations == 8
+    assert manifest.runtime.max_iterations == 16
     assert "terminal" in manifest.runtime.toolsets
     assert "file" not in manifest.runtime.toolsets
-    assert manifest.runtime.model is None
-    assert manifest.runtime.provider is None
+    assert manifest.runtime.model == "deepseek/deepseek-v4-pro"
+    assert manifest.runtime.provider == "openrouter"
     assert "LivingColor Publisher Agent" in manifest.prompt.system
     assert manifest.context["projectKey"] == "TVP"
     skill_paths = {skill.path for skill in manifest.skills}
