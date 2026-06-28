@@ -114,10 +114,15 @@ def _default_analyst_agent_factory(
         max_iterations = 15
         platform = "livingcolor-delivery"
 
-    from lc_server.agent_bridge.inference_config import resolve_delivery_inference
+    from lc_server.agent_bridge.inference_config import (
+        resolve_delivery_inference,
+        resolve_moa_or_fallback,
+    )
     from lc_server.model_defaults import (
         LIVINGCOLOR_ANALYST_MODEL,
         LIVINGCOLOR_ANALYST_PROVIDER,
+        LIVINGCOLOR_FALLBACK_PROVIDER,
+        LIVINGCOLOR_ORCHESTRATION_FALLBACK_MODEL,
     )
 
     effective_model, effective_provider = resolve_delivery_inference(
@@ -125,6 +130,12 @@ def _default_analyst_agent_factory(
         role_default_model=LIVINGCOLOR_ANALYST_MODEL,
         role_default_provider=LIVINGCOLOR_ANALYST_PROVIDER,
         allow_env_override=True,
+    )
+    effective_model, effective_provider = resolve_moa_or_fallback(
+        effective_model,
+        effective_provider,
+        fallback_model=LIVINGCOLOR_ORCHESTRATION_FALLBACK_MODEL,
+        fallback_provider=LIVINGCOLOR_FALLBACK_PROVIDER,
     )
 
     cfg = load_config()

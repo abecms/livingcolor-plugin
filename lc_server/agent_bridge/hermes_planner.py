@@ -122,8 +122,13 @@ def _default_planner_agent_factory(
         max_iterations = 20
         platform = "livingcolor-delivery"
 
-    from lc_server.agent_bridge.inference_config import resolve_delivery_inference
+    from lc_server.agent_bridge.inference_config import (
+        resolve_delivery_inference,
+        resolve_moa_or_fallback,
+    )
     from lc_server.model_defaults import (
+        LIVINGCOLOR_FALLBACK_PROVIDER,
+        LIVINGCOLOR_ORCHESTRATION_FALLBACK_MODEL,
         LIVINGCOLOR_PLANNER_MODEL,
         LIVINGCOLOR_PLANNER_PROVIDER,
     )
@@ -133,6 +138,12 @@ def _default_planner_agent_factory(
         role_default_model=LIVINGCOLOR_PLANNER_MODEL,
         role_default_provider=LIVINGCOLOR_PLANNER_PROVIDER,
         allow_env_override=True,
+    )
+    effective_model, effective_provider = resolve_moa_or_fallback(
+        effective_model,
+        effective_provider,
+        fallback_model=LIVINGCOLOR_ORCHESTRATION_FALLBACK_MODEL,
+        fallback_provider=LIVINGCOLOR_FALLBACK_PROVIDER,
     )
 
     cfg = load_config()

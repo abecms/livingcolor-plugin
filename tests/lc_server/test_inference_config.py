@@ -150,3 +150,38 @@ def test_developer_inference_prefers_manifest_model(monkeypatch, tmp_path):
 
     assert model == "z-ai/glm-5.2"
     assert provider == "openrouter"
+
+
+def test_moa_fallback_when_preset_disabled(monkeypatch, tmp_path):
+    from lc_server.agent_bridge.inference_config import resolve_moa_or_fallback
+
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes"))
+    (tmp_path / "hermes").mkdir()
+    (tmp_path / "hermes" / "config.yaml").write_text(
+        "moa:\n  presets:\n    lc-analyst:\n      enabled: false\n",
+        encoding="utf-8",
+    )
+
+    model, provider = resolve_moa_or_fallback(
+        "lc-analyst",
+        "moa",
+        fallback_model="openrouter/owl-alpha",
+        fallback_provider="openrouter",
+    )
+
+    assert model == "openrouter/owl-alpha"
+    assert provider == "openrouter"
+
+
+def test_moa_fallback_passthrough_when_not_moa():
+    from lc_server.agent_bridge.inference_config import resolve_moa_or_fallback
+
+    model, provider = resolve_moa_or_fallback(
+        "deepseek/deepseek-v4-pro",
+        "openrouter",
+        fallback_model="openrouter/owl-alpha",
+        fallback_provider="openrouter",
+    )
+
+    assert model == "deepseek/deepseek-v4-pro"
+    assert provider == "openrouter"
