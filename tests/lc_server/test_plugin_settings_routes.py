@@ -19,6 +19,8 @@ def test_plugin_settings_round_trip(_isolate_hermes_home, monkeypatch):
     monkeypatch.setattr(lc_constants, "get_livingcolor_home", lambda: lc_home)
     monkeypatch.setattr(automation_config, "get_livingcolor_home", lambda: lc_home)
     monkeypatch.delenv("STRIPE_SECRET_KEY", raising=False)
+    monkeypatch.delenv("STRIPE_TEST_CUSTOMER_ID", raising=False)
+    monkeypatch.delenv("STRIPE_DAILY_RATE_CENTS", raising=False)
 
     client = _client()
 
@@ -69,6 +71,8 @@ def test_plugin_settings_legacy_root_path(_isolate_hermes_home, monkeypatch):
     monkeypatch.setattr(lc_constants, "get_livingcolor_home", lambda: lc_home)
     monkeypatch.setattr(automation_config, "get_livingcolor_home", lambda: lc_home)
     monkeypatch.delenv("STRIPE_SECRET_KEY", raising=False)
+    monkeypatch.delenv("STRIPE_TEST_CUSTOMER_ID", raising=False)
+    monkeypatch.delenv("STRIPE_DAILY_RATE_CENTS", raising=False)
 
     app = FastAPI()
     app.include_router(plugin_router, prefix="/api/plugins/livingcolor")
