@@ -146,3 +146,50 @@ def test_resolve_livingcolor_project_cwd_from_mapping(monkeypatch, tmp_path):
     )
 
     assert resolve_livingcolor_project_cwd("BN") == str(repo.resolve())
+
+
+def test_pty_resolve_chat_argv_forwards_active_session_file(monkeypatch):
+    import sys
+    import types
+
+    import lc_server.integrations.project_chat_context as module
+
+    calls: list[dict] = []
+
+    def fake_original_resolve(**kwargs):
+        calls.append(kwargs)
+        return (["node", "entry.js"], "/tmp", {})
+
+    fake_ws = types.SimpleNamespace(
+        _resolve_chat_argv=fake_original_resolve,
+        _resolve_profile_dir=lambda name: f"/profiles/{name}",
+        pty_ws=lambda _ws: None,
+        app=types.SimpleNamespace(routes=[]),
+        _LC_PTY_PROJECT_CHAT_HOOKS=False,
+    )
+    monkeypatch.setitem(sys.modules, "hermes_cli.web_server", fake_ws)
+    monkeypatch.setattr(module, "_resolve_pty_project_key", lambda **_kwargs: None)
+    monkeypatch.setattr(module, "ensure_livingcolor_pm_profile", lambda: None)
+
+    module.install_pty_project_chat_hooks()
+
+    argv, cwd, env = fake_ws._resolve_chat_argv(
+        resume="sess-1",
+        sidecar_url="ws://127.0.0.1/api/pub?channel=plain",
+        profile="current",
+        active_session_file="/tmp/active-session.json",
+        future_kwarg="ok",
+    )
+
+    assert argv == ["node", "entry.js"]
+    assert cwd == "/tmp"
+    assert env == {}
+    assert calls == [
+        {
+            "resume": "sess-1",
+            "sidecar_url": "ws://127.0.0.1/api/pub?channel=plain",
+            "profile": "current",
+            "active_session_file": "/tmp/active-session.json",
+            "future_kwarg": "ok",
+        }
+    ]

@@ -494,14 +494,26 @@ def install_pty_project_chat_hooks() -> None:
             ensure_livingcolor_pm_profile()
         return original_resolve_profile_dir(name)
 
-    def _resolve_chat_argv(resume=None, sidecar_url=None, profile=None):
+    def _resolve_chat_argv(
+        resume=None,
+        sidecar_url=None,
+        profile=None,
+        active_session_file=None,
+        **kwargs,
+    ):
         lc_key = _resolve_pty_project_key(sidecar_url=sidecar_url)
         if lc_key:
             ensure_livingcolor_pm_profile()
             profile = LIVINGCOLOR_PM_PROFILE_NAME
             if resume and not _livingcolor_resume_allowed(resume, lc_key):
                 resume = None
-        argv, cwd, env = original_resolve(resume=resume, sidecar_url=sidecar_url, profile=profile)
+        argv, cwd, env = original_resolve(
+            resume=resume,
+            sidecar_url=sidecar_url,
+            profile=profile,
+            active_session_file=active_session_file,
+            **kwargs,
+        )
         if lc_key:
             _apply_livingcolor_pty_env(env, lc_key, resume=resume)
         return argv, cwd, env
