@@ -32,12 +32,19 @@ log() { echo "[cloud-start] $*"; }
 # shellcheck disable=SC1091
 source "${ROOT}/scripts/cloud-load-credentials.sh"
 
-# 2) Fresh credentials piped on stdin (agent extracts values from the prompt)
+# 2) Fresh credentials piped on stdin (agent extracts values from the prompt).
+# Skip when stdin is closed/empty (e.g. </dev/null) and ~/.hermes/livingcolor/.env already exists.
 if [ ! -t 0 ]; then
-  log "Writing credentials from stdin to ~/.hermes/livingcolor/.env"
-  python3 "${ROOT}/scripts/cloud_write_credentials.py"
-  # shellcheck disable=SC1091
-  source "${ROOT}/scripts/cloud-load-credentials.sh"
+  stdin_creds="$(cat)"
+  if [ -n "${stdin_creds}" ]; then
+    log "Writing credentials from stdin to ~/.hermes/livingcolor/.env"
+    printf '%s' "${stdin_creds}" | python3 "${ROOT}/scripts/cloud_write_credentials.py"
+    # shellcheck disable=SC1091
+    source "${ROOT}/scripts/cloud-load-credentials.sh"
+  elif [ ! -f "${HOME}/.hermes/livingcolor/.env" ]; then
+    log "ERROR: no credentials on stdin and ${HOME}/.hermes/livingcolor/.env is missing"
+    exit 1
+  fi
 fi
 
 # 3) Hydrate + MCP provision (also loads .env inside Python for API handlers)
