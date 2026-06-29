@@ -41,3 +41,31 @@ def test_resolve_repository_uses_managed_checkout_when_mapping_has_list_repos(_i
     assert resolved is not None
     assert resolved.checkout_path == managed_path
     ensure_mock.assert_called_once()
+
+
+def test_resolve_repository_ignores_analyst_prose_recommendations(_isolate_hermes_home):
+    mapping = {
+        "BN": {
+            "default_repo": "tv5monde/bibliotheque-numerique-v2",
+        }
+    }
+
+    with patch("delivery_runtime.context.repo_resolver.load_project_mapping", return_value=mapping), patch(
+        "delivery_runtime.readiness.project_mapping.load_project_mapping",
+        return_value=mapping,
+    ), patch(
+        "delivery_runtime.context.repo_resolver.ensure_managed_checkout",
+        return_value="/tmp/bn-checkout",
+    ):
+        resolved = resolve_repository(
+            project_key="BN",
+            snapshot={"projectKey": "BN", "labels": []},
+            recommended_repos=[
+                "BN frontend web application (bibliothequenumerique.tv5monde.com)",
+                "Author page templates/styles module",
+            ],
+        )
+
+    assert resolved is not None
+    assert resolved.repo_id == "tv5monde/bibliotheque-numerique-v2"
+    assert resolved.source == "mapping"

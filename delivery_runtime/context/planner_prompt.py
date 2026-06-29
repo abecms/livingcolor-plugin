@@ -226,10 +226,15 @@ def parse_planner_completion(text: str, pack: ContextPack) -> dict[str, Any]:
 
     impacted = payload["likelyImpactedFiles"]
     if not isinstance(impacted, list) or not impacted:
-        raise PlannerParseError("likelyImpactedFiles must be a non-empty list")
-    impacted_paths = [str(item).strip() for item in impacted if str(item).strip()]
-    if not impacted_paths:
-        raise PlannerParseError("likelyImpactedFiles must contain at least one path")
+        impacted_paths = [str(item).strip() for item in (pack.candidate_files or []) if str(item).strip()]
+        if not impacted_paths:
+            raise PlannerParseError("likelyImpactedFiles must be a non-empty list")
+    else:
+        impacted_paths = [str(item).strip() for item in impacted if str(item).strip()]
+        if not impacted_paths and pack.candidate_files:
+            impacted_paths = [str(item).strip() for item in pack.candidate_files if str(item).strip()]
+        if not impacted_paths:
+            raise PlannerParseError("likelyImpactedFiles must contain at least one path")
 
     risks = payload["risks"]
     if not isinstance(risks, list):

@@ -77,7 +77,20 @@ class HermesPlannerAgent:
         )
         result = agent.run_conversation(prompt, task_id=task_id)
         final_response = str(result.get("final_response") or "")
-        return parse_planner_completion(final_response, pack)
+        try:
+            return parse_planner_completion(final_response, pack)
+        except PlannerParseError as exc:
+            from delivery_runtime.context.planner import RepoAwarePlanner
+
+            logger.warning(
+                "Planner LLM output invalid for %s (%s); falling back to repo-aware planner",
+                jira_key or key,
+                exc,
+            )
+            fallback = RepoAwarePlanner().plan(pack, project_key=key)
+            if fallback.get("needsClarification"):
+                raise
+            return fallback
 
 
 def _resolve_planner_manifest(

@@ -17,6 +17,22 @@ class ResolvedRepository:
     source: str
 
 
+def _is_plausible_repo_id(value: str) -> bool:
+    """Return True when *value* looks like a VCS repo path, not analyst prose."""
+    candidate = str(value or "").strip().strip("/")
+    if not candidate:
+        return False
+    if any(char in candidate for char in " ()"):
+        return False
+    if candidate.count("/") < 1:
+        return False
+    return True
+
+
+def _filter_repo_candidates(candidates: list[str]) -> list[str]:
+    return [item for item in candidates if _is_plausible_repo_id(item)]
+
+
 def resolve_repository(
     *,
     project_key: str,
@@ -33,8 +49,10 @@ def resolve_repository(
     source = "override"
 
     if not repo_id and recommended_repos:
-        repo_id = str(recommended_repos[0]).strip()
-        source = "readiness"
+        filtered = _filter_repo_candidates([str(item).strip() for item in recommended_repos if str(item).strip()])
+        if filtered:
+            repo_id = filtered[0]
+            source = "readiness"
 
     if not repo_id:
         inferred = resolve_recommended_repos(project_key, snapshot)
@@ -43,6 +61,9 @@ def resolve_repository(
             source = "mapping"
 
     if not repo_id:
+        return None
+
+    if not _is_plausible_repo_id(repo_id):
         return None
 
     checkout_path = _lookup_checkout_path(project_cfg, repo_id)

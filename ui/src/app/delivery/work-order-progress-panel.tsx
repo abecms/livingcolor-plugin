@@ -137,7 +137,11 @@ export function WorkOrderProgressPanel({
   const developmentNode = nodes.find(node => node.nodeType === 'development')
   const mrCreationNode = nodes.find(node => node.nodeType === 'mr_creation')
   const mrCreationPayload = (mrCreationNode?.payload ?? {}) as ReviewRequestFields
-  const showResume = workOrder.status === 'running' && workOrderNeedsResume(workOrder) && Boolean(onResume)
+  const planNode = nodes.find(node => node.nodeType === 'implementation_plan')
+  const plannerRunning =
+    workOrder.status === 'running' && planNode?.status === 'running' && workOrder.currentStage === 'intake'
+  const showResume =
+    workOrder.status === 'running' && workOrderNeedsResume(workOrder) && !plannerRunning && Boolean(onResume)
   const agentRunning = developmentNode?.status === 'running'
   const reviewRequestSource: ReviewRequestFields = {
     reviewRequestUrl: mrDraft?.reviewRequestUrl ?? mrCreationPayload.reviewRequestUrl,
@@ -192,6 +196,12 @@ export function WorkOrderProgressPanel({
             ) : workOrder.currentStage === 'mr_publication' ? (
               <p className="mt-3 text-xs text-(--ui-text-tertiary)" data-testid="work-order-review-publication-pending">
                 {formatReviewRequestPublicationPendingLabel(provider)}
+              </p>
+            ) : null}
+            {plannerRunning ? (
+              <p className="mt-4 text-xs text-(--ui-text-tertiary)" data-testid="work-order-planner-running">
+                Planner agent is running. MoA planning can take a few minutes — this panel refreshes when the gate
+                opens.
               </p>
             ) : null}
             {workOrder.status === 'failed' ? (

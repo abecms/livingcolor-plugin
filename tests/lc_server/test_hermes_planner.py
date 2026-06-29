@@ -105,6 +105,23 @@ def test_parse_planner_completion_raises_on_missing_json():
         parse_planner_completion("No JSON here", _sample_pack())
 
 
+def test_parse_planner_completion_uses_candidate_files_when_llm_omits_paths():
+    pack = _sample_pack()
+    payload = {
+        "needsClarification": False,
+        "ticketUnderstanding": "Fix author page layout.",
+        "targetRepo": "tv5monde/tv5mondeplus-front",
+        "implementationPlan": "1. Update author template",
+        "likelyImpactedFiles": [],
+        "risks": ["Layout regression"],
+        "confidenceLevel": 0.7,
+    }
+
+    result = parse_planner_completion(_completion_text(payload), pack)
+
+    assert result["likelyImpactedFiles"] == ["tests/unit/live-direct-name.test.js", "assets/js/tv-guide.js"]
+
+
 def test_hermes_planner_agent_uses_mock_factory():
     from lc_server.agent_bridge.hermes_planner import HermesPlannerAgent
 
