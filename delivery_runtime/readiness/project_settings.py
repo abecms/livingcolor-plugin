@@ -338,6 +338,33 @@ def persist_project_default_repo(project_key: str, default_repo: str) -> str:
     return repo
 
 
+def discover_project_default_repo(project_key: str) -> str | None:
+    """Infer default repo from the configured VCS MCP when mapping has no explicit default."""
+    key = _normalize_project_key(project_key)
+    if not key:
+        return None
+
+    provider = load_project_vcs_provider(key)
+    mcp_config = resolve_project_mcp_server(key, provider)
+    if not mcp_config:
+        return None
+
+    try:
+        if provider == "github":
+            from lc_server.integrations.vcs.github import discover_github_repos_for_project
+
+            discovery = discover_github_repos_for_project(key, mcp_config)
+        else:
+            from lc_server.provisioning.gitlab_discovery import discover_gitlab_repos_for_project
+
+            discovery = discover_gitlab_repos_for_project(key, mcp_config)
+    except Exception:
+        return None
+
+    repo = str(discovery.default_repo or "").strip()
+    return repo or None
+
+
 def _patch_yaml_context_default_repo(path, default_repo: str) -> None:
     try:
         import yaml

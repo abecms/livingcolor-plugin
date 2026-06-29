@@ -69,3 +69,49 @@ def test_resolve_repository_ignores_analyst_prose_recommendations(_isolate_herme
     assert resolved is not None
     assert resolved.repo_id == "tv5monde/bibliotheque-numerique-v2"
     assert resolved.source == "mapping"
+
+
+def test_resolve_repository_uses_gitlab_discovery_when_mapping_has_no_default(_isolate_hermes_home):
+    mapping = {
+        "BN": {
+            "vcs": "gitlab",
+            "integrations": {
+                "mcp_servers": {
+                    "gitlab": {
+                        "env": {
+                            "GITLAB_API_URL": "https://gitlab.example.com/api/v4",
+                            "GITLAB_PERSONAL_ACCESS_TOKEN": "token",
+                        }
+                    }
+                }
+            },
+        }
+    }
+    discovery = type(
+        "Result",
+        (),
+        {"default_repo": "tv5monde/bibliotheque-numerique-v2", "repos": []},
+    )()
+
+    with patch("delivery_runtime.context.repo_resolver.load_project_mapping", return_value=mapping), patch(
+        "delivery_runtime.readiness.project_mapping.load_project_mapping",
+        return_value=mapping,
+    ), patch(
+        "delivery_runtime.readiness.project_settings.resolve_project_mcp_server",
+        return_value={"env": {"GITLAB_PERSONAL_ACCESS_TOKEN": "token"}},
+    ), patch(
+        "lc_server.provisioning.gitlab_discovery.discover_gitlab_repos_for_project",
+        return_value=discovery,
+    ), patch(
+        "delivery_runtime.context.repo_resolver.ensure_managed_checkout",
+        return_value="/tmp/bn-checkout",
+    ):
+        resolved = resolve_repository(
+            project_key="BN",
+            snapshot={"projectKey": "BN", "labels": []},
+            recommended_repos=[],
+        )
+
+    assert resolved is not None
+    assert resolved.repo_id == "tv5monde/bibliotheque-numerique-v2"
+    assert resolved.source == "discovery"

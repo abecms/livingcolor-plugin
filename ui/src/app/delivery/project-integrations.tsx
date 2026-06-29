@@ -278,8 +278,12 @@ export function ProjectIntegrationsSection() {
           ? await fetchProjectVcsRepos(activeProjectKey)
           : await fetchProjectGitlabRepos(activeProjectKey)
       setVcsRepos(reposPayload.items ?? [])
-      setDefaultRepo(reposPayload.defaultRepo ?? '')
+      const resolvedDefault = reposPayload.defaultRepo ?? ''
+      setDefaultRepo(resolvedDefault)
       setIntegrationBranch(config.integrationBranch ?? '')
+      if (!config.defaultRepo?.trim() && resolvedDefault.trim()) {
+        await saveProjectDefaultRepo(resolvedDefault.trim())
+      }
     } catch (error) {
       notifyError(error, `Could not load ${forgeLabel} repositories`)
       setVcsRepos([])
