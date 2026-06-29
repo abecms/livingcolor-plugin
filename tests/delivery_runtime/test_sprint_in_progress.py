@@ -69,7 +69,7 @@ def test_merge_active_work_orders_into_sprint_appends_in_flight_tickets(_isolate
     assert merged["usedDays"] == 1.0
 
 
-def test_promoted_sprint_ticket_stops_consuming_capacity(_isolate_hermes_home):
+def test_promoted_sprint_ticket_keeps_consuming_capacity(_isolate_hermes_home):
     payload = {
         "sprintName": "LivingColor Sprint",
         "capacityDays": 2.0,
@@ -86,6 +86,8 @@ def test_promoted_sprint_ticket_stops_consuming_capacity(_isolate_hermes_home):
                 "priorityRank": 1,
                 "urgencyScore": 1.0,
                 "warnings": [],
+                "sprintSelected": True,
+                "readinessStatus": "ready",
             }
         ],
     }
@@ -117,7 +119,7 @@ def test_promoted_sprint_ticket_stops_consuming_capacity(_isolate_hermes_home):
 
     merged = merge_active_work_orders_into_sprint(payload, project_key="TVP")
 
-    assert merged["usedDays"] == 0.0
+    assert merged["usedDays"] == 2.0
     assert merged["overflowRisk"] is False
 
 

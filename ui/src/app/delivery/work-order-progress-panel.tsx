@@ -34,7 +34,7 @@ function nodeStatusTone(status: string): 'good' | 'neutral' | 'warning' {
   if (status === 'completed') {
     return 'good'
   }
-  if (status === 'running') {
+  if (status === 'running' || status === 'failed') {
     return 'warning'
   }
   return 'neutral'
@@ -137,7 +137,7 @@ export function WorkOrderProgressPanel({
   const developmentNode = nodes.find(node => node.nodeType === 'development')
   const mrCreationNode = nodes.find(node => node.nodeType === 'mr_creation')
   const mrCreationPayload = (mrCreationNode?.payload ?? {}) as ReviewRequestFields
-  const showResume = workOrderNeedsResume(workOrder) && Boolean(onResume)
+  const showResume = workOrder.status === 'running' && workOrderNeedsResume(workOrder) && Boolean(onResume)
   const agentRunning = developmentNode?.status === 'running'
   const reviewRequestSource: ReviewRequestFields = {
     reviewRequestUrl: mrDraft?.reviewRequestUrl ?? mrCreationPayload.reviewRequestUrl,
@@ -194,6 +194,12 @@ export function WorkOrderProgressPanel({
                 {formatReviewRequestPublicationPendingLabel(provider)}
               </p>
             ) : null}
+            {workOrder.status === 'failed' ? (
+              <p className="mt-4 text-xs text-(--ui-text-tertiary)" data-testid="work-order-failed-notice">
+                Delivery failed. Review the pipeline step below, fix blockers, then promote the ticket again from the
+                sprint column.
+              </p>
+            ) : null}
             {showResume ? (
               <div className="mt-4 space-y-2">
                 <p className="text-xs text-(--ui-text-tertiary)">
@@ -241,10 +247,16 @@ export function WorkOrderProgressPanel({
 
 function GraphNodeRow({ node, provider }: { node: GraphNode; provider?: ReviewRequestProvider }) {
   const label = formatGraphNodeLabel(node, provider)
+  const error = typeof node.payload?.error === 'string' ? node.payload.error.trim() : ''
   return (
-    <div className="flex items-center justify-between rounded-lg border border-(--ui-border-subtle) bg-(--ui-chat-surface-background) px-3 py-2">
-      <span className="text-sm text-foreground">{label}</span>
-      <StatusPill tone={nodeStatusTone(node.status)}>{formatNodeStatus(node.status)}</StatusPill>
+    <div className="rounded-lg border border-(--ui-border-subtle) bg-(--ui-chat-surface-background) px-3 py-2">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm text-foreground">{label}</span>
+        <StatusPill tone={nodeStatusTone(node.status)}>{formatNodeStatus(node.status)}</StatusPill>
+      </div>
+      {node.status === 'failed' && error ? (
+        <p className="mt-2 text-xs text-(--ui-text-tertiary)">{error}</p>
+      ) : null}
     </div>
   )
 }

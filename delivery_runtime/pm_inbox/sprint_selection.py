@@ -154,6 +154,7 @@ def build_selected_sprint_payload(*, project_key: str, sprint_number: int | None
             "estimatedDays": ticket.estimated_days,
             "priorityRank": ticket.priority_rank,
             "urgencyScore": ticket.urgency_score,
+            "sprintSelected": True,
             "warnings": _append_latest_analysis_warning(
                 list(ticket.warnings),
                 ready_candidates_by_id[ticket.readiness_id],
@@ -200,6 +201,7 @@ def build_selected_sprint_payload(*, project_key: str, sprint_number: int | None
                 "estimatedDays": item["estimatedDays"],
                 "priorityRank": _priority_rank(item.get("jiraSnapshot") or {}),
                 "urgencyScore": 0.0,
+                "sprintSelected": True,
                 "warnings": warnings,
                 "readinessStatus": status,
                 "lastAnalysisError": item.get("lastAnalysisError"),
@@ -275,6 +277,7 @@ def merge_active_work_orders_into_sprint(
             "estimatedDays": estimated_days,
             "priorityRank": len(tickets) + 1,
             "urgencyScore": 0.0,
+            "sprintSelected": False,
             "warnings": [],
             **work_order_meta,
         }
@@ -294,13 +297,16 @@ def merge_active_work_orders_into_sprint(
 
 def _ticket_counts_toward_sprint_capacity(item: dict[str, Any]) -> bool:
     if item.get("inDevelopment"):
-        return False
+        if "sprintSelected" in item:
+            return bool(item.get("sprintSelected"))
+        # Legacy payloads: sprint-committed tickets stay ready in the panel after approve dev.
+        return str(item.get("readinessStatus") or item.get("readiness_status") or "").strip().lower() == "ready"
     status = str(item.get("readinessStatus") or item.get("readiness_status") or "ready").strip().lower()
     return status == "ready"
 
 
 def sprint_capacity_used_days(tickets: list[dict[str, Any]]) -> float:
-    """Sum estimates for sprint-ready backlog tickets; in-flight carry-over work is excluded."""
+    """Sum estimates for sprint backlog tickets, including approved in-flight work."""
     total = 0.0
     for item in tickets:
         if not _ticket_counts_toward_sprint_capacity(item):

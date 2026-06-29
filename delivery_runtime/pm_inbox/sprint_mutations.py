@@ -57,6 +57,7 @@ def _payload_from_recommendation(recommendation) -> dict[str, Any]:
                 "estimatedDays": ticket.estimated_days,
                 "priorityRank": ticket.priority_rank,
                 "urgencyScore": ticket.urgency_score,
+                "sprintSelected": True,
                 "warnings": ticket.warnings,
             }
             for ticket in recommendation.tickets

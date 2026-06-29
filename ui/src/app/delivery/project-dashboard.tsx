@@ -42,6 +42,7 @@ import { PatchReviewPanel } from './patch-review-panel'
 import { parseProjectKeyFromPath, isProjectWorkspacePath } from './project-navigation'
 import { reviewRequestShortLabel } from './review-request-labels'
 import { SprintHeaderStrip } from './sprint-header-strip'
+import { computeSprintUsedDays } from './sprint-capacity'
 import { StripeSetupBanner } from './stripe-setup-banner'
 import { useDailyAnalysis } from './use-daily-analysis'
 import { WorkOrderProgressPanel } from './work-order-progress-panel'
@@ -62,11 +63,14 @@ function applyPromoteResultToInbox(
           ...ticket,
           workOrderId: workOrder.id,
           inDevelopment: true,
+          sprintSelected: ticket.sprintSelected ?? true,
           currentStage: workOrder.currentStage,
           status: workOrder.status
         }
       : ticket
   )
+  const usedDays = computeSprintUsedDays(tickets)
+  const capacityDays = inbox.selectedSprint.capacityDays
   const activeDevelopments = [
     ...(inbox.activeDevelopments ?? []).filter(item => item.jiraKey !== workOrder.jiraKey),
     {
@@ -84,6 +88,8 @@ function applyPromoteResultToInbox(
     selectedSprint: {
       ...inbox.selectedSprint,
       tickets,
+      usedDays,
+      overflowRisk: usedDays > capacityDays + 0.01,
       activeDevelopmentCount: activeDevelopments.length
     },
     activeDevelopments

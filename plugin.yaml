@@ -1,5 +1,5 @@
 name: livingcolor
-version: 0.3.18
+version: 0.3.19
 description: "LivingColor autonomous delivery platform — slash commands and model tools. The Mission Control UI ships as a dashboard tab (see dashboard/)."
 author: "Tamsi Besson"
 pip_dependencies:
