@@ -13,7 +13,7 @@ def _billing_snapshot():
         "currency": "eur",
         "dailyRateCents": 80000,
         "maxInvoiceCents": 500000,
-        "deliveredTickets": [
+        "doneTickets": [
             {"jiraKey": "BN-1", "title": "First", "estimatedDays": 2.0},
             {"jiraKey": "BN-2", "title": "Second", "estimatedDays": 1.5},
         ],
@@ -82,7 +82,7 @@ def test_validate_invoice_proposal_rejects_unknown_ticket():
         ],
     }
 
-    with pytest.raises(SprintInvoiceError, match="Unknown delivered ticket BN-9"):
+    with pytest.raises(SprintInvoiceError, match="Unknown done ticket BN-9"):
         validate_invoice_proposal(proposal, _billing_snapshot())
 
 
@@ -118,9 +118,39 @@ def test_validate_invoice_proposal_rejects_arbitrary_amount():
         validate_invoice_proposal(proposal, _billing_snapshot())
 
 
+def test_validate_invoice_proposal_bills_only_done_tickets_with_estimates():
+    snapshot = {
+        "customerId": "cus_123",
+        "currency": "eur",
+        "dailyRateCents": 80000,
+        "maxInvoiceCents": 500000,
+        "doneTickets": [
+            {"jiraKey": "BN-1", "title": "Done", "estimatedDays": 2.0},
+            {"jiraKey": "BN-2", "title": "Done without estimate", "estimatedDays": None},
+        ],
+    }
+    proposal = {
+        "customerId": "cus_123",
+        "currency": "eur",
+        "lineItems": [
+            {
+                "description": "Done BN-1",
+                "ticketKeys": ["BN-1"],
+                "quantityDays": 2.0,
+                "unitAmountCents": 80000,
+            }
+        ],
+    }
+
+    validated = validate_invoice_proposal(proposal, snapshot)
+
+    assert validated["totalCents"] == 160000
+    assert validated["lineItems"][0]["ticketKeys"] == ["BN-1"]
+
+
 def test_validate_invoice_proposal_rejects_total_above_cap():
     snapshot = _billing_snapshot()
-    snapshot["deliveredTickets"] = [
+    snapshot["doneTickets"] = [
         {"jiraKey": "BN-1", "title": "First", "estimatedDays": 2.0},
     ]
     snapshot["maxInvoiceCents"] = 100000
@@ -129,7 +159,7 @@ def test_validate_invoice_proposal_rejects_total_above_cap():
         "currency": "eur",
         "lineItems": [
             {
-                "description": "Delivered BN-1",
+                "description": "Done BN-1",
                 "ticketKeys": ["BN-1"],
                 "quantityDays": 2.0,
                 "unitAmountCents": 80000,

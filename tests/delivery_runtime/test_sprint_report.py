@@ -68,6 +68,7 @@ def test_build_sprint_report_snapshot_includes_work_orders(_isolate_hermes_home)
     assert snapshot["sprintNumber"] == 3
     assert snapshot["ticketsPlanned"][0]["jiraKey"] == "BN-1"
     assert snapshot["workOrderStatusCounts"]["completed"] == 1
+    assert snapshot["doneTicketKeys"] == ["BN-1"]
     assert snapshot["deliveredTicketKeys"] == ["BN-1"]
 
 
@@ -118,6 +119,68 @@ def test_should_run_scheduled_sprint_report_on_end_day(_isolate_hermes_home):
 
 def test_sprint_report_dedup_key_is_stable():
     assert sprint_report_dedup_key(sprint_number=4, sprint_end_date="2026-06-16") == "4:2026-06-16"
+
+
+def test_build_sprint_report_snapshot_excludes_in_progress_from_done_keys(_isolate_hermes_home):
+    project_key = "BN"
+    save_delivery_project_config(duration_days=14, capacity_days=15, project_key=project_key)
+    payload = {
+        "sprintName": "Sprint 3",
+        "capacityDays": 15.0,
+        "usedDays": 8.0,
+        "durationDays": 14,
+        "overflowRisk": False,
+        "warnings": [],
+        "tickets": [
+            {
+                "readinessId": "RD-BN-1",
+                "jiraKey": "BN-1",
+                "title": "Done ticket",
+                "estimatedDays": 2.0,
+                "priorityRank": 1,
+                "urgencyScore": 1.0,
+                "warnings": [],
+            },
+            {
+                "readinessId": "RD-BN-2",
+                "jiraKey": "BN-2",
+                "title": "In progress ticket",
+                "estimatedDays": 3.0,
+                "priorityRank": 2,
+                "urgencyScore": 0.8,
+                "warnings": [],
+            },
+        ],
+    }
+    persist_selected_sprint(
+        project_key=project_key,
+        payload=payload,
+        memory_patch={
+            "sprintNumber": 3,
+            "sprintStartDate": "2026-06-03",
+            "sprintEndDate": "2026-06-16",
+        },
+    )
+
+    now = utc_now_iso()
+    with connect() as conn:
+        conn.executemany(
+            """
+            INSERT INTO work_orders (
+                id, jira_key, readiness_id, title, description, priority, status,
+                current_stage, confidence, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                ("WO-1", "BN-1", "RD-BN-1", "Done ticket", "", "High", "completed", "done", 0.9, now, now),
+                ("WO-2", "BN-2", "RD-BN-2", "In progress ticket", "", "High", "running", "development", 0.8, now, now),
+            ],
+        )
+
+    snapshot = build_sprint_report_snapshot(project_key=project_key)
+    assert snapshot is not None
+    assert snapshot["doneTicketKeys"] == ["BN-1"]
+    assert snapshot["carryOverTicketKeys"] == ["BN-2"]
 
 
 def test_publish_sprint_report_creates_invoice_and_includes_url(_isolate_hermes_home):

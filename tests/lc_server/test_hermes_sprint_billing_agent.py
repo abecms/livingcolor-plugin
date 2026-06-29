@@ -44,7 +44,7 @@ def test_sprint_billing_agent_returns_json_proposal(monkeypatch):
             "customerId": "cus_123",
             "currency": "eur",
             "dailyRateCents": 80000,
-            "deliveredTickets": [{"jiraKey": "BN-1", "title": "Delivered", "estimatedDays": 2.0}],
+            "doneTickets": [{"jiraKey": "BN-1", "title": "Done", "estimatedDays": 2.0}],
         },
         project_key="BN",
     )

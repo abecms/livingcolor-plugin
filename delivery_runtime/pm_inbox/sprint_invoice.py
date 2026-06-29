@@ -22,6 +22,37 @@ def _optional_float(value: Any) -> float | None:
         return None
 
 
+def sprint_done_ticket_keys(
+    *,
+    sprint_ticket_keys: set[str],
+    work_orders: list[dict[str, Any]],
+) -> set[str]:
+    """Return sprint ticket keys whose work order reached the Done kanban column."""
+    done: set[str] = set()
+    for item in work_orders:
+        if not isinstance(item, dict):
+            continue
+        key = _ticket_key(item.get("jiraKey"))
+        if not key or key not in sprint_ticket_keys:
+            continue
+        if str(item.get("status") or "").strip().lower() != "completed":
+            continue
+        done.add(key)
+    return done
+
+
+def _done_ticket_keys_from_report(report_snapshot: dict[str, Any]) -> set[str]:
+    raw_keys = report_snapshot.get("doneTicketKeys") or report_snapshot.get("deliveredTicketKeys") or []
+    return {_ticket_key(key) for key in raw_keys if _ticket_key(key)}
+
+
+def _is_billable_done_ticket(item: dict[str, Any], done_keys: set[str]) -> bool:
+    key = _ticket_key(item.get("jiraKey"))
+    if key not in done_keys:
+        return False
+    return str(item.get("workOrderStatus") or "").strip().lower() == "completed"
+
+
 def build_sprint_billing_snapshot(
     report_snapshot: dict[str, Any],
     *,
@@ -35,24 +66,20 @@ def build_sprint_billing_snapshot(
     sprint_end_date = str(sprint.get("endDate") or "")
     dedup_key = f"{sprint_number}:{sprint_end_date}"
 
-    delivered_keys = {
-        _ticket_key(key)
-        for key in report_snapshot.get("deliveredTicketKeys") or []
-        if _ticket_key(key)
-    }
+    done_keys = _done_ticket_keys_from_report(report_snapshot)
 
-    delivered_tickets: list[dict[str, Any]] = []
+    done_tickets: list[dict[str, Any]] = []
     warnings: list[str] = []
     for item in report_snapshot.get("ticketsPlanned") or []:
         if not isinstance(item, dict):
             continue
-        key = _ticket_key(item.get("jiraKey"))
-        if key not in delivered_keys:
+        if not _is_billable_done_ticket(item, done_keys):
             continue
+        key = _ticket_key(item.get("jiraKey"))
         estimated_days = _optional_float(item.get("estimatedDays"))
         if estimated_days is None:
-            warnings.append(f"Missing estimate for delivered ticket {key}")
-        delivered_tickets.append(
+            warnings.append(f"Missing estimate for done ticket {key}")
+        done_tickets.append(
             {
                 "jiraKey": key,
                 "title": str(item.get("title") or "").strip(),
@@ -74,7 +101,7 @@ def build_sprint_billing_snapshot(
         "dailyRateCents": int(daily_rate_cents),
         "currency": str(currency or "eur").strip().lower(),
         "maxInvoiceCents": max_invoice_cents,
-        "deliveredTickets": delivered_tickets,
+        "doneTickets": done_tickets,
         "warnings": warnings,
     }
 
@@ -116,15 +143,15 @@ def validate_invoice_proposal(proposal: dict[str, Any], billing_snapshot: dict[s
     if str(proposal.get("currency") or "").strip().lower() != currency:
         raise SprintInvoiceError("Currency does not match configured currency")
 
-    delivered = {
+    done_tickets = billing_snapshot.get("doneTickets") or billing_snapshot.get("deliveredTickets") or []
+    billable = {
         _ticket_key(item.get("jiraKey")): _optional_float(item.get("estimatedDays"))
-        for item in billing_snapshot.get("deliveredTickets") or []
+        for item in done_tickets
         if isinstance(item, dict) and _ticket_key(item.get("jiraKey"))
     }
+    delivered = {key: days for key, days in billable.items() if days is not None}
     if not delivered:
-        raise SprintInvoiceError("No delivered tickets are billable")
-    if any(value is None for value in delivered.values()):
-        raise SprintInvoiceError("Delivered tickets with missing estimates cannot be invoiced")
+        raise SprintInvoiceError("No done tickets are billable")
 
     line_items = proposal.get("lineItems")
     if not isinstance(line_items, list) or not line_items:
@@ -138,10 +165,10 @@ def validate_invoice_proposal(proposal: dict[str, Any], billing_snapshot: dict[s
             raise SprintInvoiceError("Invoice line item must be an object")
         keys = _as_ticket_keys(line.get("ticketKeys"))
         if not keys:
-            raise SprintInvoiceError("Invoice line item must reference delivered tickets")
+            raise SprintInvoiceError("Invoice line item must reference done tickets")
         for key in keys:
             if key not in delivered:
-                raise SprintInvoiceError(f"Unknown delivered ticket {key}")
+                raise SprintInvoiceError(f"Unknown done ticket {key}")
             if key in seen:
                 raise SprintInvoiceError(f"Ticket {key} is billed more than once")
             seen.add(key)
@@ -169,7 +196,7 @@ def validate_invoice_proposal(proposal: dict[str, Any], billing_snapshot: dict[s
 
     missing = sorted(set(delivered) - seen)
     if missing:
-        raise SprintInvoiceError(f"Delivered ticket {missing[0]} is not included in invoice proposal")
+        raise SprintInvoiceError(f"Done ticket {missing[0]} is not included in invoice proposal")
 
     if max_invoice is not None and total_cents > int(max_invoice):
         raise SprintInvoiceError("Invoice total exceeds billingMaxInvoiceCents")

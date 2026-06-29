@@ -11,9 +11,7 @@ def test_propose_heuristic_sprint_billing_builds_line_items():
         "currency": "eur",
         "dailyRateCents": 80000,
         "sprintNumber": 3,
-        "deliveredTickets": [
-            {"jiraKey": "TVP-14", "title": "Example", "estimatedDays": 1.0},
-        ],
+        "doneTickets": [{"jiraKey": "TVP-14", "title": "Example", "estimatedDays": 1.0}],
     }
     proposal = propose_heuristic_sprint_billing(snapshot, project_key="TVP")
     assert proposal["customerId"] == "cus_test"

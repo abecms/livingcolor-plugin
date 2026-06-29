@@ -13,7 +13,7 @@ def propose_heuristic_sprint_billing(billing_snapshot: dict[str, Any], *, projec
     sprint_number = billing_snapshot.get("sprintNumber") or "?"
 
     line_items: list[dict[str, Any]] = []
-    for ticket in billing_snapshot.get("deliveredTickets") or []:
+    for ticket in billing_snapshot.get("doneTickets") or billing_snapshot.get("deliveredTickets") or []:
         if not isinstance(ticket, dict):
             continue
         key = str(ticket.get("jiraKey") or "").strip().upper()
@@ -29,7 +29,7 @@ def propose_heuristic_sprint_billing(billing_snapshot: dict[str, Any], *, projec
         title = str(ticket.get("title") or key).strip()
         line_items.append(
             {
-                "description": f"Delivered {key}: {title}"[:120],
+                "description": f"Done {key}: {title}"[:120],
                 "quantityDays": quantity_days,
                 "unitAmountCents": daily_rate,
                 "amountCents": amount_cents,

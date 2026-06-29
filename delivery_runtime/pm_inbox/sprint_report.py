@@ -13,6 +13,7 @@ from delivery_runtime.pm_inbox import store as pm_store
 from delivery_runtime.pm_inbox.sprint_invoice import (
     SprintInvoiceError,
     build_sprint_billing_snapshot,
+    sprint_done_ticket_keys,
     validate_invoice_proposal,
 )
 from delivery_runtime.work_orders.service import WorkOrderService
@@ -95,12 +96,11 @@ def build_sprint_report_snapshot(*, project_key: str) -> dict[str, Any] | None:
         status = str(item.get("status") or "unknown").strip().lower() or "unknown"
         status_counts[status] = status_counts.get(status, 0) + 1
 
-    delivered_keys = {
-        str(item.get("jiraKey") or "").strip().upper()
-        for item in sprint_work_orders
-        if str(item.get("status") or "").strip().lower() == "completed"
-    }
-    planned_not_delivered = sorted(key for key in sprint_keys if key and key not in delivered_keys)
+    done_keys = sprint_done_ticket_keys(
+        sprint_ticket_keys=sprint_keys,
+        work_orders=sprint_work_orders,
+    )
+    planned_not_done = sorted(key for key in sprint_keys if key and key not in done_keys)
 
     latest_run = pm_store.get_latest_daily_run(project_key=project_key)
 
@@ -138,8 +138,9 @@ def build_sprint_report_snapshot(*, project_key: str) -> dict[str, Any] | None:
         ],
         "workOrders": sprint_work_orders,
         "workOrderStatusCounts": status_counts,
-        "deliveredTicketKeys": sorted(delivered_keys),
-        "carryOverTicketKeys": planned_not_delivered,
+        "doneTicketKeys": sorted(done_keys),
+        "deliveredTicketKeys": sorted(done_keys),
+        "carryOverTicketKeys": planned_not_done,
         "latestDailyAnalysis": {
             "runId": latest_run.get("id") if latest_run else None,
             "status": latest_run.get("status") if latest_run else None,
@@ -277,8 +278,16 @@ def _create_or_reuse_sprint_invoice(
         currency=billing.currency,
         max_invoice_cents=billing.max_invoice_cents,
     )
-    if billing_snapshot["warnings"]:
-        warning = "; ".join(billing_snapshot["warnings"])
+    if not any(
+        ticket.get("estimatedDays") is not None
+        for ticket in billing_snapshot.get("doneTickets") or []
+        if isinstance(ticket, dict)
+    ):
+        warning = (
+            "; ".join(billing_snapshot["warnings"])
+            if billing_snapshot["warnings"]
+            else "No billable done tickets"
+        )
         EventStore().append(
             event_type="SPRINT_INVOICE_SKIPPED",
             actor=actor,

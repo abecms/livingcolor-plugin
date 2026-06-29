@@ -13,10 +13,10 @@ Build a Stripe invoice proposal from the provided sprint billing snapshot.
 
 Rules:
 - Output ONLY valid JSON.
-- Use only delivered tickets from the snapshot.
+- Use only done tickets from the snapshot.
 - Do not invent ticket keys, quantities, currency, customer IDs, or prices.
-- You may group delivered tickets into one line when the description remains clear.
-- Every delivered ticket must appear exactly once.
+- You may group done tickets into one line when the description remains clear.
+- Every billable done ticket must appear exactly once.
 - Keep descriptions concise and client-ready.
 """
 
