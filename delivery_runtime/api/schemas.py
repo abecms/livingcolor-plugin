@@ -274,7 +274,7 @@ class SelectedSprintTicketResponse(BaseModel):
     readinessId: str
     jiraKey: str
     title: str
-    estimatedDays: float
+    estimatedDays: float | None = None
     priorityRank: int = 0
     urgencyScore: float = 0
     warnings: list[str] = Field(default_factory=list)
@@ -500,6 +500,7 @@ class SprintResetRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     project_key: str | None = Field(default=None, alias="projectKey")
+    repopulate_tickets: bool | None = Field(default=None, alias="repopulateTickets")
 
 
 class SprintSelectionUpdateRequest(BaseModel):

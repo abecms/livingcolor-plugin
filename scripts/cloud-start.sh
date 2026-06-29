@@ -24,6 +24,7 @@ export LIVINGCOLOR_PLANNER_BACKEND="${LIVINGCOLOR_PLANNER_BACKEND:-heuristic}"
 export LIVINGCOLOR_ANALYST_BACKEND="${LIVINGCOLOR_ANALYST_BACKEND:-heuristic}"
 export LIVINGCOLOR_PUBLISHER_BACKEND="${LIVINGCOLOR_PUBLISHER_BACKEND:-heuristic}"
 export LIVINGCOLOR_SPRINT_REPORTER_BACKEND="${LIVINGCOLOR_SPRINT_REPORTER_BACKEND:-heuristic}"
+export LIVINGCOLOR_SPRINT_BILLING_BACKEND="${LIVINGCOLOR_SPRINT_BILLING_BACKEND:-heuristic}"
 
 log() { echo "[cloud-start] $*"; }
 
@@ -69,3 +70,4 @@ fi
 python3 "${ROOT}/scripts/cloud_configure_tvp.py"
 
 log "Cloud start complete — proceed with workflow FRT phases B–H"
+log "Run: python3 scripts/cloud-workflow-frt.py  (preferred) or ./scripts/cloud-workflow-frt.sh"

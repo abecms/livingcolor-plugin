@@ -33,15 +33,26 @@ install_hermes() {
   pip install --user hermes-agent mcp
 }
 
-install_uv() {
+install_uvx() {
   if command -v uvx >/dev/null 2>&1; then
+    log "uvx already installed"
     return 0
   fi
   if command -v uv >/dev/null 2>&1; then
+    log "uv already installed"
     return 0
   fi
-  log "Installing uv (required for Jira MCP via uvx)..."
+  log "Installing uv (provides uvx for mcp-atlassian)..."
   pip install --user uv
+}
+
+install_stripe() {
+  if python3 -c "import stripe" 2>/dev/null; then
+    log "stripe Python package already installed"
+    return 0
+  fi
+  log "Installing stripe (user site) for sprint invoice path..."
+  pip install --user stripe
 }
 
 sync_plugin() {
@@ -72,12 +83,65 @@ configure_mcp_from_env() {
   python3 -m lc_server.integrations.mcp_env_bootstrap
 }
 
+configure_billing_from_env() {
+  log "Configuring Stripe billing for cloud FRT"
+  python3 - <<'PY'
+import json
+import os
+import urllib.error
+import urllib.parse
+import urllib.request
+
+from lc_server.integrations.plugin_billing import load_plugin_billing_settings, persist_plugin_billing_settings
+
+customer = (os.environ.get("STRIPE_TEST_CUSTOMER_ID") or "").strip()
+stripe_key = (os.environ.get("STRIPE_SECRET_KEY") or "").strip()
+
+if not customer and stripe_key.startswith("sk_test_"):
+    body = urllib.parse.urlencode(
+        {
+            "email": "cloud-frt@livingcolor.test",
+            "name": "LivingColor Cloud FRT",
+            "metadata[source]": "livingcolor-cloud-bootstrap",
+        }
+    ).encode()
+    req = urllib.request.Request(
+        "https://api.stripe.com/v1/customers",
+        data=body,
+        headers={"Authorization": f"Bearer {stripe_key}"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+        customer = str(payload.get("id") or "").strip()
+        if customer:
+            os.environ["STRIPE_TEST_CUSTOMER_ID"] = customer
+            print(f"stripe_customer_created id={customer}")
+    except urllib.error.HTTPError as exc:
+        print(f"stripe_customer_create_failed http={exc.code}", flush=True)
+
+if not customer:
+    raise SystemExit(0)
+
+existing = load_plugin_billing_settings()
+persist_plugin_billing_settings(
+    stripe_customer_id=customer,
+    daily_rate_cents=existing.daily_rate_cents or 80000,
+    currency=existing.currency or "eur",
+    invoice_mode=existing.invoice_mode or "draft",
+    approval_required=existing.approval_required,
+    max_invoice_cents=existing.max_invoice_cents or 500000,
+)
+print("billing_configured")
+PY
+}
+
 write_livingcolor_env() {
   local env_path="${HOME}/.hermes/livingcolor/.env"
   mkdir -p "$(dirname "${env_path}")"
   local tmp
   tmp="$(mktemp)"
-  trap 'rm -f "${tmp}"' RETURN
   : >"${tmp}"
   for key in JIRA_URL JIRA_USERNAME JIRA_API_TOKEN GITHUB_TOKEN GH_TOKEN STRIPE_SECRET_KEY \
     STRIPE_TEST_CUSTOMER_ID STRIPE_DAILY_RATE_CENTS OPENROUTER_API_KEY GITLAB_PERSONAL_ACCESS_TOKEN GITLAB_API_URL \
@@ -90,12 +154,18 @@ write_livingcolor_env() {
     python3 "${ROOT}/scripts/cloud_write_credentials.py" <"${tmp}" >/dev/null
     log "Synced in-process credentials to ${env_path}"
   fi
+  rm -f "${tmp}"
 }
 
 start_dashboard() {
+  local already_up=0
   if curl -sf -H "X-Hermes-Session-Token: ${SESSION_TOKEN}" \
     "http://127.0.0.1:${HERMES_PORT}/api/plugins/livingcolor/delivery/overview" >/dev/null 2>&1; then
     log "Dashboard already responding on port ${HERMES_PORT}"
+    already_up=1
+  fi
+
+  if [ "${already_up}" = "1" ]; then
     return 0
   fi
 
@@ -108,6 +178,7 @@ start_dashboard() {
   export LIVINGCOLOR_ANALYST_BACKEND=heuristic
   export LIVINGCOLOR_PUBLISHER_BACKEND=heuristic
   export LIVINGCOLOR_SPRINT_REPORTER_BACKEND=heuristic
+  export LIVINGCOLOR_SPRINT_BILLING_BACKEND=heuristic
 
   nohup hermes dashboard --skip-build --no-open --port "${HERMES_PORT}" >"${LOG_FILE}" 2>&1 &
   for _ in $(seq 1 30); do
@@ -136,15 +207,46 @@ verify_mount() {
   fi
 }
 
+warmup_jira_mcp() {
+  log "Warming up Jira MCP connection (mcp-atlassian via uvx)..."
+  if ! python3 - <<'PY'
+import json
+import sys
+from jira_dashboard.mcp_compat import install_mcp_tool_shims
+install_mcp_tool_shims()
+from jira_dashboard.service import connect_jira_mcp
+result = connect_jira_mcp()
+if not result.get("ok"):
+    print(result.get("message") or "Jira MCP warmup failed", file=sys.stderr)
+    sys.exit(1)
+print(f"toolCount={result.get('toolCount', 0)}")
+PY
+  then
+    log "WARNING: Jira MCP warmup failed in bootstrap shell; Hermes process may need dashboard restart"
+    return 1
+  fi
+}
+
+restart_dashboard() {
+  log "Restarting Hermes dashboard to load MCP runtime with uvx available"
+  pkill -f "hermes dashboard" 2>/dev/null || true
+  sleep 2
+  start_dashboard
+}
+
 main() {
   require_cmd python3
   install_hermes
-  install_uv
+  install_uvx
+  install_stripe
   sync_plugin
   write_project_mapping
   configure_mcp_from_env
+  configure_billing_from_env
   write_livingcolor_env
   start_dashboard
+  verify_mount
+  warmup_jira_mcp || restart_dashboard
   verify_mount
   log "Credential scan:"
   python3 -c "from lc_server.integrations.mcp_env_bootstrap import credential_env_status; [print(f'{k}={v}') for k, v in credential_env_status().items()]"

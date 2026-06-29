@@ -12,7 +12,11 @@ from delivery_runtime.readiness.project_settings import (
     load_project_vcs_provider,
     resolve_project_mcp_server,
 )
-from lc_server.agent_bridge.heuristic_publisher import create_github_pull_request, push_delivery_branch
+from lc_server.agent_bridge.heuristic_publisher import (
+    create_github_pull_request,
+    find_existing_github_pull_request,
+    push_delivery_branch,
+)
 from lc_server.agent_bridge.hermes_publisher import PublisherCompletionError
 from lc_server.integrations.vcs.github import github_token_from_config
 from lc_server.integrations.vcs.provider import normalize_vcs_provider
@@ -50,6 +54,43 @@ class HeuristicPublisherAgent:
             or (context.get("workOrder") or {}).get("jiraKey")
             or work_order_id
         )
+
+        repo_path = self._resolve_repo_path(context, project_key)
+        existing_pr = find_existing_github_pull_request(
+            token=token,
+            repo_path=repo_path,
+            head_branch=delivery_branch,
+            base_branch=integration_branch,
+        )
+        if existing_pr:
+            pr_url = str(existing_pr.get("html_url") or "")
+            pr_number = existing_pr.get("number")
+            if pr_url and isinstance(pr_number, int):
+                logger.info(
+                    "Reusing existing GitHub PR #%s for %s (skip push)",
+                    pr_number,
+                    delivery_branch,
+                )
+                completion = {
+                    "reviewRequestUrl": pr_url,
+                    "reviewRequestNumber": pr_number,
+                    "reviewRequestProvider": "github",
+                    "mrUrl": pr_url,
+                    "mrIid": pr_number,
+                    "targetBranch": integration_branch,
+                    "status": "published",
+                    "reusedExistingPullRequest": True,
+                }
+                draft_id = str(context.get("draftId") or "")
+                if draft_id:
+                    set_mr_draft_publication(
+                        draft_id,
+                        review_request_url=completion["reviewRequestUrl"],
+                        review_request_number=completion["reviewRequestNumber"],
+                        review_request_provider=completion["reviewRequestProvider"],
+                    )
+                return completion
+
         commit_message = f"{jira_key}: {str(context.get('mrTitle') or 'delivery work')}"
         commit_delivery_work(workspace, branch=delivery_branch, message=commit_message)
         push_delivery_branch(workspace, delivery_branch=delivery_branch)
