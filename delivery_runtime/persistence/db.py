@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import shutil
 import sqlite3
 import threading
@@ -17,6 +18,8 @@ from delivery_runtime.persistence.paths import (
     get_delivery_root,
     get_project_mapping_path,
 )
+
+logger = logging.getLogger(__name__)
 
 SCHEMA_VERSION = 12
 
@@ -477,6 +480,86 @@ def _migrate_analysis_metadata_columns(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE readiness_records ADD COLUMN last_analysis_failed_at TEXT")
 
 
+def _apply_idempotent_column_patches(conn: sqlite3.Connection) -> list[str]:
+    """Add any missing columns on already-provisioned databases.
+
+    Runs even when ``schema_version`` is current so older DBs that reached the
+    latest version before a column patch landed still get repaired on startup.
+    """
+    applied: list[str] = []
+    tables = {
+        str(item["name"])
+        for item in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table'"
+        ).fetchall()
+    }
+    if "readiness_records" in tables:
+        columns = _table_columns(conn, "readiness_records")
+        if "estimated_days" not in columns:
+            conn.execute("ALTER TABLE readiness_records ADD COLUMN estimated_days REAL")
+            applied.append("readiness_records.estimated_days")
+        before = _table_columns(conn, "readiness_records")
+        _migrate_analysis_metadata_columns(conn)
+        after = _table_columns(conn, "readiness_records")
+        for column in (
+            "analysis_input_hash",
+            "analysis_backend",
+            "last_analysis_error",
+            "last_analysis_failed_at",
+        ):
+            if column in after and column not in before:
+                applied.append(f"readiness_records.{column}")
+    if "execution_queue_items" in tables:
+        before = _table_columns(conn, "execution_queue_items")
+        _migrate_execution_queue_consumer_columns(conn)
+        after = _table_columns(conn, "execution_queue_items")
+        for column in ("work_order_id", "started_at", "failure_reason"):
+            if column in after and column not in before:
+                applied.append(f"execution_queue_items.{column}")
+    if "merge_request_drafts" in tables:
+        columns = _table_columns(conn, "merge_request_drafts")
+        if "decision_trace_json" not in columns:
+            conn.execute(
+                """
+                ALTER TABLE merge_request_drafts
+                ADD COLUMN decision_trace_json TEXT NOT NULL DEFAULT '{}'
+                """
+            )
+            applied.append("merge_request_drafts.decision_trace_json")
+        if "mr_url" not in columns:
+            conn.execute(
+                "ALTER TABLE merge_request_drafts ADD COLUMN mr_url TEXT NOT NULL DEFAULT ''"
+            )
+            applied.append("merge_request_drafts.mr_url")
+        if "mr_iid" not in columns:
+            conn.execute("ALTER TABLE merge_request_drafts ADD COLUMN mr_iid INTEGER")
+            applied.append("merge_request_drafts.mr_iid")
+    return applied
+
+
+def _ensure_idempotent_column_patches(path: Path) -> list[str]:
+    if not _database_exists(path):
+        return []
+    conn = sqlite3.connect(path)
+    conn.row_factory = sqlite3.Row
+    try:
+        _configure_connection(conn, busy_timeout_ms=_MIGRATION_BUSY_TIMEOUT_MS)
+        applied = _apply_idempotent_column_patches(conn)
+        conn.commit()
+        return applied
+    finally:
+        conn.close()
+
+
+def repair_delivery_database_schema(db_path: Path | None = None) -> list[str]:
+    """Repair a delivery database in place. Safe to call on every plugin startup."""
+    if db_path is None:
+        _migrate_legacy_storage()
+    path = Path(db_path) if db_path else get_delivery_db_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return _ensure_idempotent_column_patches(path)
+
+
 _MR_DRAFTS_SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS merge_request_drafts (
     id TEXT PRIMARY KEY,
@@ -572,26 +655,6 @@ def _apply_schema_migrations(conn: sqlite3.Connection) -> None:
         current = int(row["value"]) if row else 0
     else:
         current = 0
-    if current >= SCHEMA_VERSION:
-        return
-    if "merge_request_drafts" in tables:
-        columns = {
-            str(item["name"])
-            for item in conn.execute("PRAGMA table_info(merge_request_drafts)").fetchall()
-        }
-        if "decision_trace_json" not in columns:
-            conn.execute(
-                """
-                ALTER TABLE merge_request_drafts
-                ADD COLUMN decision_trace_json TEXT NOT NULL DEFAULT '{}'
-                """
-            )
-        if "mr_url" not in columns:
-            conn.execute(
-                "ALTER TABLE merge_request_drafts ADD COLUMN mr_url TEXT NOT NULL DEFAULT ''"
-            )
-        if "mr_iid" not in columns:
-            conn.execute("ALTER TABLE merge_request_drafts ADD COLUMN mr_iid INTEGER")
 
     if "readiness_records" in tables:
         columns = _table_columns(conn, "readiness_records")
@@ -600,6 +663,9 @@ def _apply_schema_migrations(conn: sqlite3.Connection) -> None:
 
     if "readiness_records" in tables:
         _migrate_analysis_metadata_columns(conn)
+
+    if current >= SCHEMA_VERSION:
+        return
 
     if current < 5:
         conn.executescript(_SCHEMA_V5_SQL)
@@ -746,6 +812,9 @@ def init_db(db_path=None) -> Path:
     path_key = str(path.resolve())
     with _init_lock:
         path.parent.mkdir(parents=True, exist_ok=True)
+        patches = _ensure_idempotent_column_patches(path)
+        if patches:
+            logger.info("Repaired delivery database schema: %s", ", ".join(patches))
         if path_key in _initialized_paths:
             return path
         if _schema_ready(path):
