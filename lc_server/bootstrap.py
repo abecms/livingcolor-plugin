@@ -73,12 +73,18 @@ def bootstrap_livingcolor_server() -> None:
         logger.warning("MoA preset bootstrap skipped: %s", exc)
 
     from delivery_runtime.api import deps
-    from delivery_runtime.persistence.db import init_db
+    from delivery_runtime.persistence.db import init_db, repair_delivery_database_schema
 
     try:
+        patches = repair_delivery_database_schema()
+        if patches:
+            logger.info(
+                "LivingColor delivery database repaired on startup: %s",
+                ", ".join(patches),
+            )
         init_db()
     except Exception as exc:
-        logger.warning("Delivery persistence is not ready yet: %s", exc)
+        logger.error("Delivery persistence bootstrap failed: %s", exc)
 
     try:
         from lc_server.provisioning.upgrade import upgrade_all_project_manifests
