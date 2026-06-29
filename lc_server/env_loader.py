@@ -23,6 +23,9 @@ _STRIPE_ENV_KEYS = ("STRIPE_SECRET_KEY", "STRIPE_API_KEY")
 _LIVINGCOLOR_ENV_TEMPLATE = """\
 # LivingColor product secrets (optional — ~/.hermes/.env is also loaded)
 # STRIPE_SECRET_KEY=sk_test_...
+# MoA tier: nemotron (default) | standard | premium
+# Analyst + planner use Nemotron Ultra MoA; developer stays on lc-developer (OpenRouter).
+# LIVINGCOLOR_MOA_TIER=standard
 """
 
 

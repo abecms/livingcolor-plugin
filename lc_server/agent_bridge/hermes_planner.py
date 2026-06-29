@@ -125,6 +125,7 @@ def _default_planner_agent_factory(
     from lc_server.agent_bridge.inference_config import (
         resolve_delivery_inference,
         resolve_moa_or_fallback,
+        resolve_moa_tier_model,
     )
     from lc_server.model_defaults import (
         LIVINGCOLOR_FALLBACK_PROVIDER,
@@ -139,6 +140,7 @@ def _default_planner_agent_factory(
         role_default_provider=LIVINGCOLOR_PLANNER_PROVIDER,
         allow_env_override=True,
     )
+    effective_model = resolve_moa_tier_model(effective_model, role="planner")
     effective_model, effective_provider = resolve_moa_or_fallback(
         effective_model,
         effective_provider,

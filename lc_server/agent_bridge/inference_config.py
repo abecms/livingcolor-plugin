@@ -51,6 +51,41 @@ def resolve_delivery_inference(
     return effective_model, effective_provider or None
 
 
+_MANAGED_MOA_PRESETS: dict[str, tuple[str, ...]] = {
+    "analyst": ("lc-analyst", "lc-analyst-premium", "lc-analyst-nemotron"),
+    "planner": ("lc-planner", "lc-planner-premium", "lc-planner-nemotron"),
+    "developer": ("lc-developer", "lc-developer-premium"),
+}
+
+
+def resolve_moa_tier_model(model: str, *, role: str) -> str:
+    """Map bundled LivingColor preset names to the active MoA tier.
+
+    Developer is unchanged under the nemotron tier. Custom manifest models that
+    are not LivingColor-managed presets are left as-is.
+    """
+    preset = model.strip()
+    if not preset:
+        return preset
+
+    from lc_server.model_defaults import LIVINGCOLOR_MOA_TIER_DEFAULT
+
+    tier = os.getenv("LIVINGCOLOR_MOA_TIER", LIVINGCOLOR_MOA_TIER_DEFAULT).strip().lower()
+    managed = _MANAGED_MOA_PRESETS.get(role, ())
+    if preset not in managed:
+        return preset
+
+    if tier == "premium":
+        return f"lc-{role}-premium"
+    if tier in ("nemotron", "nvidia"):
+        if role == "developer":
+            return preset
+        return f"lc-{role}-nemotron"
+    if preset.endswith("-premium") or preset.endswith("-nemotron"):
+        return f"lc-{role}"
+    return preset
+
+
 def resolve_moa_or_fallback(
     model: str,
     provider: str | None,

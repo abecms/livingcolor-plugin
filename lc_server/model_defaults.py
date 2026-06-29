@@ -17,23 +17,32 @@ LIVINGCOLOR_DEVELOPER_FALLBACK_MODEL = "deepseek/deepseek-v4-pro"
 LIVINGCOLOR_FALLBACK_PROVIDER = LIVINGCOLOR_PROVIDER
 
 
-def _moa_preset(base: str) -> str:
-    tier = os.getenv("LIVINGCOLOR_MOA_TIER", "standard").strip().lower()
+LIVINGCOLOR_MOA_TIER_DEFAULT = "nemotron"
+
+
+def _moa_tier() -> str:
+    return os.getenv("LIVINGCOLOR_MOA_TIER", LIVINGCOLOR_MOA_TIER_DEFAULT).strip().lower()
+
+
+def _moa_preset(base: str, *, role: str) -> str:
+    tier = _moa_tier()
     if tier == "premium":
         return f"{base}-premium"
+    if tier in ("nemotron", "nvidia") and role in ("analyst", "planner"):
+        return f"{base}-nemotron"
     return base
 
 
-LIVINGCOLOR_ANALYST_MODEL = _moa_preset("lc-analyst")
+LIVINGCOLOR_ANALYST_MODEL = _moa_preset("lc-analyst", role="analyst")
 LIVINGCOLOR_ANALYST_PROVIDER = LIVINGCOLOR_MOA_PROVIDER
-LIVINGCOLOR_PLANNER_MODEL = _moa_preset("lc-planner")
+LIVINGCOLOR_PLANNER_MODEL = _moa_preset("lc-planner", role="planner")
 LIVINGCOLOR_PLANNER_PROVIDER = LIVINGCOLOR_MOA_PROVIDER
 
 LIVINGCOLOR_REPORTER_MODEL = LIVINGCOLOR_ORCHESTRATION_MODEL
 LIVINGCOLOR_REPORTER_PROVIDER = LIVINGCOLOR_ORCHESTRATION_PROVIDER
 
 # Code generation and mutating delivery roles.
-LIVINGCOLOR_DEVELOPER_MODEL = _moa_preset("lc-developer")
+LIVINGCOLOR_DEVELOPER_MODEL = _moa_preset("lc-developer", role="developer")
 LIVINGCOLOR_DEVELOPER_PROVIDER = LIVINGCOLOR_MOA_PROVIDER
 LIVINGCOLOR_PUBLISHER_MODEL = LIVINGCOLOR_DEVELOPER_FALLBACK_MODEL
 LIVINGCOLOR_PUBLISHER_PROVIDER = LIVINGCOLOR_PROVIDER

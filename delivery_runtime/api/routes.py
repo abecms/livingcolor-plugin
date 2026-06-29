@@ -734,6 +734,11 @@ def publish_sprint_report(request: Request, force: bool = False) -> SprintReport
 def get_pm_inbox(project: str | None = None) -> PmInboxResponse:
     services = get_services()
     try:
+        from delivery_runtime.persistence.db import connect
+        from delivery_runtime.pm_inbox import store as pm_store
+
+        with connect() as conn:
+            pm_store.fail_stale_daily_runs(conn)
         payload = services.pm_inbox.get_inbox(project)
     except sqlite3.OperationalError as exc:
         raise HTTPException(status_code=503, detail=_delivery_db_unavailable_detail(exc)) from exc

@@ -629,6 +629,7 @@ export function fetchPmInbox(projectKey?: string): Promise<PmInboxPayload> {
 export interface DailyAnalysisStartResponse {
   status: 'started'
   projectKey: string
+  runId?: string
   force?: boolean
 }
 

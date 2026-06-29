@@ -20,13 +20,28 @@ def test_role_defaults_use_moa_presets():
     assert LIVINGCOLOR_ANALYST_PROVIDER == "moa"
     assert LIVINGCOLOR_PLANNER_PROVIDER == "moa"
     assert LIVINGCOLOR_DEVELOPER_PROVIDER == "moa"
-    assert LIVINGCOLOR_ANALYST_MODEL == "lc-analyst"
-    assert LIVINGCOLOR_PLANNER_MODEL == "lc-planner"
+    assert LIVINGCOLOR_ANALYST_MODEL == "lc-analyst-nemotron"
+    assert LIVINGCOLOR_PLANNER_MODEL == "lc-planner-nemotron"
     assert LIVINGCOLOR_DEVELOPER_MODEL == "lc-developer"
     assert LIVINGCOLOR_REPORTER_PROVIDER == "openrouter"
     assert LIVINGCOLOR_REPORTER_MODEL == "openrouter/owl-alpha"
     assert LIVINGCOLOR_PUBLISHER_PROVIDER == "openrouter"
     assert LIVINGCOLOR_PUBLISHER_MODEL == "deepseek/deepseek-v4-pro"
+
+
+def test_moa_tier_standard(monkeypatch):
+    monkeypatch.setenv("LIVINGCOLOR_MOA_TIER", "standard")
+    from importlib import reload
+
+    import lc_server.model_defaults as md
+
+    reload(md)
+    assert md.LIVINGCOLOR_ANALYST_MODEL == "lc-analyst"
+    assert md.LIVINGCOLOR_PLANNER_MODEL == "lc-planner"
+    assert md.LIVINGCOLOR_DEVELOPER_MODEL == "lc-developer"
+
+    monkeypatch.delenv("LIVINGCOLOR_MOA_TIER", raising=False)
+    reload(md)
 
 
 def test_moa_tier_premium(monkeypatch):
@@ -41,6 +56,34 @@ def test_moa_tier_premium(monkeypatch):
 
     monkeypatch.delenv("LIVINGCOLOR_MOA_TIER", raising=False)
     reload(md)
+
+
+def test_moa_tier_nemotron(monkeypatch):
+    monkeypatch.setenv("LIVINGCOLOR_MOA_TIER", "nemotron")
+    from importlib import reload
+
+    import lc_server.model_defaults as md
+
+    reload(md)
+    assert md.LIVINGCOLOR_ANALYST_MODEL == "lc-analyst-nemotron"
+    assert md.LIVINGCOLOR_PLANNER_MODEL == "lc-planner-nemotron"
+    assert md.LIVINGCOLOR_DEVELOPER_MODEL == "lc-developer"
+
+    monkeypatch.delenv("LIVINGCOLOR_MOA_TIER", raising=False)
+    reload(md)
+
+
+def test_resolve_moa_tier_model_maps_provisioned_manifests(monkeypatch):
+    from lc_server.agent_bridge.inference_config import resolve_moa_tier_model
+
+    monkeypatch.delenv("LIVINGCOLOR_MOA_TIER", raising=False)
+    assert resolve_moa_tier_model("lc-analyst", role="analyst") == "lc-analyst-nemotron"
+    assert resolve_moa_tier_model("lc-planner", role="planner") == "lc-planner-nemotron"
+    assert resolve_moa_tier_model("lc-developer", role="developer") == "lc-developer"
+    assert resolve_moa_tier_model("z-ai/glm-5.2", role="developer") == "z-ai/glm-5.2"
+
+    monkeypatch.setenv("LIVINGCOLOR_MOA_TIER", "standard")
+    assert resolve_moa_tier_model("lc-analyst", role="analyst") == "lc-analyst"
 
 
 def test_developer_inference_uses_role_defaults_without_env_override(monkeypatch, tmp_path):
@@ -84,7 +127,7 @@ def test_planner_inference_uses_owl_role_defaults(monkeypatch, tmp_path):
         allow_env_override=False,
     )
 
-    assert model == "lc-planner"
+    assert model == "lc-planner-nemotron"
     assert provider == "moa"
 
 

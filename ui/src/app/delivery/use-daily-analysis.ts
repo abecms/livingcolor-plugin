@@ -10,6 +10,7 @@ import { bumpProjectConfigRevision } from '@/store/project-config'
 import { notifyError, notify } from '@/store/notifications'
 
 export type DailyAnalysisLastRun = {
+  id?: string
   status: string
   startedAt?: string
   completedAt?: string | null
@@ -93,9 +94,22 @@ function isAnalysisAlreadyRunningError(error: unknown): boolean {
   return /already running/i.test(message)
 }
 
-async function waitForDailyAnalysisCompletion(projectKey?: string): Promise<PmInboxPayload> {
+function isTrackedRun(lastRun: PmInboxPayload['lastRun'], expectedRunId?: string): boolean {
+  if (!lastRun) {
+    return false
+  }
+  if (!expectedRunId) {
+    return true
+  }
+  return lastRun.id === expectedRunId
+}
+
+async function waitForDailyAnalysisCompletion(
+  projectKey?: string,
+  expectedRunId?: string
+): Promise<PmInboxPayload> {
   const deadline = Date.now() + POLL_TIMEOUT_MS
-  let sawRunning = false
+  let sawTrackedRunning = false
 
   while (Date.now() < deadline) {
     await sleep(POLL_INTERVAL_MS)
@@ -105,8 +119,12 @@ async function waitForDailyAnalysisCompletion(projectKey?: string): Promise<PmIn
       continue
     }
 
+    if (!isTrackedRun(lastRun, expectedRunId)) {
+      continue
+    }
+
     if (lastRun.status === 'running') {
-      sawRunning = true
+      sawTrackedRunning = true
       continue
     }
 
@@ -118,7 +136,7 @@ async function waitForDailyAnalysisCompletion(projectKey?: string): Promise<PmIn
       return inbox
     }
 
-    if (sawRunning) {
+    if (sawTrackedRunning) {
       return inbox
     }
   }
@@ -128,9 +146,10 @@ async function waitForDailyAnalysisCompletion(projectKey?: string): Promise<PmIn
 
 async function finishDailyAnalysis(
   projectKey: string | undefined,
+  expectedRunId: string | undefined,
   onSuccess?: () => void | Promise<void>
 ): Promise<{ status: string; projectKey?: string }> {
-  const inbox = await waitForDailyAnalysisCompletion(projectKey)
+  const inbox = await waitForDailyAnalysisCompletion(projectKey, expectedRunId)
   bumpProjectConfigRevision()
   const lastRun = inbox.lastRun
   const dispatch = inbox.analysisDispatch
@@ -161,14 +180,14 @@ export function useDailyAnalysis(onSuccess?: () => void | Promise<void>) {
               kind: 'info',
               message: 'Analysis already running. Waiting for completion…'
             })
-            return await finishDailyAnalysis(projectKey, onSuccess)
+            return await finishDailyAnalysis(projectKey, undefined, onSuccess)
           }
           throw error
         }
 
         if (started.status === 'started') {
           notify({ kind: 'info', message: 'Daily analysis started…' })
-          return await finishDailyAnalysis(projectKey, onSuccess)
+          return await finishDailyAnalysis(projectKey, started.runId, onSuccess)
         }
 
         bumpProjectConfigRevision()

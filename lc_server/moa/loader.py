@@ -3,7 +3,7 @@ from importlib.resources import files
 from typing import Any
 import yaml
 
-_BUNDLE_VERSION = "1.0.0"
+_BUNDLE_VERSION = "1.1.0"
 
 
 @lru_cache(maxsize=1)
