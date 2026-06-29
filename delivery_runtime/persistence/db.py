@@ -477,6 +477,58 @@ def _migrate_analysis_metadata_columns(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE readiness_records ADD COLUMN last_analysis_failed_at TEXT")
 
 
+def _apply_idempotent_column_patches(conn: sqlite3.Connection) -> None:
+    """Add any missing columns on already-provisioned databases.
+
+    Runs even when ``schema_version`` is current so older DBs that reached the
+  latest version before a column patch landed still get repaired on startup.
+    """
+    tables = {
+        str(item["name"])
+        for item in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table'"
+        ).fetchall()
+    }
+    if "readiness_records" in tables:
+        columns = _table_columns(conn, "readiness_records")
+        if "estimated_days" not in columns:
+            conn.execute("ALTER TABLE readiness_records ADD COLUMN estimated_days REAL")
+        _migrate_analysis_metadata_columns(conn)
+    if "execution_queue_items" in tables:
+        _migrate_execution_queue_consumer_columns(conn)
+    if "merge_request_drafts" in tables:
+        columns = {
+            str(item["name"])
+            for item in conn.execute("PRAGMA table_info(merge_request_drafts)").fetchall()
+        }
+        if "decision_trace_json" not in columns:
+            conn.execute(
+                """
+                ALTER TABLE merge_request_drafts
+                ADD COLUMN decision_trace_json TEXT NOT NULL DEFAULT '{}'
+                """
+            )
+        if "mr_url" not in columns:
+            conn.execute(
+                "ALTER TABLE merge_request_drafts ADD COLUMN mr_url TEXT NOT NULL DEFAULT ''"
+            )
+        if "mr_iid" not in columns:
+            conn.execute("ALTER TABLE merge_request_drafts ADD COLUMN mr_iid INTEGER")
+
+
+def _ensure_idempotent_column_patches(path: Path) -> None:
+    if not _database_exists(path):
+        return
+    conn = sqlite3.connect(path)
+    conn.row_factory = sqlite3.Row
+    try:
+        _configure_connection(conn, busy_timeout_ms=_MIGRATION_BUSY_TIMEOUT_MS)
+        _apply_idempotent_column_patches(conn)
+        conn.commit()
+    finally:
+        conn.close()
+
+
 _MR_DRAFTS_SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS merge_request_drafts (
     id TEXT PRIMARY KEY,
@@ -746,6 +798,7 @@ def init_db(db_path=None) -> Path:
     path_key = str(path.resolve())
     with _init_lock:
         path.parent.mkdir(parents=True, exist_ok=True)
+        _ensure_idempotent_column_patches(path)
         if path_key in _initialized_paths:
             return path
         if _schema_ready(path):

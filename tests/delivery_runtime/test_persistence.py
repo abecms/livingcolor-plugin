@@ -157,6 +157,54 @@ def test_init_db_migrates_pre_v12_analysis_metadata_columns(tmp_path: Path):
     assert "last_analysis_failed_at" in columns
 
 
+def test_init_db_patches_analysis_metadata_when_schema_already_current(tmp_path: Path):
+    db_path = tmp_path / "runtime.db"
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.executescript(
+            """
+            CREATE TABLE delivery_meta (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
+            INSERT INTO delivery_meta(key, value) VALUES ('schema_version', '12');
+            CREATE TABLE readiness_records (
+                id TEXT PRIMARY KEY,
+                org_id TEXT NOT NULL DEFAULT 'local',
+                jira_key TEXT NOT NULL,
+                project_key TEXT NOT NULL DEFAULT '',
+                title TEXT NOT NULL DEFAULT '',
+                readiness_score INTEGER NOT NULL DEFAULT 0,
+                readiness_status TEXT NOT NULL DEFAULT 'pending_analysis',
+                analysis_summary TEXT NOT NULL DEFAULT '',
+                blockers_json TEXT NOT NULL DEFAULT '[]',
+                recommended_repos_json TEXT NOT NULL DEFAULT '[]',
+                confidence REAL NOT NULL DEFAULT 0,
+                estimated_days REAL,
+                jira_snapshot_json TEXT NOT NULL DEFAULT '{}',
+                analyzed_at TEXT,
+                promoted_work_order_id TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    init_db(db_path)
+
+    with connect(db_path) as upgraded:
+        columns = {
+            row["name"]
+            for row in upgraded.execute("PRAGMA table_info(readiness_records)").fetchall()
+        }
+
+    assert "last_analysis_error" in columns
+    assert "last_analysis_failed_at" in columns
+
+
 def test_connect_handles_concurrent_readers(_isolate_hermes_home):
     init_db()
 
