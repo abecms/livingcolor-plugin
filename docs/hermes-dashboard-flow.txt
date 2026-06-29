@@ -1,0 +1,212 @@
+Nobody talks about the Hermes dashboard. I open it every day. Here's why.
+
+Hermes Bible flow — Guides · Beginner · ~6 min read
+Summary: The Hermes community posts a lot about SOUL.md, Telegram bots, and overnight cron jobs — but relatively little about the dashboard as a daily tool. For me it's the most powerful surface Hermes ships. This is what I actually use it for, every day.
+Tags: dashboard, daily-workflow, mcp, skills, sessions, operations
+
+Author: Tamsi Besson
+Contacts: X @tamsi_besson (https://x.com/tamsi_besson) · GitHub abecms/livingcolor-plugin
+
+Screenshots: captured from Hermes Agent v0.17.0 (hermes dashboard on macOS). Image files live alongside this text in docs/hermes-dashboard-flow/. Before publishing publicly, redact hostnames or project names visible in your own captures if needed.
+
+
+Scroll Hermes Twitter, Reddit, or the flows on this site. You'll find a lot of posts about SOUL.md, multi-agent setups, Telegram gateways, /goal, Polymarket trading bots, and the 9-hour overnight workflow.
+
+You'll find far less about hermes dashboard as a daily operating surface. The official docs cover it well. Community write-ups rarely do.
+
+I think that's a gap — and it's probably why a lot of people stall after the initial install honeymoon. They set up Hermes Desktop or run hermes chat once, configure everything in YAML, lose track of what their agent actually did, and wonder why Hermes feels like a fancy chat app instead of a system.
+
+I use Hermes Desktop when I want to talk to the agent — that's my main chat surface, not a raw terminal. I use Telegram when I want Hermes to reach me. But I open the dashboard every single day — often multiple times — because it's where I can see and operate the whole machine in one browser tab. And when I do want the CLI, I don't need a separate terminal: the dashboard Chat tab embeds the full TUI (hermes --tui) right in the browser.
+
+This isn't a feature tour. It's the honest account of why the boring browser tab became the most important window in my Hermes setup.
+
+
+THE CONTENT GAP (RELATIVE, NOT ABSOLUTE)
+
+Hermes has a lot of surfaces, and the community attention is uneven:
+
+  SOUL.md / personality ............... Very high
+  Telegram / gateway setup .......... Very high
+  Cron / overnight automation ....... High
+  Multi-agent / Kanban .............. Growing fast
+  Web dashboard as daily ops tool ... Much lower
+
+The dashboard doesn't photograph well. There's no dramatic before/after. No 170-line markdown file to share. No "my agent made $12 while I slept" headline.
+
+It's a local admin UI at localhost:9119. It looks like settings pages and tables. So a lot of people skip it — and then wonder why their MCP server silently stopped working three days ago.
+
+To be fair: Hermes Desktop shares the same backend and covers overlapping ground (Skills, Cron, Channels, Profiles). I use Desktop for chat and the browser dashboard for ops — they're complementary, not competing. The official docs have a full Web Dashboard page: https://hermes-agent.nousresearch.com/docs/user-guide/features/web-dashboard
+
+What's missing is the practitioner angle — someone saying "I live here, here's my actual routine."
+
+
+WHAT THE DASHBOARD ACTUALLY LOOKS LIKE
+
+In current Hermes (v0.17), opening http://127.0.0.1:9119/ lands on Sessions — not chat by default. The left sidebar is the map of everything: Chat (the real TUI over PTY — slash commands, tool cards, approvals), Sessions, Files, Models, Logs, Cron, Skills, Plugins, MCP, Channels, Webhooks, Profiles, Config, Keys, System.
+
+I mostly chat from Hermes Desktop, but the dashboard Chat tab is the same agent when I'm already in the browser configuring things.
+
+At the bottom of that sidebar, a System strip shows gateway status, active sessions, and quick actions (restart gateway, update Hermes). That's my morning heartbeat check before I read a single session.
+
+[Screenshot: Sessions — default home; sidebar lists every ops surface, gateway status at the bottom]
+→ hermes-dashboard-flow/sessions.png
+
+
+WHAT CHANGED WHEN I STOPPED IGNORING IT
+
+My old workflow: edit config.yaml, run hermes mcp add from memory, grep logs in the terminal, hope the gateway was still up.
+
+My current workflow: open the dashboard first thing, read the sidebar System strip, skim Sessions, and I know immediately if something is wrong before I waste a chat turn.
+
+That single habit changed everything. The dashboard isn't my primary chat window — Desktop is. It's where I operate Hermes.
+
+
+MY DAILY DASHBOARD — WHAT I ACTUALLY OPEN
+
+Here's what a normal day looks like for me. Not aspirational. Not a setup guide. Just what I click.
+
+
+Morning: Sessions + sidebar status (2 minutes)
+
+I keep the dashboard backend running — Hermes Desktop does this automatically on my machine, or I run hermes dashboard in a long-lived tmux/systemd session. Then I just open the browser:
+
+  http://127.0.0.1:9119
+
+First checks:
+
+  - Sidebar → System: is the gateway running? How many active sessions?
+  - Sessions page: message totals, per-source breakdown (CLI, cron, Telegram…), connected platforms
+
+If a cron job ran at 3am and delivered garbage to Telegram, I don't find out from the message alone — I find out in Sessions. I search across message content (FTS5 in the dashboard UI), expand the cron session, read the tool calls, and see exactly where it went wrong.
+
+The CLI can do related work (hermes sessions browse, hermes sessions list, and the agent's session_search tool all exist). I still prefer the dashboard here because I get search + full history + tool-call inspection in one visual flow, without spelunking commands.
+
+
+When I add or fix an integration: MCP (5 minutes)
+
+Every time I connect a new tool — GitHub, a database, an internal API — I use the MCP tab, not raw YAML editing.
+
+Why? The Test button (lightning icon). It connects, lists the tools, and disconnects. I know the integration works before I start a chat session and wonder why the agent can't see my tools.
+
+[Screenshot: MCP tab — configured servers with enable/disable and test; catalog for one-click installs]
+→ hermes-dashboard-flow/mcp.png
+
+I've lost count of how many times I had a server in config.yaml that was enabled: false, or had a typo in the env var, or needed a gateway restart. The MCP tab shows all of it visually. Enable, test, restart gateway from Channels or System, done.
+
+Per the official docs, MCP enable/disable takes effect on the next gateway restart — not instantly mid-session.
+
+
+When the agent feels "off": Skills (3 minutes)
+
+Before I blame the model, I open Skills:
+
+  - Is the skill I expect actually enabled?
+  - Are the right toolsets active?
+  - Did something get archived? (The background curator moves long-unused agent-created skills to ~/.hermes/skills/.archive/ — check System → Skill curator or hermes curator list-archived, not just the enable toggle.)
+
+[Screenshot: Skills tab — search, category filters, per-skill toggles, hub install]
+→ hermes-dashboard-flow/skills.png
+
+A well-used Hermes instance accumulates dozens of skills. They're invisible in daily chat — you don't see which playbook the agent loaded. The Skills tab is where procedural memory becomes tangible. Toggle one off, start a fresh session, notice the difference.
+
+You can also manage skills from the CLI (hermes skills config, hermes skills list). I use the dashboard because I see skills and toolsets side by side, with search and hub install in the same place.
+
+
+When I want Hermes to work without me: Cron
+
+I still read posts about cron workflows. I still use cron. But I create and debug cron jobs in the Cron tab, not only the CLI.
+
+Because I need to see:
+
+  - Is the job paused or errored?
+  - When did it last run?
+  - What's the delivery target?
+
+And when I'm testing, I hit Trigger now instead of waiting for the schedule. (hermes cron run does the same from the CLI — the dashboard just makes the state obvious.)
+
+[Screenshot: Cron tab — create jobs at the top; list shows schedule, delivery, pause/resume, trigger-now]
+→ hermes-dashboard-flow/cron.png
+
+
+When I'm curious about cost: Analytics
+
+This tab has no hype around it whatsoever. I love it — when it's enabled.
+
+Token usage per day. Per model. Estimated cost. Cache hit rate. After a heavy week, I open Analytics and see whether I should switch models, reduce cron frequency, or fix a runaway job.
+
+Note: in v0.17, local token analytics can be hidden by default. If you see a "TOKEN ANALYTICS HIDDEN" message, set dashboard.show_token_analytics: true in Config (or config.yaml). The numbers are estimates — check your provider dashboard for authoritative billing.
+
+[Screenshot: Analytics tab — hidden by default in this install; enable via Config]
+→ hermes-dashboard-flow/analytics.png
+
+hermes insights --days N covers similar ground from the CLI. I still use the dashboard charts when enabled because they're faster to scan.
+
+
+When something breaks: Logs + System
+
+Logs — filter by gateway/agent/errors, tail live, find the line.
+
+[Screenshot: Logs tab — file selector, level/component filters, live tail]
+→ hermes-dashboard-flow/logs.png
+
+System — host stats, gateway start/stop/restart, memory provider, credential pools, doctor, backup/restore, skill curator.
+
+[Screenshot: System tab — host metrics, gateway controls, curator, maintenance actions]
+→ hermes-dashboard-flow/system.png
+
+I reach for Hermes Desktop when I want to work with the agent. I reach for the dashboard when something is wrong — or when I need to change how the agent runs.
+
+
+WHY I THINK A LOT OF PEOPLE SKIP IT
+
+Three reasons, in my experience:
+
+1. It looks like admin UI, not magic.
+
+SOUL.md posts spread because they're copy-paste identity files. Dashboard posts would be screenshots of tables. Less shareable. More useful.
+
+2. People conflate chat with the whole product.
+
+Hermes Desktop, the dashboard Chat tab, and hermes chat in a terminal all talk to the same agent. Easy to think you've "seen Hermes" after installing one of them — and never open Sessions, MCP, or Cron. The chat surfaces are real; they're just not the ops layer.
+
+3. YAML + Desktop alone is good enough until it isn't.
+
+A clean Desktop install works fine when you have one profile, a handful of skills, and no cron. It gets harder when you have multiple profiles, dozens of skills, several MCP servers, a gateway on Telegram, and cron jobs delivering to multiple platforms. That's infrastructure — and infrastructure benefits from a control panel.
+
+
+THE ONE CONCEPT THAT MADE IT CLICK
+
+Hermes Desktop (or the dashboard Chat tab) is for conversations.
+
+The dashboard is for the system that runs conversations.
+
+Hermes is designed to persist — memory, skills, sessions, scheduled jobs, messaging platforms. All of that state exists whether or not you have a chat window open. The dashboard is where I see most of that state in one place. Desktop and dashboard share the same config, sessions, and skills — I just use each for what it's best at.
+
+Once I internalized that, I stopped treating hermes dashboard as optional.
+
+
+DESKTOP VS DASHBOARD VS CLI — HOW I ACTUALLY SPLIT IT
+
+  Daily chat, file browser, native GUI ... Hermes Desktop
+  Ops: sessions, MCP, cron, skills, logs ... Dashboard (hermes dashboard or Desktop's backend)
+  Chat while already in the dashboard ...... Chat tab (embedded TUI — same as CLI, no extra terminal)
+  Scripting, piping, automation ............ CLI in a real terminal
+  Hermes reaches me on my phone ............ Gateway (Telegram, etc.)
+
+I'm not a heavy standalone hermes chat user. Desktop is my agent UI. The dashboard is my control room. The CLI still matters for scripts and one-off terminal workflows — but I don't need it for day-to-day conversation.
+
+
+THE BOTTOM LINE
+
+The Hermes community is rich with content about personality files, messaging bots, and autonomous overnight loops. All of that is real and valuable.
+
+But day-to-day operations — the unglamorous work of keeping a 24/7 agent healthy — gets far less attention than SOUL.md threads. For me, the dashboard is where that work happens.
+
+If you're past the "I installed Hermes and it chats" stage — whether that's via Desktop, the dashboard Chat tab, or the terminal — and you want it to actually operate, open the dashboard. Start with Sessions and the sidebar System strip. Search Sessions when something breaks. Test your MCP servers before you trust them.
+
+It's not glamorous. It's the most powerful part of Hermes I've found.
+
+
+---
+
+Shared by Tamsi Besson — X @tamsi_besson (https://x.com/tamsi_besson). The Hermes Bible is an unofficial, community-built resource and is not affiliated with Nous Research.

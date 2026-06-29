@@ -66,5 +66,8 @@ fi
 # 4) Hermes + LivingColor plugin + dashboard (re-runs MCP bootstrap with loaded env)
 "${ROOT}/scripts/cloud-bootstrap.sh"
 
+# 5) TVP billing (STRIPE_TEST_CUSTOMER_ID) + active sprint for phases G/H
+python3 "${ROOT}/scripts/cloud_configure_tvp.py"
+
 log "Cloud start complete — proceed with workflow FRT phases B–H"
 log "Run: python3 scripts/cloud-workflow-frt.py  (preferred) or ./scripts/cloud-workflow-frt.sh"

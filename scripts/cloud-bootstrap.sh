@@ -38,6 +38,10 @@ install_uvx() {
     log "uvx already installed"
     return 0
   fi
+  if command -v uv >/dev/null 2>&1; then
+    log "uv already installed"
+    return 0
+  fi
   log "Installing uv (provides uvx for mcp-atlassian)..."
   pip install --user uv
 }
@@ -140,7 +144,7 @@ write_livingcolor_env() {
   tmp="$(mktemp)"
   : >"${tmp}"
   for key in JIRA_URL JIRA_USERNAME JIRA_API_TOKEN GITHUB_TOKEN GH_TOKEN STRIPE_SECRET_KEY \
-    STRIPE_TEST_CUSTOMER_ID OPENROUTER_API_KEY GITLAB_PERSONAL_ACCESS_TOKEN GITLAB_API_URL \
+    STRIPE_TEST_CUSTOMER_ID STRIPE_DAILY_RATE_CENTS OPENROUTER_API_KEY GITLAB_PERSONAL_ACCESS_TOKEN GITLAB_API_URL \
     LIVINGCOLOR_TEST_PROJECT_KEY LIVINGCOLOR_TEST_GITHUB_REPO; do
     if [ -n "${!key:-}" ]; then
       printf '%s=%s\n' "${key}" "${!key}" >>"${tmp}"

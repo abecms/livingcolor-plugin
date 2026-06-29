@@ -49,7 +49,9 @@ Configure these on the **Automation** (not only IDE MCP connections):
 | `STRIPE_SECRET_KEY` | Stripe test mode (`sk_test_*`) |
 | `OPENROUTER_API_KEY` | Optional when heuristic backends are active |
 
-Optional: `STRIPE_TEST_CUSTOMER_ID`, `GITLAB_PERSONAL_ACCESS_TOKEN`, `GITLAB_API_URL`.
+Optional: `STRIPE_TEST_CUSTOMER_ID`, `STRIPE_DAILY_RATE_CENTS` (default `80000`), `GITLAB_PERSONAL_ACCESS_TOKEN`, `GITLAB_API_URL`.
+
+`cloud-start.sh` runs `cloud_configure_tvp.py` after bootstrap: persists Stripe customer from `STRIPE_TEST_CUSTOMER_ID` to `~/.hermes/livingcolor/billing.json` and starts an active TVP sprint (phase G/H).
 
 **IDE MCP connections are not enough.** Cursor chat MCP servers do not populate the Cloud Agent process environment or Hermes `config.yaml`. The automation must inject the variables above.
 

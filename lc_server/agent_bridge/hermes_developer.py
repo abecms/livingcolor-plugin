@@ -633,10 +633,15 @@ def _default_agent_factory(
     )
 
     manifest = _resolve_developer_manifest(project_key)
-    from lc_server.agent_bridge.inference_config import resolve_delivery_inference
+    from lc_server.agent_bridge.inference_config import (
+        resolve_delivery_inference,
+        resolve_moa_or_fallback,
+    )
     from lc_server.model_defaults import (
+        LIVINGCOLOR_DEVELOPER_FALLBACK_MODEL,
         LIVINGCOLOR_DEVELOPER_MODEL,
         LIVINGCOLOR_DEVELOPER_PROVIDER,
+        LIVINGCOLOR_FALLBACK_PROVIDER,
     )
 
     effective_model, effective_provider = resolve_delivery_inference(
@@ -644,6 +649,12 @@ def _default_agent_factory(
         role_default_model=LIVINGCOLOR_DEVELOPER_MODEL,
         role_default_provider=LIVINGCOLOR_DEVELOPER_PROVIDER,
         allow_env_override=True,
+    )
+    effective_model, effective_provider = resolve_moa_or_fallback(
+        effective_model,
+        effective_provider,
+        fallback_model=LIVINGCOLOR_DEVELOPER_FALLBACK_MODEL,
+        fallback_provider=LIVINGCOLOR_FALLBACK_PROVIDER,
     )
 
     cfg = load_config()

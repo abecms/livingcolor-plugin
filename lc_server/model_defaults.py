@@ -1,17 +1,54 @@
-"""LivingColor fixed model bootstrap."""
+"""LivingColor per-role model defaults for delivery agents."""
 
 from __future__ import annotations
 
 import os
 
+LIVINGCOLOR_PROVIDER = "openrouter"
+LIVINGCOLOR_MOA_PROVIDER = "moa"
+
+# Orchestration-oriented roles: Jira analysis, Gate 1 planning, sprint documentation.
+LIVINGCOLOR_ORCHESTRATION_MODEL = "openrouter/owl-alpha"
+LIVINGCOLOR_ORCHESTRATION_PROVIDER = LIVINGCOLOR_PROVIDER
+
+# Single-model fallbacks when MoA presets are disabled or missing.
+LIVINGCOLOR_ORCHESTRATION_FALLBACK_MODEL = LIVINGCOLOR_ORCHESTRATION_MODEL
+LIVINGCOLOR_DEVELOPER_FALLBACK_MODEL = "deepseek/deepseek-v4-pro"
+LIVINGCOLOR_FALLBACK_PROVIDER = LIVINGCOLOR_PROVIDER
+
+
+def _moa_preset(base: str) -> str:
+    tier = os.getenv("LIVINGCOLOR_MOA_TIER", "standard").strip().lower()
+    if tier == "premium":
+        return f"{base}-premium"
+    return base
+
+
+LIVINGCOLOR_ANALYST_MODEL = _moa_preset("lc-analyst")
+LIVINGCOLOR_ANALYST_PROVIDER = LIVINGCOLOR_MOA_PROVIDER
+LIVINGCOLOR_PLANNER_MODEL = _moa_preset("lc-planner")
+LIVINGCOLOR_PLANNER_PROVIDER = LIVINGCOLOR_MOA_PROVIDER
+
+LIVINGCOLOR_REPORTER_MODEL = LIVINGCOLOR_ORCHESTRATION_MODEL
+LIVINGCOLOR_REPORTER_PROVIDER = LIVINGCOLOR_ORCHESTRATION_PROVIDER
+
+# Code generation and mutating delivery roles.
+LIVINGCOLOR_DEVELOPER_MODEL = _moa_preset("lc-developer")
+LIVINGCOLOR_DEVELOPER_PROVIDER = LIVINGCOLOR_MOA_PROVIDER
+LIVINGCOLOR_PUBLISHER_MODEL = LIVINGCOLOR_DEVELOPER_FALLBACK_MODEL
+LIVINGCOLOR_PUBLISHER_PROVIDER = LIVINGCOLOR_PROVIDER
+
+# Optional per-project override for frontend-heavy repos (set in developer manifest).
+LIVINGCOLOR_FRONTEND_MODEL = "z-ai/glm-5.2"
+LIVINGCOLOR_FRONTEND_PROVIDER = LIVINGCOLOR_PROVIDER
+
+# Legacy aliases kept for callers that imported the old names.
 LIVINGCOLOR_FIXED_PROVIDER: str | None = None
 LIVINGCOLOR_FIXED_MODEL: str | None = None
-LIVINGCOLOR_DEVELOPER_PROVIDER: str | None = None
-LIVINGCOLOR_DEVELOPER_MODEL: str | None = None
 
 
 def ensure_livingcolor_fixed_model() -> None:
-    """No-op — Hermes user config is the sole source of truth."""
+    """No-op — Hermes user config is the fallback when manifests omit model/provider."""
 
 
 def is_delivery_llm_available() -> bool:

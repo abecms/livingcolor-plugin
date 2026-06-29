@@ -95,7 +95,8 @@ Expected variables:
 - `GITHUB_TOKEN`
 - `GH_TOKEN` (required for `gh pr create` on `livingcolor-plugin`)
 - `STRIPE_SECRET_KEY`
-- `STRIPE_TEST_CUSTOMER_ID` (optional)
+- `STRIPE_TEST_CUSTOMER_ID` (required for phase H — set in Automation Secrets, not in git)
+- `STRIPE_DAILY_RATE_CENTS` (optional, default `80000` — cents per day for sprint invoice)
 - `GITLAB_PERSONAL_ACCESS_TOKEN` (compatibility only — not TVP primary VCS)
 - `GITLAB_API_URL`
 - `LIVINGCOLOR_TEST_PROJECT_KEY` (default `TVP`)

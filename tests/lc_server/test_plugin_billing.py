@@ -27,3 +27,18 @@ def test_plugin_billing_settings_round_trip(_isolate_hermes_home):
 
     loaded = load_plugin_billing_settings()
     assert loaded == saved
+
+
+def test_load_plugin_billing_uses_stripe_test_customer_env(_isolate_hermes_home, monkeypatch):
+    monkeypatch.delenv("STRIPE_TEST_CUSTOMER_ID", raising=False)
+    monkeypatch.delenv("STRIPE_DAILY_RATE_CENTS", raising=False)
+
+    loaded = load_plugin_billing_settings()
+    assert loaded.stripe_customer_id is None
+
+    monkeypatch.setenv("STRIPE_TEST_CUSTOMER_ID", "cus_from_env")
+    monkeypatch.setenv("STRIPE_DAILY_RATE_CENTS", "90000")
+
+    loaded = load_plugin_billing_settings()
+    assert loaded.stripe_customer_id == "cus_from_env"
+    assert loaded.daily_rate_cents == 90000

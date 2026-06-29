@@ -122,20 +122,31 @@ def _default_planner_agent_factory(
         max_iterations = 20
         platform = "livingcolor-delivery"
 
+    from lc_server.agent_bridge.inference_config import (
+        resolve_delivery_inference,
+        resolve_moa_or_fallback,
+    )
+    from lc_server.model_defaults import (
+        LIVINGCOLOR_FALLBACK_PROVIDER,
+        LIVINGCOLOR_ORCHESTRATION_FALLBACK_MODEL,
+        LIVINGCOLOR_PLANNER_MODEL,
+        LIVINGCOLOR_PLANNER_PROVIDER,
+    )
+
+    effective_model, effective_provider = resolve_delivery_inference(
+        manifest=manifest,
+        role_default_model=LIVINGCOLOR_PLANNER_MODEL,
+        role_default_provider=LIVINGCOLOR_PLANNER_PROVIDER,
+        allow_env_override=True,
+    )
+    effective_model, effective_provider = resolve_moa_or_fallback(
+        effective_model,
+        effective_provider,
+        fallback_model=LIVINGCOLOR_ORCHESTRATION_FALLBACK_MODEL,
+        fallback_provider=LIVINGCOLOR_FALLBACK_PROVIDER,
+    )
+
     cfg = load_config()
-    model_cfg = cfg.get("model") or {}
-    if isinstance(model_cfg, str):
-        effective_model = model_cfg
-        cfg_provider = ""
-    else:
-        effective_model = str(model_cfg.get("default") or model_cfg.get("model") or "")
-        cfg_provider = str(model_cfg.get("provider") or "").strip()
-
-    env_model = os.getenv("HERMES_INFERENCE_MODEL", "").strip()
-    env_provider = os.getenv("HERMES_INFERENCE_PROVIDER", "").strip()
-    effective_model = env_model or effective_model
-    effective_provider = env_provider or cfg_provider or None
-
     runtime = resolve_runtime_provider(
         requested=effective_provider,
         target_model=effective_model or None,

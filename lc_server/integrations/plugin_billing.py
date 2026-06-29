@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -86,6 +87,7 @@ def _load_billing_from_project_mapping() -> BillingSettings | None:
 
 def load_plugin_billing_settings() -> BillingSettings:
     path = _billing_config_path()
+    settings = BillingSettings()
     if path.is_file():
         try:
             raw = json.loads(path.read_text(encoding="utf-8"))
@@ -94,7 +96,7 @@ def load_plugin_billing_settings() -> BillingSettings:
         if isinstance(raw, dict):
             settings = _billing_settings_from_map(raw)
             if _has_billing_values(settings):
-                return settings
+                return _apply_billing_env_defaults(settings)
 
     migrated = _load_billing_from_project_mapping()
     if migrated is not None:
@@ -106,9 +108,40 @@ def load_plugin_billing_settings() -> BillingSettings:
             approval_required=migrated.approval_required,
             max_invoice_cents=migrated.max_invoice_cents,
         )
-        return migrated
+        return _apply_billing_env_defaults(migrated)
 
-    return BillingSettings()
+    return _apply_billing_env_defaults(settings)
+
+
+def _daily_rate_cents_from_env() -> int | None:
+    raw = os.environ.get("STRIPE_DAILY_RATE_CENTS", "").strip()
+    if not raw:
+        return None
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return None
+
+
+def _stripe_customer_id_from_env() -> str | None:
+    value = os.environ.get("STRIPE_TEST_CUSTOMER_ID", "").strip()
+    return value or None
+
+
+def _apply_billing_env_defaults(settings: BillingSettings) -> BillingSettings:
+    """Fill billing gaps from cloud env vars without persisting secrets to git."""
+    customer_id = settings.stripe_customer_id or _stripe_customer_id_from_env()
+    daily_rate = settings.daily_rate_cents or _daily_rate_cents_from_env()
+    if customer_id == settings.stripe_customer_id and daily_rate == settings.daily_rate_cents:
+        return settings
+    return BillingSettings(
+        stripe_customer_id=customer_id,
+        daily_rate_cents=daily_rate,
+        currency=settings.currency,
+        invoice_mode=settings.invoice_mode,
+        approval_required=settings.approval_required,
+        max_invoice_cents=settings.max_invoice_cents,
+    )
 
 
 def persist_plugin_billing_settings(
