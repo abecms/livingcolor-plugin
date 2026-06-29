@@ -109,12 +109,17 @@ class TestDeliveryApi:
         response = self.client.post(f"/api/delivery/readiness/{record_id}/promote")
         assert response.status_code == 200
         payload = response.json()
-        assert payload["workOrder"]["id"].startswith("WO-")
+        work_order_id = payload["workOrder"]["id"]
+        assert work_order_id.startswith("WO-")
         assert payload["workOrder"]["jiraKey"] == "AAC-9"
         assert payload["readiness"]["readinessStatus"] == "promoted"
-        assert payload["workOrder"]["status"] == "awaiting_gate"
-        assert payload["workOrder"]["currentStage"] == "analysis_review"
-        assert payload["workOrder"]["gates"][0]["gateType"] == "analysis_plan"
+        # Promote response is captured before the post-response orchestrator tick.
+        assert payload["workOrder"]["status"] == "intake"
+
+        work_order = self.client.get(f"/api/delivery/work-orders/{work_order_id}").json()
+        assert work_order["status"] == "awaiting_gate"
+        assert work_order["currentStage"] == "analysis_review"
+        assert work_order["gates"][0]["gateType"] == "analysis_plan"
 
         work_orders = self.client.get("/api/delivery/work-orders").json()["items"]
         assert len(work_orders) == 1
@@ -126,7 +131,9 @@ class TestDeliveryApi:
     def test_gate_approve_and_reject_via_api(self):
         record_id = _seed_ready_record("AAC-10")
         promote = self.client.post(f"/api/delivery/readiness/{record_id}/promote")
-        gate_id = promote.json()["workOrder"]["gates"][0]["id"]
+        work_order_id = promote.json()["workOrder"]["id"]
+        work_order = self.client.get(f"/api/delivery/work-orders/{work_order_id}").json()
+        gate_id = work_order["gates"][0]["id"]
 
         reject = self.client.post(
             f"/api/delivery/gates/{gate_id}/reject",
