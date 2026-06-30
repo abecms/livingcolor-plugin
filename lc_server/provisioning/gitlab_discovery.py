@@ -19,11 +19,78 @@ class GitLabDiscoveryResult:
     warnings: list[str] = field(default_factory=list)
 
 
-def _project_matches_key(project: dict[str, Any], project_key: str) -> bool:
+@dataclass(frozen=True)
+class GitLabDiscoveryHints:
+    """Project mapping hints — repos already linked to a LivingColor project."""
+
+    default_repo: str | None = None
+    repo_paths: tuple[str, ...] = ()
+    match_terms: tuple[str, ...] = ()
+
+
+def load_gitlab_discovery_hints(project_key: str) -> GitLabDiscoveryHints:
+    from delivery_runtime.readiness.project_mapping import load_project_mapping_entry
+
+    entry = load_project_mapping_entry(project_key)
+    repo_paths: list[str] = []
+    for item in entry.get("repos") or []:
+        if isinstance(item, dict):
+            path = str(item.get("path") or "").strip()
+            if path:
+                repo_paths.append(path)
+
+    default_repo = str(entry.get("default_repo") or "").strip() or None
+    match_terms: list[str] = []
+    for raw in entry.get("repo_match_terms") or []:
+        term = str(raw).strip()
+        if term:
+            match_terms.append(term)
+    if default_repo:
+        match_terms.extend(_slug_match_terms(default_repo))
+
+    deduped_terms: list[str] = []
+    seen_terms: set[str] = set()
+    for term in match_terms:
+        key = term.casefold()
+        if key not in seen_terms:
+            seen_terms.add(key)
+            deduped_terms.append(term)
+
+    return GitLabDiscoveryHints(
+        default_repo=default_repo,
+        repo_paths=tuple(repo_paths),
+        match_terms=tuple(deduped_terms),
+    )
+
+
+def _slug_match_terms(repo_path: str) -> list[str]:
+    slug = repo_path.strip().strip("/").split("/")[-1]
+    if not slug:
+        return []
+    terms = [slug]
+    for part in slug.replace("_", "-").split("-"):
+        if len(part) >= 5:
+            terms.append(part)
+            break
+    return terms
+
+
+def _project_matches_key(
+    project: dict[str, Any],
+    project_key: str,
+    *,
+    match_terms: tuple[str, ...] = (),
+) -> bool:
     key = project_key.casefold()
     path = str(project.get("path_with_namespace") or "").casefold()
     name = str(project.get("name") or "").casefold()
-    return key in path or key in name
+    if key in path or key in name:
+        return True
+    for term in match_terms:
+        token = term.casefold().strip()
+        if token and token in path:
+            return True
+    return False
 
 
 def _to_repo_entry(project: dict[str, Any]) -> dict[str, Any]:
@@ -33,11 +100,73 @@ def _to_repo_entry(project: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def discover_gitlab_repos(project_key: str, projects: list[dict]) -> GitLabDiscoveryResult:
+def _projects_by_paths(projects: list[dict], repo_paths: set[str]) -> list[dict]:
+    normalized = {path.casefold() for path in repo_paths if path}
+    return [
+        project
+        for project in projects
+        if str(project.get("path_with_namespace") or "").casefold() in normalized
+    ]
+
+
+def _pick_default_repo(mapped_projects: list[dict], preferred: str | None) -> str | None:
+    if not mapped_projects:
+        return None
+    if preferred:
+        preferred_cf = preferred.casefold()
+        for project in mapped_projects:
+            path = str(project.get("path_with_namespace") or "")
+            if path.casefold() == preferred_cf:
+                return path or None
+    if len(mapped_projects) == 1:
+        return str(mapped_projects[0].get("path_with_namespace") or "") or None
+    best = max(mapped_projects, key=lambda project: str(project.get("last_activity_at") or ""))
+    return str(best.get("path_with_namespace") or "") or None
+
+
+def _result_from_mapped_projects(
+    mapped_projects: list[dict],
+    *,
+    preferred_default: str | None,
+) -> GitLabDiscoveryResult:
+    sorted_projects = sorted(
+        mapped_projects,
+        key=lambda project: str(project.get("path_with_namespace") or "").casefold(),
+    )
+    return GitLabDiscoveryResult(
+        repos=[_to_repo_entry(project) for project in sorted_projects],
+        default_repo=_pick_default_repo(mapped_projects, preferred_default),
+        warnings=[],
+    )
+
+
+def discover_gitlab_repos(
+    project_key: str,
+    projects: list[dict],
+    *,
+    hints: GitLabDiscoveryHints | None = None,
+) -> GitLabDiscoveryResult:
     """Apply heuristics to pick a default repo from a GitLab project list."""
     normalized_key = (project_key or "").strip()
+    resolved_hints = hints or GitLabDiscoveryHints()
     if not projects:
         return GitLabDiscoveryResult()
+
+    if resolved_hints.repo_paths:
+        mapped = _projects_by_paths(projects, set(resolved_hints.repo_paths))
+        if mapped:
+            return _result_from_mapped_projects(
+                mapped,
+                preferred_default=resolved_hints.default_repo,
+            )
+
+    if resolved_hints.default_repo:
+        mapped = _projects_by_paths(projects, {resolved_hints.default_repo})
+        if mapped:
+            return _result_from_mapped_projects(
+                mapped,
+                preferred_default=resolved_hints.default_repo,
+            )
 
     if len(projects) == 1:
         repo_path = str(projects[0].get("path_with_namespace") or "")
@@ -46,7 +175,15 @@ def discover_gitlab_repos(project_key: str, projects: list[dict]) -> GitLabDisco
             default_repo=repo_path or None,
         )
 
-    matches = [project for project in projects if _project_matches_key(project, normalized_key)]
+    matches = [
+        project
+        for project in projects
+        if _project_matches_key(
+            project,
+            normalized_key,
+            match_terms=resolved_hints.match_terms,
+        )
+    ]
 
     if matches:
         if len(matches) == 1:
@@ -154,4 +291,5 @@ def _fetch_gitlab_projects(mcp_config: dict) -> list[dict]:
 
 def discover_gitlab_repos_for_project(project_key: str, mcp_config: dict) -> GitLabDiscoveryResult:
     projects = _fetch_gitlab_projects(mcp_config)
-    return discover_gitlab_repos(project_key, projects)
+    hints = load_gitlab_discovery_hints(project_key)
+    return discover_gitlab_repos(project_key, projects, hints=hints)

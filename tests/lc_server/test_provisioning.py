@@ -201,6 +201,69 @@ def test_discover_repos_no_match_lists_all_with_warning():
     assert "BN" in result.warnings[0]
 
 
+def test_discover_repos_uses_mapping_repo_paths_without_key_substring_match():
+    from lc_server.provisioning.gitlab_discovery import GitLabDiscoveryHints, discover_gitlab_repos
+
+    projects = [
+        {
+            "id": 84,
+            "path_with_namespace": "tv5monde/bibliotheque-numerique-v2",
+            "name": "Bibliotheque Numerique V2",
+            "last_activity_at": "2026-06-11T00:00:00Z",
+        },
+        {
+            "id": 20,
+            "path_with_namespace": "tv5monde/tv5mondeplus-front",
+            "name": "TV5MONDE+ Front",
+            "last_activity_at": "2026-06-12T00:00:00Z",
+        },
+    ]
+    hints = GitLabDiscoveryHints(
+        default_repo="tv5monde/bibliotheque-numerique-v2",
+        repo_paths=(
+            "tv5monde/bibliotheque-numerique-v2",
+            "tv5monde/bibliotheque-numerique-v2-static",
+            "tv5monde/tv5mondeplus-front",
+        ),
+    )
+
+    result = discover_gitlab_repos(project_key="BN", projects=projects, hints=hints)
+
+    assert result.default_repo == "tv5monde/bibliotheque-numerique-v2"
+    assert {repo["path"] for repo in result.repos} == {
+        "tv5monde/bibliotheque-numerique-v2",
+        "tv5monde/tv5mondeplus-front",
+    }
+    assert result.warnings == []
+
+
+def test_discover_repos_matches_bibliotheque_slug_when_default_repo_configured():
+    from lc_server.provisioning.gitlab_discovery import GitLabDiscoveryHints, discover_gitlab_repos
+
+    projects = [
+        {
+            "id": 84,
+            "path_with_namespace": "tv5monde/bibliotheque-numerique-v2",
+            "name": "Bibliotheque Numerique V2",
+            "last_activity_at": "2026-06-11T00:00:00Z",
+        },
+        {
+            "id": 20,
+            "path_with_namespace": "tv5monde/tv5mondeplus-front",
+            "name": "TV5MONDE+ Front",
+            "last_activity_at": "2026-06-12T00:00:00Z",
+        },
+    ]
+    hints = GitLabDiscoveryHints(default_repo="tv5monde/bibliotheque-numerique-v2")
+
+    result = discover_gitlab_repos(project_key="BN", projects=projects, hints=hints)
+
+    assert result.default_repo == "tv5monde/bibliotheque-numerique-v2"
+    assert len(result.repos) == 1
+    assert result.repos[0]["path"] == "tv5monde/bibliotheque-numerique-v2"
+    assert result.warnings == []
+
+
 def test_discover_gitlab_repos_for_project_uses_fetch():
     from unittest.mock import patch
 
