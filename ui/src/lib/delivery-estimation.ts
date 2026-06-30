@@ -1,6 +1,6 @@
 /** Person-day estimates from delivery runtime are converted to hours for PM review. */
 
-export const HOURS_PER_PERSON_DAY = 7
+export const HOURS_PER_PERSON_DAY = 8
 
 export function personDaysToHours(estimatedDays: number): number {
   return Math.round(estimatedDays * HOURS_PER_PERSON_DAY * 10) / 10

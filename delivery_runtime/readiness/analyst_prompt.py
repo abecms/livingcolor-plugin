@@ -100,9 +100,19 @@ def build_analyst_user_prompt(snapshot: dict[str, Any]) -> str:
             "readinessStatus must be one of: ready, not_ready, needs_clarification, not_development.",
             "Do not use analysis_failed; it is only for runtime/parser failures outside this analysis.",
             "blockers and recommendedRepos must be arrays.",
-            "estimatedDays is your effort estimate in workdays (8h) as a positive number, e.g. 1.5.",
+            "estimatedDays is your effort estimate in 8-hour workdays as a positive number, e.g. 0.5.",
             "Omit estimatedDays or set it to null for needs_clarification and not_development —",
             "effort cannot be estimated until the ticket is understandable and testable.",
+            "",
+            "## Effort estimation rubric (8-hour workdays)",
+            "",
+            "Most BN/TVP delivery tickets are small, well-scoped changes. Avoid defaulting to 1.0–1.5d.",
+            "- 0.25d (2h): one-file fix, copy/CSS tweak, config flag, obvious typo/regression.",
+            "- 0.5d (4h): isolated FE or BO bug with clear reproduction, expected touch in 1–3 files.",
+            "- 1.0d (8h): cross-component bug, unclear root cause, or moderate feature slice.",
+            "- 1.5–2.0d: multi-area change, migration, or refactor — only when the ticket proves it.",
+            "For Bug issue types, start at 0.5d unless the description explicitly requires multi-day work.",
+            "A long Jira description does not by itself justify a higher estimate.",
         ]
     )
     return "\n".join(sections)
